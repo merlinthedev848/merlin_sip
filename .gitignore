@@ -1,0 +1,12 @@
+node_modules/
+dist/
+release/
+bin/
+obj/
+publish/
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+*.log
+.env
+.env.local
