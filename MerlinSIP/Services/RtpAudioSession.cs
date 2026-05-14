@@ -24,6 +24,9 @@ public sealed class RtpAudioSession : IDisposable
     private readonly uint _ssrc = (uint)Random.Shared.Next();
     private int _payloadType;
     private bool _running;
+    private bool _devicesPrepared;
+    private int _receivedPackets;
+    private int _sentPackets;
 
     public int LocalPort { get; }
 
@@ -36,23 +39,44 @@ public sealed class RtpAudioSession : IDisposable
         LocalPort = ((IPEndPoint)_rtpClient.Client.LocalEndPoint!).Port;
     }
 
-    public Task StartAsync(string remoteAddress, int remotePort, int payloadType)
+    public void PrepareDevices()
     {
-        _remoteEndPoint = new IPEndPoint(IPAddress.Parse(remoteAddress), remotePort);
-        _payloadType = payloadType;
+        if (_devicesPrepared)
+        {
+            return;
+        }
+
         OpenWaveOut();
         OpenWaveIn();
+        _devicesPrepared = true;
+        DebugLog.Write($"RTP devices prepared input={_inputDevice.Name} output={_outputDevice.Name} localPort={LocalPort}");
+    }
+
+    public async Task StartAsync(string remoteAddress, int remotePort, int payloadType)
+    {
+        if (_running)
+        {
+            DebugLog.Write("RTP start ignored because audio is already running");
+            return;
+        }
+
+        var address = await ResolveRemoteAddressAsync(remoteAddress);
+        _remoteEndPoint = new IPEndPoint(address, remotePort);
+        _payloadType = payloadType;
+        DebugLog.Write($"RTP start remote={_remoteEndPoint} payload={payloadType} input={_inputDevice.Name} output={_outputDevice.Name}");
+        PrepareDevices();
         _running = true;
         _receiveCancellation = new CancellationTokenSource();
         _ = Task.Run(() => ReceiveLoopAsync(_receiveCancellation.Token));
-        WinMm.waveInStart(_waveIn);
-        return Task.CompletedTask;
+        var startResult = WinMm.waveInStart(_waveIn);
+        DebugLog.Write($"RTP microphone start result={startResult}");
     }
 
     public void Stop()
     {
         _running = false;
         _receiveCancellation?.Cancel();
+        DebugLog.Write("RTP stop");
         if (_waveIn != IntPtr.Zero)
         {
             WinMm.waveInStop(_waveIn);
@@ -63,6 +87,8 @@ public sealed class RtpAudioSession : IDisposable
         {
             WinMm.waveOutReset(_waveOut);
         }
+
+        _remoteEndPoint = null;
     }
 
     public void Dispose()
@@ -90,6 +116,7 @@ public sealed class RtpAudioSession : IDisposable
             _waveOut = IntPtr.Zero;
         }
 
+        _devicesPrepared = false;
         _receiveCancellation?.Dispose();
         _rtpClient.Dispose();
     }
@@ -101,8 +128,10 @@ public sealed class RtpAudioSession : IDisposable
         var result = WinMm.waveInOpen(out _waveIn, deviceId, ref format, _waveInCallback, IntPtr.Zero, WinMm.CallbackFunction);
         if (result != 0)
         {
+            DebugLog.Write($"RTP microphone open failed device={_inputDevice.Name} result={result}");
             throw new InvalidOperationException($"Unable to open microphone device: {result}");
         }
+        DebugLog.Write($"RTP microphone open device={_inputDevice.Name} id={deviceId}");
 
         for (var i = 0; i < 6; i++)
         {
@@ -120,8 +149,10 @@ public sealed class RtpAudioSession : IDisposable
         var result = WinMm.waveOutOpen(out _waveOut, deviceId, ref format, IntPtr.Zero, IntPtr.Zero, 0);
         if (result != 0)
         {
+            DebugLog.Write($"RTP speaker open failed device={_outputDevice.Name} result={result}");
             throw new InvalidOperationException($"Unable to open speaker device: {result}");
         }
+        DebugLog.Write($"RTP speaker open device={_outputDevice.Name} id={deviceId}");
     }
 
     private void WaveInCallback(IntPtr waveIn, uint message, IntPtr instance, IntPtr headerPointer, IntPtr reserved)
@@ -149,6 +180,11 @@ public sealed class RtpAudioSession : IDisposable
 
         var packet = BuildRtpPacket(payload);
         _rtpClient.Send(packet, packet.Length, _remoteEndPoint);
+        var sent = Interlocked.Increment(ref _sentPackets);
+        if (sent is 1 or 50 or 250)
+        {
+            DebugLog.Write($"RTP sent packets={sent} bytes={packet.Length} remote={_remoteEndPoint}");
+        }
         _timestamp += (uint)payload.Length;
         WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
     }
@@ -200,16 +236,34 @@ public sealed class RtpAudioSession : IDisposable
                 }
 
                 PlayPcm(pcm);
+                var received = Interlocked.Increment(ref _receivedPackets);
+                if (received is 1 or 50 or 250)
+                {
+                    DebugLog.Write($"RTP received packets={received} bytes={result.Buffer.Length} from={result.RemoteEndPoint}");
+                }
             }
             catch (OperationCanceledException)
             {
                 return;
             }
-            catch
+            catch (Exception error)
             {
-                // Drop malformed RTP/audio packets and continue.
+                DebugLog.Write($"RTP receive/playback error={error.Message}");
             }
         }
+    }
+
+    private static async Task<IPAddress> ResolveRemoteAddressAsync(string remoteAddress)
+    {
+        if (IPAddress.TryParse(remoteAddress, out var parsed))
+        {
+            return parsed;
+        }
+
+        var addresses = await Dns.GetHostAddressesAsync(remoteAddress);
+        return addresses.FirstOrDefault(item => item.AddressFamily == AddressFamily.InterNetwork)
+            ?? addresses.FirstOrDefault()
+            ?? throw new InvalidOperationException($"Unable to resolve RTP address {remoteAddress}.");
     }
 
     private void PlayPcm(byte[] pcm)

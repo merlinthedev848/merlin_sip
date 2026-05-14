@@ -48,7 +48,7 @@ const features = [
 ];
 
 const extensions = [
-  { number: "1001", name: "Chris Kendall", department: "Sales", state: "Available" },
+  { number: "1001", name: "CK Media Services", department: "Sales", state: "Available" },
   { number: "1002", name: "Support Desk", department: "Support", state: "Ringing" },
   { number: "1003", name: "Accounts", department: "Finance", state: "Busy" },
   { number: "1004", name: "Warehouse", department: "Ops", state: "DND" }

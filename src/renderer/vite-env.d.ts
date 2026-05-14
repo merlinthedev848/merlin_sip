@@ -5,7 +5,7 @@ type LicenseActivationResult =
   | { valid: false; reason: string };
 
 interface Window {
-  signalDesk: {
+  merlinSip: {
     getLicense: () => Promise<{ key?: string; name?: string; expiresAt?: string }>;
     activateLicense: (licenseText: string) => Promise<LicenseActivationResult>;
   };

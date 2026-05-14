@@ -7,6 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MerlinSIP</AssemblyName>
     <RootNamespace>MerlinSip</RootNamespace>
+    <Authors>CK Media Services</Authors>
+    <Company>CK Media Services</Company>
+    <Product>Merlin SIP</Product>
+    <Copyright>Copyright © CK Media Services</Copyright>
+    <PackageProjectUrl>https://ckmediaservices.co.uk</PackageProjectUrl>
     <ApplicationIcon />
   </PropertyGroup>
 </Project>

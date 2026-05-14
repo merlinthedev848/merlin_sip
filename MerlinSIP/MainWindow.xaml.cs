@@ -15,6 +15,7 @@ public partial class MainWindow : Window
     private readonly AppCacheService _cacheService = new();
     private readonly DeviceDiscoveryService _deviceDiscoveryService = new();
     private readonly SipRegistrationService _sipRegistrationService = new();
+    private readonly RingtonePlayer _ringtonePlayer = new();
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
     private AppStartupConfig _config;
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
         RecentCallsListView.ItemsSource = _callHistory;
         CallHistoryListView.ItemsSource = _callHistory;
         _sipRegistrationService.IncomingCall += SipRegistrationService_IncomingCall;
+        _sipRegistrationService.CallProgress += SipRegistrationService_CallProgress;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
     }
@@ -44,6 +46,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        _ringtonePlayer.Dispose();
         _sipRegistrationService.Dispose();
     }
 
@@ -58,7 +61,44 @@ public partial class MainWindow : Window
             CallStateText.Text = "Ringing";
             NoticeText.Text = $"Incoming call from {callerName}.";
             FooterStatusText.Text = "Incoming SIP INVITE received. Ringing response sent.";
+            _ringtonePlayer.Start(_config.AudioOutput);
             _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming SIP INVITE received.");
+        });
+    }
+
+    private void SipRegistrationService_CallProgress(object? sender, CallProgressEventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (e.Connected)
+            {
+                CallStateText.Text = "In call";
+                NoticeText.Text = "Call connected.";
+                FooterStatusText.Text = "Call connected. Audio session is active.";
+                return;
+            }
+
+            if (e.Code is 180 or 183)
+            {
+                CallStateText.Text = "Ringing";
+                NoticeText.Text = e.Message;
+                FooterStatusText.Text = $"{e.Code} {e.Reason}".Trim();
+                return;
+            }
+
+            if (e.Code == 100)
+            {
+                CallStateText.Text = "Trying";
+                FooterStatusText.Text = "Call setup in progress.";
+                return;
+            }
+
+            if (e.Code >= 300)
+            {
+                CallStateText.Text = "Ready";
+                NoticeText.Text = e.Message;
+                FooterStatusText.Text = e.Message;
+            }
         });
     }
 
@@ -173,6 +213,7 @@ public partial class MainWindow : Window
 
         var contact = _contactStore.FindByNumber(_contacts, destination);
         var name = contact?.Name ?? destination;
+        _ringtonePlayer.Stop();
         CallStateText.Text = "Calling";
         NoticeText.Text = $"Calling {name}.";
         _activeCallStartedAt = DateTimeOffset.Now;
@@ -189,6 +230,7 @@ public partial class MainWindow : Window
     private async void HangupButton_Click(object sender, RoutedEventArgs e)
     {
         var result = await _sipRegistrationService.EndCallAsync();
+        _ringtonePlayer.Stop();
         CallStateText.Text = "Ready";
         NoticeText.Text = "Call ended.";
         FooterStatusText.Text = result.Message;
@@ -211,6 +253,10 @@ public partial class MainWindow : Window
     private void DndButton_Click(object sender, RoutedEventArgs e)
     {
         _dndEnabled = !_dndEnabled;
+        if (_dndEnabled)
+        {
+            _ringtonePlayer.Stop();
+        }
         CallStateText.Text = _dndEnabled ? "DND" : "Ready";
         NoticeText.Text = _dndEnabled ? "Do not disturb enabled." : "Do not disturb disabled.";
         FooterStatusText.Text = NoticeText.Text;

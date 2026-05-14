@@ -17,7 +17,20 @@
 
         <LinearGradientBrush x:Key="SurfaceBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#FFFFFF" Offset="0" />
-            <GradientStop Color="#F3F7FB" Offset="1" />
+            <GradientStop Color="#F8FBFF" Offset="0.44" />
+            <GradientStop Color="#EAF1F8" Offset="1" />
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DialFaceBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFFFFF" Offset="0" />
+            <GradientStop Color="#EAF2FA" Offset="0.55" />
+            <GradientStop Color="#D9E5F1" Offset="1" />
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SideRailBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#121B2B" Offset="0" />
+            <GradientStop Color="#070C15" Offset="0.64" />
+            <GradientStop Color="#030711" Offset="1" />
         </LinearGradientBrush>
 
         <LinearGradientBrush x:Key="PrimaryBrush" StartPoint="0,0" EndPoint="0,1">
@@ -38,7 +51,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect BlurRadius="30" ShadowDepth="10" Opacity="0.16" Color="#0D1421" />
+                    <DropShadowEffect BlurRadius="42" ShadowDepth="18" Opacity="0.24" Color="#07111E" />
                 </Setter.Value>
             </Setter>
         </Style>
@@ -49,33 +62,41 @@
             <Setter Property="FontSize" Value="21" />
             <Setter Property="FontWeight" Value="Black" />
             <Setter Property="Foreground" Value="#111827" />
-            <Setter Property="Background" Value="#EDF4FB" />
-            <Setter Property="BorderBrush" Value="#DCE7F2" />
+            <Setter Property="Background" Value="{StaticResource DialFaceBrush}" />
+            <Setter Property="BorderBrush" Value="#F9FCFF" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="12" ShadowDepth="5" Opacity="0.16" Color="#0D1421" />
-                            </Border.Effect>
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <Grid>
+                            <Border x:Name="ShadowPlate" CornerRadius="8" Background="#9CB1C8" Margin="1,4,1,0" Opacity="0.26" />
+                            <Border x:Name="Chrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="6" Opacity="0.22" Color="#07111E" />
+                                </Border.Effect>
+                                <Grid>
+                                    <Border CornerRadius="7" BorderBrush="#FFFFFF" BorderThickness="1" Opacity="0.76" Margin="1" />
+                                    <Border CornerRadius="7" Margin="3,3,3,29" Background="#66FFFFFF" />
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#FAFCFF" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Chrome" Property="Effect">
                                     <Setter.Value>
-                                        <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.18" Color="#0D1421" />
+                                        <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.18" Color="#07111E" />
                                     </Setter.Value>
                                 </Setter>
+                                <Setter TargetName="ShadowPlate" Property="Opacity" Value="0.08" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -95,8 +116,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="Card" Padding="14" CornerRadius="8" Background="#F8FBFE" BorderBrush="#E2EAF3" BorderThickness="1">
-                            <ContentPresenter />
+                        <Border x:Name="Card" Padding="14" CornerRadius="8" Background="{StaticResource SurfaceBrush}" BorderBrush="#F9FCFF" BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="6" Opacity="0.12" Color="#07111E" />
+                            </Border.Effect>
+                            <Grid>
+                                <Border CornerRadius="7" BorderBrush="#FFFFFF" BorderThickness="1" Opacity="0.72" Margin="0" />
+                                <ContentPresenter />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -120,10 +147,16 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Background="#0B111D" Padding="16,22">
+        <Border Grid.Column="0" Background="{StaticResource SideRailBrush}" Padding="16,22">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="28" ShadowDepth="10" Opacity="0.34" Color="#020617" />
+            </Border.Effect>
             <DockPanel LastChildFill="True">
                 <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center">
-                    <Border Width="58" Height="58" CornerRadius="8" Background="#28D3B4">
+                    <Border Width="58" Height="58" CornerRadius="8" Background="{StaticResource PrimaryBrush}">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="18" ShadowDepth="7" Opacity="0.28" Color="#020617" />
+                        </Border.Effect>
                         <TextBlock Text="MS" Foreground="#07111E" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Text="Merlin" Foreground="#FFFFFF" FontSize="13" FontWeight="Black" Margin="0,14,0,0" TextAlignment="Center" />
@@ -157,6 +190,9 @@
 
             <DockPanel Grid.Row="0" Margin="0,0,0,20">
                 <Border DockPanel.Dock="Right" x:Name="ConnectionPill" Background="#FFF1D6" CornerRadius="8" Padding="16,11">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.20" Color="#07111E" />
+                    </Border.Effect>
                     <TextBlock x:Name="ConnectionStatusText" Text="Connecting..." Foreground="#8A4F08" FontWeight="Black" />
                 </Border>
                 <StackPanel>
@@ -379,7 +415,10 @@
                 </TabItem>
             </TabControl>
 
-            <Border Grid.Row="2" Background="#EEF4FB" CornerRadius="8" Padding="14,11" Margin="0,18,0,0">
+            <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" BorderBrush="#F9FCFF" BorderThickness="1" CornerRadius="8" Padding="14,11" Margin="0,18,0,0">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="8" Opacity="0.14" Color="#07111E" />
+                </Border.Effect>
                 <TextBlock x:Name="FooterStatusText" Text="Ready." Foreground="#475569" FontWeight="Bold" />
             </Border>
         </Grid>

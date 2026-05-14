@@ -56,6 +56,6 @@ export function verifyLicense(licenseText: string): LicenseResult {
       features: parsed.payload.features
     };
   } catch {
-    return { valid: false, reason: "License text is not a valid SignalDesk license." };
+    return { valid: false, reason: "License text is not a valid Merlin SIP license." };
   }
 }

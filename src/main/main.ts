@@ -15,7 +15,7 @@ function createWindow() {
     height: 820,
     minWidth: 980,
     minHeight: 680,
-    title: "SignalDesk",
+    title: "Merlin SIP",
     backgroundColor: "#f5f7fb",
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.js"),

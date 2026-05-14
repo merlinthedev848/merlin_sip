@@ -53,7 +53,7 @@ export function App() {
   const [activeNav, setActiveNav] = useState("Dialer");
 
   useEffect(() => {
-    window.signalDesk.getLicense().then(setLicense);
+    window.merlinSip.getLicense().then(setLicense);
     return sip.onStatus((next, message) => {
       setStatus(next);
       setNotice(message ?? statusLabel[next]);
@@ -64,7 +64,7 @@ export function App() {
   const selectedProfile = pbxProfiles[profile];
 
   async function activateLicense() {
-    const result = await window.signalDesk.activateLicense(licenseText);
+    const result = await window.merlinSip.activateLicense(licenseText);
     if (result.valid) {
       setLicense({ name: result.name, expiresAt: result.expiresAt });
       setNotice(`Licensed to ${result.name}`);
@@ -82,8 +82,8 @@ export function App() {
             <Headphones size={22} />
           </div>
           <div>
-            <strong>SignalDesk</strong>
-            <span>PBX companion</span>
+            <strong>Merlin SIP</strong>
+            <span>CK Media Services</span>
           </div>
         </div>
 
