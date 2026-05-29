@@ -24,12 +24,14 @@
                 WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon.ico"
                 Advertise="yes" />
+              <Shortcut
+                Id="DesktopShortcut"
+                Directory="DesktopFolder"
+                Name="Merlin SIP"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon.ico"
+                Advertise="yes" />
             </File>
-          </Component>
-
-          <Component Id="MerlinSipPublishedFiles" Guid="{5F2BAA4C-B46E-4E01-9881-F20E139E8D21}">
-            <Files Include="$(var.PublishDir)\**" Exclude="$(var.PublishDir)\MerlinSIP.exe" />
-            <RegistryValue Root="HKLM" Key="Software\CK Media Services\Merlin SIP" Name="PublishedFilesInstalled" Type="integer" Value="1" KeyPath="yes" />
           </Component>
         </Directory>
       </Directory>
@@ -44,9 +46,10 @@
       </Directory>
     </StandardDirectory>
 
+    <StandardDirectory Id="DesktopFolder" />
+
     <Feature Id="MainFeature" Title="Merlin SIP" Level="1">
       <ComponentRef Id="MerlinSipExecutable" />
-      <ComponentRef Id="MerlinSipPublishedFiles" />
       <ComponentRef Id="ApplicationProgramsFolderCleanup" />
     </Feature>
   </Package>
