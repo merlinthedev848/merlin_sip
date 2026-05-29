@@ -30,7 +30,10 @@ public sealed class ProvisioningService
 
         try
         {
-            using var response = await HttpClient.PostAsJsonAsync(ProvisioningUrl, new ProvisioningRequest(cleanedCode), cancellationToken);
+            using var response = await HttpClient.PostAsJsonAsync(
+                ProvisioningUrl,
+                new ProvisioningRequest(cleanedCode, LicenseService.ProductId),
+                cancellationToken);
             var payload = await response.Content.ReadFromJsonAsync<ProvisioningResponse>(cancellationToken: cancellationToken);
 
             if (!response.IsSuccessStatusCode || payload is null || !payload.Success || payload.Sip is null)
@@ -83,7 +86,9 @@ public sealed class ProvisioningService
         return "The provisioning code could not be accepted.";
     }
 
-    private sealed record ProvisioningRequest([property: JsonPropertyName("code")] string Code);
+    private sealed record ProvisioningRequest(
+        [property: JsonPropertyName("code")] string Code,
+        [property: JsonPropertyName("product_id")] string ProductId);
 
     private sealed record ProvisioningResponse(
         [property: JsonPropertyName("success")] bool Success,

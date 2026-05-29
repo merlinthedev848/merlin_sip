@@ -27,15 +27,41 @@ public sealed class AppCacheService
         }
 
         await using var stream = File.OpenRead(SettingsPath);
-        var config = await JsonSerializer.DeserializeAsync<AppStartupConfig>(stream);
-        return config?.WithFixedSipEndpoint();
+        var settings = await JsonSerializer.DeserializeAsync<SavedAppSettings>(stream);
+        if (settings is null)
+        {
+            return null;
+        }
+
+        return new AppStartupConfig(
+            AppStartupConfig.FixedSipServer,
+            AppStartupConfig.FixedSipPort,
+            AppStartupConfig.FixedSipServer,
+            settings.Extension,
+            settings.Username,
+            settings.Password,
+            settings.LicenseKey,
+            settings.LicenseStatus,
+            settings.AudioInput,
+            settings.AudioOutput,
+            settings.VideoSource).WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
     {
+        var settings = new SavedAppSettings(
+            config.Extension,
+            config.Username,
+            config.Password,
+            config.LicenseKey,
+            config.LicenseStatus,
+            config.AudioInput,
+            config.AudioOutput,
+            config.VideoSource);
+
         Directory.CreateDirectory(_root);
         await using var stream = File.Create(SettingsPath);
-        await JsonSerializer.SerializeAsync(stream, config.WithFixedSipEndpoint(), JsonOptions);
+        await JsonSerializer.SerializeAsync(stream, settings, JsonOptions);
     }
 
     public void Reset()
@@ -52,4 +78,14 @@ public sealed class AppCacheService
             File.Delete(path);
         }
     }
+
+    private sealed record SavedAppSettings(
+        string Extension,
+        string Username,
+        string Password,
+        string LicenseKey,
+        string LicenseStatus,
+        MediaDeviceInfo AudioInput,
+        MediaDeviceInfo AudioOutput,
+        MediaDeviceInfo VideoSource);
 }
