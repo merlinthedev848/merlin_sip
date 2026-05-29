@@ -25,6 +25,8 @@ public sealed class RtpAudioSession : IDisposable
     private int _payloadType;
     private bool _running;
     private bool _devicesPrepared;
+    private bool _muted;
+    private bool _held;
     private int _receivedPackets;
     private int _sentPackets;
 
@@ -89,6 +91,18 @@ public sealed class RtpAudioSession : IDisposable
         }
 
         _remoteEndPoint = null;
+    }
+
+    public void SetMuted(bool muted)
+    {
+        _muted = muted;
+        DebugLog.Write($"RTP muted={muted}");
+    }
+
+    public void SetHeld(bool held)
+    {
+        _held = held;
+        DebugLog.Write($"RTP held={held}");
     }
 
     public void Dispose()
@@ -169,6 +183,12 @@ public sealed class RtpAudioSession : IDisposable
             return;
         }
 
+        if (_muted || _held)
+        {
+            WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
+            return;
+        }
+
         var pcm = new byte[header.BytesRecorded];
         Marshal.Copy(header.Data, pcm, 0, pcm.Length);
         var payload = new byte[pcm.Length / 2];
@@ -235,7 +255,10 @@ public sealed class RtpAudioSession : IDisposable
                     pcm[i * 2 + 1] = bytes[1];
                 }
 
-                PlayPcm(pcm);
+                if (!_held)
+                {
+                    PlayPcm(pcm);
+                }
                 var received = Interlocked.Increment(ref _receivedPackets);
                 if (received is 1 or 50 or 250)
                 {

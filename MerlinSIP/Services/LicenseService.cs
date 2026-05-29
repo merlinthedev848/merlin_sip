@@ -2,9 +2,7 @@ namespace MerlinSip.Services;
 
 public sealed class LicenseService
 {
-    public const string PlaceholderKey = "TEST-MERLIN-SIP";
-
-    public string Status { get; private set; } = "Trial mode";
+    public string Status { get; private set; } = "Licensed";
 
     public bool Activate(string token)
     {
@@ -13,9 +11,7 @@ public sealed class LicenseService
             return false;
         }
 
-        Status = token.Trim().Equals(PlaceholderKey, StringComparison.OrdinalIgnoreCase)
-            ? "Test license"
-            : "Pending online validation";
+        Status = "Licensed";
         return true;
     }
 }

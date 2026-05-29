@@ -9,8 +9,9 @@ public partial class StartupWindow : Window
 {
     private readonly LicenseService _licenseService = new();
     private readonly DeviceDiscoveryService _deviceDiscoveryService = new();
+    private readonly ProvisioningService _provisioningService = new();
     private string _licenseKey = string.Empty;
-    private string _licenseStatus = "Trial mode";
+    private string _licenseStatus = "Licensed";
     private bool _licenseAccepted;
 
     public AppStartupConfig? Config { get; private set; }
@@ -18,6 +19,7 @@ public partial class StartupWindow : Window
     public StartupWindow()
     {
         InitializeComponent();
+        MaxHeight = SystemParameters.WorkArea.Height;
         Loaded += StartupWindow_Loaded;
     }
 
@@ -37,7 +39,7 @@ public partial class StartupWindow : Window
         VideoSourceComboBox.SelectedIndex = VideoSourceComboBox.Items.Count > 0 ? 0 : -1;
     }
 
-    private void ContinueButton_Click(object sender, RoutedEventArgs e)
+    private async void ContinueButton_Click(object sender, RoutedEventArgs e)
     {
         ErrorText.Text = string.Empty;
 
@@ -47,7 +49,15 @@ public partial class StartupWindow : Window
             return;
         }
 
-        AcceptCredentialsStep();
+        ContinueButton.IsEnabled = false;
+        try
+        {
+            await AcceptCredentialsStep();
+        }
+        finally
+        {
+            ContinueButton.IsEnabled = true;
+        }
     }
 
     private void AcceptLicenseStep()
@@ -56,7 +66,7 @@ public partial class StartupWindow : Window
 
         if (!_licenseService.Activate(licenseKey))
         {
-            ErrorText.Text = $"Enter a license key. For testing, use {LicenseService.PlaceholderKey}.";
+            ErrorText.Text = "Enter a valid license key.";
             return;
         }
 
@@ -65,34 +75,48 @@ public partial class StartupWindow : Window
         _licenseStatus = _licenseService.Status;
         LicenseStepPanel.Visibility = Visibility.Collapsed;
         CredentialsStepPanel.Visibility = Visibility.Visible;
-        SubtitleText.Text = "License accepted. Now enter your SIP account details and devices.";
+        SubtitleText.Text = "License accepted. Now choose how to authenticate this device.";
         ContinueButton.Content = "Open Merlin SIP";
     }
 
-    private void AcceptCredentialsStep()
+    private async Task AcceptCredentialsStep()
     {
-        var server = ServerTextBox.Text.Trim();
-        var domain = DomainTextBox.Text.Trim();
+        if (AudioInputComboBox.SelectedItem is not MediaDeviceInfo audioInput ||
+            AudioOutputComboBox.SelectedItem is not MediaDeviceInfo audioOutput ||
+            VideoSourceComboBox.SelectedItem is not MediaDeviceInfo videoSource)
+        {
+            ErrorText.Text = "Select audio input, audio output, and video source devices.";
+            return;
+        }
+
+        if (ProvisionCodeRadioButton.IsChecked == true)
+        {
+            var provisioned = await _provisioningService.ProvisionAsync(
+                ProvisioningCodeTextBox.Text,
+                _licenseKey,
+                _licenseStatus,
+                audioInput,
+                audioOutput,
+                videoSource);
+
+            if (!provisioned.Success || provisioned.Config is null)
+            {
+                ErrorText.Text = provisioned.Message;
+                return;
+            }
+
+            Config = provisioned.Config;
+            DialogResult = true;
+            return;
+        }
+
         var extension = ExtensionTextBox.Text.Trim();
         var username = UsernameTextBox.Text.Trim();
         var password = PasswordBox.Password;
-        var portIsValid = int.TryParse(PortTextBox.Text.Trim(), out var port) && port is > 0 and <= 65535;
-
-        if (string.IsNullOrWhiteSpace(server))
-        {
-            ErrorText.Text = "Enter the SIP server.";
-            return;
-        }
-
-        if (!portIsValid)
-        {
-            ErrorText.Text = "Enter a valid SIP port.";
-            return;
-        }
 
         if (string.IsNullOrWhiteSpace(extension))
         {
-            ErrorText.Text = "Enter the extension.";
+            ErrorText.Text = "Enter the user / extension.";
             return;
         }
 
@@ -102,18 +126,10 @@ public partial class StartupWindow : Window
             return;
         }
 
-        if (AudioInputComboBox.SelectedItem is not MediaDeviceInfo audioInput ||
-            AudioOutputComboBox.SelectedItem is not MediaDeviceInfo audioOutput ||
-            VideoSourceComboBox.SelectedItem is not MediaDeviceInfo videoSource)
-        {
-            ErrorText.Text = "Select audio input, audio output, and video source devices.";
-            return;
-        }
-
         Config = new AppStartupConfig(
-            server,
-            port,
-            domain,
+            AppStartupConfig.FixedSipServer,
+            AppStartupConfig.FixedSipPort,
+            AppStartupConfig.FixedSipServer,
             extension,
             username,
             password,
@@ -121,7 +137,7 @@ public partial class StartupWindow : Window
             _licenseStatus,
             audioInput,
             audioOutput,
-            videoSource);
+            videoSource).WithFixedSipEndpoint();
 
         DialogResult = true;
     }
@@ -131,4 +147,18 @@ public partial class StartupWindow : Window
         DialogResult = false;
     }
 
+    private void AuthenticationMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        ProvisionCodePanel.Visibility = ProvisionCodeRadioButton.IsChecked == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ManualSipPanel.Visibility = ManualSipRadioButton.IsChecked == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
 }

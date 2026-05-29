@@ -26,10 +26,33 @@ public sealed class SipRegistrationService : IDisposable
     private int _inviteCseq = 1;
     private int _registerCseq = 1;
     private ActiveCall? _activeCall;
+    private PendingIncomingCall? _pendingIncomingCall;
     private RtpAudioSession? _audioSession;
+    private bool _rejectIncomingCalls;
 
     public event EventHandler<IncomingCallEventArgs>? IncomingCall;
     public event EventHandler<CallProgressEventArgs>? CallProgress;
+    public event EventHandler<CallEndedEventArgs>? CallEnded;
+
+    public bool CanControlAudio => _audioSession is not null;
+
+    public bool HasPendingIncomingCall => _pendingIncomingCall is not null;
+
+    public void SetRejectIncomingCalls(bool reject)
+    {
+        _rejectIncomingCalls = reject;
+        DebugLog.Write($"DND rejectIncomingCalls={reject}");
+    }
+
+    public void SetMuted(bool muted)
+    {
+        _audioSession?.SetMuted(muted);
+    }
+
+    public void SetHeld(bool held)
+    {
+        _audioSession?.SetHeld(held);
+    }
 
     public async Task<SipRegistrationResult> RegisterAsync(AppStartupConfig config, CancellationToken cancellationToken = default)
     {
@@ -41,7 +64,16 @@ public sealed class SipRegistrationService : IDisposable
         _client = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
         _localPort = ((IPEndPoint)_client.Client.LocalEndPoint!).Port;
 
-        var result = await RegisterCurrentSocketAsync(cancellationToken);
+        SipRegistrationResult result;
+        try
+        {
+            result = await RegisterCurrentSocketAsync(cancellationToken);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"REGISTER failed error={error.Message}");
+            result = new SipRegistrationResult(false, $"Unable to connect: {error.Message}");
+        }
         if (result.Connected)
         {
             _registered = true;
@@ -155,7 +187,23 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task<SipCallResult> EndCallAsync(CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null || _activeCall is null)
+        if (_client is null || _config is null)
+        {
+            return new SipCallResult(false, "No active SIP call to end.");
+        }
+
+        if (_pendingIncomingCall is not null)
+        {
+            await SendSimpleResponseAsync(_pendingIncomingCall.Request, _pendingIncomingCall.RemoteEndPoint, 486, "Busy Here", cancellationToken);
+            DebugLog.Write($"SEND INCOMING REJECT callId={_pendingIncomingCall.CallId}");
+            _pendingIncomingCall = null;
+            _audioSession?.Dispose();
+            _audioSession = null;
+            QueueRegistrationRefresh("incoming call rejected");
+            return new SipCallResult(true, "Incoming call rejected. Extension remains registered.");
+        }
+
+        if (_activeCall is null)
         {
             return new SipCallResult(false, "No active SIP call to end.");
         }
@@ -169,10 +217,41 @@ public sealed class SipRegistrationService : IDisposable
         var payload = Encoding.UTF8.GetBytes(message);
         var method = _activeCall.Established ? "BYE" : "CANCEL";
         DebugLog.Write($"SEND {method} callId={_activeCall.CallId} bytes={payload.Length}");
-        await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        try
+        {
+            await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"SEND {method} failed callId={_activeCall.CallId} error={error.Message}");
+            return new SipCallResult(false, $"Unable to end call: {error.Message}");
+        }
         _activeCall = null;
         QueueRegistrationRefresh("local hangup");
-        return new SipCallResult(true, $"{method} sent to SIP server.");
+        return new SipCallResult(true, $"{method} sent to SIP server. Extension remains registered.");
+    }
+
+    public async Task<SipCallResult> TransferAsync(string destination, CancellationToken cancellationToken = default)
+    {
+        if (_client is null || _config is null || _activeCall is null || !_activeCall.Established)
+        {
+            return new SipCallResult(false, "Connect a call before transferring.");
+        }
+
+        var transferTarget = destination.Contains('@') ? destination : $"{destination}@{_domain}";
+        var refer = BuildRefer(_activeCall, transferTarget);
+        var payload = Encoding.UTF8.GetBytes(refer);
+        DebugLog.Write($"SEND REFER callId={_activeCall.CallId} target={transferTarget} bytes={payload.Length}");
+        try
+        {
+            await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"SEND REFER failed callId={_activeCall.CallId} error={error.Message}");
+            return new SipCallResult(false, $"Unable to transfer call: {error.Message}");
+        }
+        return new SipCallResult(true, $"Transfer requested to {destination}.");
     }
 
     public void Dispose()
@@ -350,6 +429,33 @@ public sealed class SipRegistrationService : IDisposable
         ]);
     }
 
+    private string BuildRefer(ActiveCall call, string transferTarget)
+    {
+        var branch = CreateBranch();
+        var to = $"<sip:{call.Target}>";
+        if (!string.IsNullOrWhiteSpace(call.RemoteTag))
+        {
+            to += $";tag={call.RemoteTag}";
+        }
+
+        return string.Join("\r\n", [
+            $"REFER sip:{call.Target} SIP/2.0",
+            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={branch};rport",
+            "Max-Forwards: 70",
+            $"From: <sip:{_config!.Extension}@{_domain}>;tag={call.LocalTag}",
+            $"To: {to}",
+            $"Call-ID: {call.CallId}",
+            $"CSeq: {_inviteCseq++} REFER",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Refer-To: <sip:{transferTarget}>",
+            $"Referred-By: <sip:{_config.Extension}@{_domain}>",
+            "User-Agent: Merlin SIP",
+            "Content-Length: 0",
+            "",
+            ""
+        ]);
+    }
+
     private async Task<SipResponse> SendAndReceiveDirectAsync(string message, CancellationToken cancellationToken)
     {
         if (_client is null || _config is null)
@@ -358,7 +464,15 @@ public sealed class SipRegistrationService : IDisposable
         }
 
         var payload = Encoding.UTF8.GetBytes(message);
-        await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        try
+        {
+            await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"SEND DIRECT failed error={error.Message}");
+            return new SipResponse(0, error.Message, new Dictionary<string, string>(), "");
+        }
         DebugLog.Write($"SEND DIRECT bytes={payload.Length}");
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(6));
@@ -404,7 +518,15 @@ public sealed class SipRegistrationService : IDisposable
         var waitSource = new TaskCompletionSource<SipResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pendingResponse = waitSource;
         var payload = Encoding.UTF8.GetBytes(message);
-        await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        try
+        {
+            await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"SEND LISTENER failed error={error.Message}");
+            return new SipResponse(0, error.Message, new Dictionary<string, string>(), "");
+        }
         DebugLog.Write($"SEND LISTENER bytes={payload.Length}");
 
         var timeoutAt = DateTimeOffset.Now.AddSeconds(12);
@@ -613,6 +735,8 @@ public sealed class SipRegistrationService : IDisposable
                     _audioSession?.Dispose();
                     _audioSession = null;
                     _activeCall = null;
+                    _pendingIncomingCall = null;
+                    CallEnded?.Invoke(this, new CallEndedEventArgs("Remote side ended the call. Extension remains registered."));
                     QueueRegistrationRefresh("remote BYE");
                 }
                 else if (message.StartsWith("CANCEL ", StringComparison.OrdinalIgnoreCase))
@@ -622,6 +746,8 @@ public sealed class SipRegistrationService : IDisposable
                     _audioSession?.Dispose();
                     _audioSession = null;
                     _activeCall = null;
+                    _pendingIncomingCall = null;
+                    CallEnded?.Invoke(this, new CallEndedEventArgs("Incoming call was cancelled. Extension remains registered."));
                     QueueRegistrationRefresh("remote CANCEL");
                 }
             }
@@ -638,11 +764,22 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task HandleIncomingInviteAsync(string message, IPEndPoint remoteEndPoint, CancellationToken cancellationToken)
     {
+        if (_rejectIncomingCalls)
+        {
+            await SendSimpleResponseAsync(message, remoteEndPoint, 486, "Busy Here", cancellationToken);
+            DebugLog.Write("RECV INVITE rejected because DND is enabled");
+            return;
+        }
+
         await SendSimpleResponseAsync(message, remoteEndPoint, 100, "Trying", cancellationToken);
         await SendSimpleResponseAsync(message, remoteEndPoint, 180, "Ringing", cancellationToken);
 
         var headers = ParseHeaders(message);
         var from = headers.GetValueOrDefault("from", "Unknown caller");
+        _pendingIncomingCall = new PendingIncomingCall(
+            headers.GetValueOrDefault("call-id", ""),
+            message,
+            remoteEndPoint);
         IncomingCall?.Invoke(this, new IncomingCallEventArgs(ExtractCaller(from), from));
     }
 
@@ -888,6 +1025,7 @@ public sealed class SipRegistrationService : IDisposable
         _registrationRefreshCancellation = null;
         _pendingResponse?.TrySetCanceled();
         _pendingResponse = null;
+        _pendingIncomingCall = null;
         _client?.Dispose();
         _client = null;
         _registered = false;
@@ -904,6 +1042,10 @@ public sealed record IncomingCallEventArgs(string CallerNumber, string RawFromHe
 
 public sealed record CallProgressEventArgs(int Code, string Reason, bool Connected, string Message);
 
+public sealed record CallEndedEventArgs(string Message);
+
 internal sealed record SipResponse(int Code, string Reason, IReadOnlyDictionary<string, string> Headers, string Raw);
 
 internal sealed record ActiveCall(string CallId, string Target, string LocalTag, int CSeq, string InviteBranch, bool Established, string? RemoteTag);
+
+internal sealed record PendingIncomingCall(string CallId, string Request, IPEndPoint RemoteEndPoint);

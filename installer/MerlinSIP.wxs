@@ -1,0 +1,53 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Merlin SIP"
+    Manufacturer="CK Media Services"
+    Version="1.0.5"
+    UpgradeCode="{8E5C2C6E-3A1E-4F83-9897-4E62EB06E0EC}"
+    Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Merlin SIP is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon.ico" SourceFile="$(var.ProjectDir)\MerlinSIP\Assets\CKMedia-Icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="CompanyFolder" Name="CK Media Services">
+        <Directory Id="INSTALLFOLDER" Name="Merlin SIP">
+          <Component Id="MerlinSipExecutable" Guid="{55B7EF24-DAC2-4CD4-A58A-FF6B0D238F97}">
+            <File Id="MerlinSipExe" Source="$(var.PublishDir)\MerlinSIP.exe" KeyPath="yes">
+              <Shortcut
+                Id="StartMenuShortcut"
+                Directory="ApplicationProgramsFolder"
+                Name="Merlin SIP"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon.ico"
+                Advertise="yes" />
+            </File>
+          </Component>
+
+          <Component Id="MerlinSipPublishedFiles" Guid="{5F2BAA4C-B46E-4E01-9881-F20E139E8D21}">
+            <Files Include="$(var.PublishDir)\**" Exclude="$(var.PublishDir)\MerlinSIP.exe" />
+            <RegistryValue Root="HKLM" Key="Software\CK Media Services\Merlin SIP" Name="PublishedFilesInstalled" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Merlin SIP">
+        <Component Id="ApplicationProgramsFolderCleanup" Guid="{74F4EF38-5304-41F9-80AD-BE35983B67DC}">
+          <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\CK Media Services\Merlin SIP" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="Merlin SIP" Level="1">
+      <ComponentRef Id="MerlinSipExecutable" />
+      <ComponentRef Id="MerlinSipPublishedFiles" />
+      <ComponentRef Id="ApplicationProgramsFolderCleanup" />
+    </Feature>
+  </Package>
+</Wix>

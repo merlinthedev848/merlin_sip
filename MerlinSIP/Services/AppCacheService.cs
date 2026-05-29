@@ -27,14 +27,15 @@ public sealed class AppCacheService
         }
 
         await using var stream = File.OpenRead(SettingsPath);
-        return await JsonSerializer.DeserializeAsync<AppStartupConfig>(stream);
+        var config = await JsonSerializer.DeserializeAsync<AppStartupConfig>(stream);
+        return config?.WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
     {
         Directory.CreateDirectory(_root);
         await using var stream = File.Create(SettingsPath);
-        await JsonSerializer.SerializeAsync(stream, config, JsonOptions);
+        await JsonSerializer.SerializeAsync(stream, config.WithFixedSipEndpoint(), JsonOptions);
     }
 
     public void Reset()

@@ -1,8 +1,13 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Net.NetworkInformation;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MerlinSip.Models;
 using MerlinSip.Services;
 
@@ -16,23 +21,32 @@ public partial class MainWindow : Window
     private readonly DeviceDiscoveryService _deviceDiscoveryService = new();
     private readonly SipRegistrationService _sipRegistrationService = new();
     private readonly RingtonePlayer _ringtonePlayer = new();
+    private readonly UpdateService _updateService = new();
+    private readonly ProvisioningService _provisioningService = new();
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
     private AppStartupConfig _config;
-    private bool _dndEnabled;
     private DateTimeOffset? _activeCallStartedAt;
+    private string _activeCallDirection = "Outbound";
+    private bool _dndEnabled;
+    private bool _muted;
+    private bool _held;
+    private ContactEntry? _editingContact;
 
     public MainWindow(AppStartupConfig config)
     {
         _config = config;
         InitializeComponent();
         ApplyStartupConfig();
-        LoadDeviceSelectors();
-        ContactsListView.ItemsSource = _contacts;
+        ApplyAppVersion();
+        LoadDefaultDeviceSelectors();
+        DialContactsListView.ItemsSource = _contacts;
+        PhonebookContactsListView.ItemsSource = _contacts;
         RecentCallsListView.ItemsSource = _callHistory;
         CallHistoryListView.ItemsSource = _callHistory;
         _sipRegistrationService.IncomingCall += SipRegistrationService_IncomingCall;
         _sipRegistrationService.CallProgress += SipRegistrationService_CallProgress;
+        _sipRegistrationService.CallEnded += SipRegistrationService_CallEnded;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
     }
@@ -41,7 +55,8 @@ public partial class MainWindow : Window
     {
         await LoadContactsAsync();
         await LoadCallHistoryAsync();
-        await RegisterSipAsync();
+        await Dispatcher.InvokeAsync(LoadDeviceSelectors, DispatcherPriority.Background);
+        _ = RegisterSipAsync();
     }
 
     private void MainWindow_Closed(object? sender, EventArgs e)
@@ -57,12 +72,16 @@ public partial class MainWindow : Window
             var contact = _contactStore.FindByNumber(_contacts, e.CallerNumber);
             var callerName = contact?.Name ?? e.CallerNumber;
             DestinationTextBox.Text = e.CallerNumber;
+            IncomingCallerNameText.Text = callerName;
+            IncomingCallerNumberText.Text = e.CallerNumber;
+            IncomingCallOverlay.Visibility = Visibility.Visible;
             CallerLookupText.Text = contact is null ? "Unknown caller" : $"{contact.Name}  {contact.Company}".Trim();
-            CallStateText.Text = "Ringing";
             NoticeText.Text = $"Incoming call from {callerName}.";
-            FooterStatusText.Text = "Incoming SIP INVITE received. Ringing response sent.";
+            FooterStatusText.Text = "Incoming call received.";
+            _activeCallStartedAt = DateTimeOffset.Now;
+            _activeCallDirection = "Inbound";
             _ringtonePlayer.Start(_config.AudioOutput);
-            _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming SIP INVITE received.");
+            _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming call received.");
         });
     }
 
@@ -72,7 +91,7 @@ public partial class MainWindow : Window
         {
             if (e.Connected)
             {
-                CallStateText.Text = "In call";
+                IncomingCallOverlay.Visibility = Visibility.Collapsed;
                 NoticeText.Text = "Call connected.";
                 FooterStatusText.Text = "Call connected. Audio session is active.";
                 return;
@@ -80,37 +99,46 @@ public partial class MainWindow : Window
 
             if (e.Code is 180 or 183)
             {
-                CallStateText.Text = "Ringing";
                 NoticeText.Text = e.Message;
-                FooterStatusText.Text = $"{e.Code} {e.Reason}".Trim();
+                FooterStatusText.Text = e.Message;
                 return;
             }
 
             if (e.Code == 100)
             {
-                CallStateText.Text = "Trying";
+                NoticeText.Text = "Call setup in progress.";
                 FooterStatusText.Text = "Call setup in progress.";
                 return;
             }
 
             if (e.Code >= 300)
             {
-                CallStateText.Text = "Ready";
+                IncomingCallOverlay.Visibility = Visibility.Collapsed;
                 NoticeText.Text = e.Message;
                 FooterStatusText.Text = e.Message;
             }
         });
     }
 
+    private void SipRegistrationService_CallEnded(object? sender, CallEndedEventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            IncomingCallOverlay.Visibility = Visibility.Collapsed;
+            _ringtonePlayer.Stop();
+            NoticeText.Text = "Call ended.";
+            FooterStatusText.Text = e.Message;
+            _activeCallStartedAt = null;
+        });
+    }
+
     private void ApplyStartupConfig()
     {
-        ServerTextBox.Text = _config.Server;
-        PortTextBox.Text = _config.Port.ToString();
-        DomainTextBox.Text = _config.Domain;
+        _config = _config.WithFixedSipEndpoint();
         ExtensionTextBox.Text = _config.Extension;
         UsernameTextBox.Text = _config.Username;
         PasswordBox.Password = _config.Password;
-        LicenseStatusText.Text = _config.LicenseStatus;
+        LicenseStatusText.Text = "Licensed";
     }
 
     private void LoadDeviceSelectors()
@@ -121,6 +149,16 @@ public partial class MainWindow : Window
         SelectDevice(AudioInputComboBox, _config.AudioInput);
         SelectDevice(AudioOutputComboBox, _config.AudioOutput);
         SelectDevice(VideoSourceComboBox, _config.VideoSource);
+    }
+
+    private void LoadDefaultDeviceSelectors()
+    {
+        AudioInputComboBox.ItemsSource = new[] { _config.AudioInput };
+        AudioOutputComboBox.ItemsSource = new[] { _config.AudioOutput };
+        VideoSourceComboBox.ItemsSource = new[] { _config.VideoSource };
+        AudioInputComboBox.SelectedIndex = 0;
+        AudioOutputComboBox.SelectedIndex = 0;
+        VideoSourceComboBox.SelectedIndex = 0;
     }
 
     private static void SelectDevice(ComboBox comboBox, MediaDeviceInfo selected)
@@ -140,21 +178,33 @@ public partial class MainWindow : Window
     private async Task RegisterSipAsync()
     {
         SetConnectionState("Connecting...", "#FFF1D6", "#8A4F08");
-        NoticeText.Text = "Registering your SIP account...";
-        var result = await _sipRegistrationService.RegisterAsync(_config);
+        ServerStatusText.Text = "Checking account connection.";
+        await RefreshConnectionDiagnosticsAsync();
+        SipRegistrationResult result;
+        try
+        {
+            result = await _sipRegistrationService.RegisterAsync(_config);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"REGISTER unhandled error={error.Message}");
+            result = new SipRegistrationResult(false, $"Unable to connect: {error.Message}");
+        }
 
         if (result.Connected)
         {
             SetConnectionState("Connected", "#DFF8EE", "#106247");
-            NoticeText.Text = "Ready to make and receive calls.";
+            ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
+            FooterStatusText.Text = "Ready.";
         }
         else
         {
             SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
-            NoticeText.Text = result.Message;
+            ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
+            FooterStatusText.Text = "Connection status is available in Settings.";
         }
 
-        FooterStatusText.Text = result.Message;
+        await RefreshConnectionDiagnosticsAsync();
     }
 
     private void SetConnectionState(string text, string background, string foreground)
@@ -162,6 +212,65 @@ public partial class MainWindow : Window
         ConnectionStatusText.Text = text;
         ConnectionPill.Background = (Brush)new BrushConverter().ConvertFromString(background)!;
         ConnectionStatusText.Foreground = (Brush)new BrushConverter().ConvertFromString(foreground)!;
+
+        var mainText = text.Equals("Connected", StringComparison.OrdinalIgnoreCase)
+            ? "Connected"
+            : text.Equals("Connecting...", StringComparison.OrdinalIgnoreCase)
+                ? "Checking"
+                : "Not connected";
+        MainConnectionStatusText.Text = mainText;
+        MainConnectionPill.Background = (Brush)new BrushConverter().ConvertFromString(background)!;
+        MainConnectionStatusText.Foreground = (Brush)new BrushConverter().ConvertFromString(foreground)!;
+    }
+
+    private void ApplyAppVersion()
+    {
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        AppVersionText.Text = version is null
+            ? "Unknown"
+            : $"{version.Major}.{version.Minor}.{version.Build}";
+        UpdateStatusText.Text = $"Version {AppVersionText.Text}";
+    }
+
+    private async Task RefreshConnectionDiagnosticsAsync()
+    {
+        PingStatusText.Text = "Checking...";
+        try
+        {
+            using var ping = new Ping();
+            var reply = await ping.SendPingAsync(AppStartupConfig.FixedSipServer, 2500);
+            PingStatusText.Text = reply.Status == IPStatus.Success
+                ? $"{reply.RoundtripTime} ms"
+                : reply.Status.ToString();
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"PING failed error={error.Message}");
+            PingStatusText.Text = "Unavailable";
+        }
+    }
+
+    private static string ToCustomerConnectionMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return "Connection unavailable.";
+        }
+
+        if (message.Contains("No such host", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Unable to reach the service.";
+        }
+
+        if (message.Contains("Timed out", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Connection timed out.";
+        }
+
+        return message
+            .Replace("SIP server returned 0 ", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("SIP registration failed: ", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("SIP server returned ", "", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task LoadContactsAsync()
@@ -214,15 +323,14 @@ public partial class MainWindow : Window
         var contact = _contactStore.FindByNumber(_contacts, destination);
         var name = contact?.Name ?? destination;
         _ringtonePlayer.Stop();
-        CallStateText.Text = "Calling";
         NoticeText.Text = $"Calling {name}.";
         _activeCallStartedAt = DateTimeOffset.Now;
+        _activeCallDirection = "Outbound";
         var result = await _sipRegistrationService.InviteAsync(destination);
         FooterStatusText.Text = result.Message;
         await AddCallHistory("Outbound", name, destination, result.Signalled ? "Signalled" : "Failed", result.Message);
         if (!result.Signalled)
         {
-            CallStateText.Text = "Ready";
             NoticeText.Text = result.Message;
         }
     }
@@ -231,35 +339,28 @@ public partial class MainWindow : Window
     {
         var result = await _sipRegistrationService.EndCallAsync();
         _ringtonePlayer.Stop();
-        CallStateText.Text = "Ready";
+        IncomingCallOverlay.Visibility = Visibility.Collapsed;
+        _muted = false;
+        _held = false;
+        _sipRegistrationService.SetMuted(false);
+        _sipRegistrationService.SetHeld(false);
+        MuteButton.Content = "Mute";
+        HoldButton.Content = "Hold";
         NoticeText.Text = "Call ended.";
         FooterStatusText.Text = result.Message;
         if (_activeCallStartedAt is not null && !string.IsNullOrWhiteSpace(DestinationTextBox.Text))
         {
             var number = DestinationTextBox.Text.Trim();
             var contact = _contactStore.FindByNumber(_contacts, number);
-            await AddCallHistory("Outbound", contact?.Name ?? number, number, result.Signalled ? "Ended" : "Cleared", result.Message, _activeCallStartedAt.Value);
+            await AddCallHistory(_activeCallDirection, contact?.Name ?? number, number, result.Signalled ? "Ended" : "Cleared", result.Message, _activeCallStartedAt.Value);
             _activeCallStartedAt = null;
         }
     }
 
-    private void PlaceholderCallControl_Click(object sender, RoutedEventArgs e)
+    private void OpenIncomingDialerButton_Click(object sender, RoutedEventArgs e)
     {
-        var action = sender is Button button ? button.Content?.ToString() : "Call control";
-        NoticeText.Text = $"{action} requested.";
-        FooterStatusText.Text = $"{action} will bind to the live SIP session.";
-    }
-
-    private void DndButton_Click(object sender, RoutedEventArgs e)
-    {
-        _dndEnabled = !_dndEnabled;
-        if (_dndEnabled)
-        {
-            _ringtonePlayer.Stop();
-        }
-        CallStateText.Text = _dndEnabled ? "DND" : "Ready";
-        NoticeText.Text = _dndEnabled ? "Do not disturb enabled." : "Do not disturb disabled.";
-        FooterStatusText.Text = NoticeText.Text;
+        IncomingCallOverlay.Visibility = Visibility.Collapsed;
+        MainTabs.SelectedItem = PhoneTab;
     }
 
     private void ClearDestinationButton_Click(object sender, RoutedEventArgs e)
@@ -279,21 +380,118 @@ public partial class MainWindow : Window
 
     private void ContactsListView_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        UseSelectedContact();
+        if (sender is ListBox listBox && listBox.SelectedItem is ContactEntry contact)
+        {
+            UseSelectedContact(contact);
+        }
+    }
+
+    private void MuteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_sipRegistrationService.CanControlAudio)
+        {
+            FooterStatusText.Text = "Connect a call before muting.";
+            return;
+        }
+
+        _muted = !_muted;
+        _sipRegistrationService.SetMuted(_muted);
+        MuteButton.Content = _muted ? "Unmute" : "Mute";
+        FooterStatusText.Text = _muted ? "Microphone muted." : "Microphone unmuted.";
+    }
+
+    private void HoldButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_sipRegistrationService.CanControlAudio)
+        {
+            FooterStatusText.Text = "Connect a call before using hold.";
+            return;
+        }
+
+        _held = !_held;
+        _sipRegistrationService.SetHeld(_held);
+        HoldButton.Content = _held ? "Resume" : "Hold";
+        FooterStatusText.Text = _held ? "Call audio paused." : "Call audio resumed.";
+    }
+
+    private async void TransferButton_Click(object sender, RoutedEventArgs e)
+    {
+        var target = Microsoft.VisualBasic.Interaction.InputBox(
+            "Enter the extension or number to transfer to.",
+            "Transfer call",
+            "");
+
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return;
+        }
+
+        var result = await _sipRegistrationService.TransferAsync(target.Trim());
+        FooterStatusText.Text = result.Message;
+    }
+
+    private async void DndButton_Click(object sender, RoutedEventArgs e)
+    {
+        _dndEnabled = !_dndEnabled;
+        _sipRegistrationService.SetRejectIncomingCalls(_dndEnabled);
+        if (_dndEnabled)
+        {
+            _ringtonePlayer.Stop();
+            var rejectedCurrentCall = false;
+            if (_sipRegistrationService.HasPendingIncomingCall)
+            {
+                var result = await _sipRegistrationService.EndCallAsync();
+                IncomingCallOverlay.Visibility = Visibility.Collapsed;
+                FooterStatusText.Text = result.Message;
+                rejectedCurrentCall = true;
+            }
+
+            if (rejectedCurrentCall)
+            {
+                DndButton.Content = "DND on";
+                return;
+            }
+        }
+
+        DndButton.Content = _dndEnabled ? "DND on" : "DND";
+        if (!_dndEnabled || !_sipRegistrationService.HasPendingIncomingCall)
+        {
+            FooterStatusText.Text = _dndEnabled ? "Do not disturb is on." : "Do not disturb is off.";
+        }
     }
 
     private void UseSelectedContactButton_Click(object sender, RoutedEventArgs e)
     {
-        UseSelectedContact();
+        var contact = MainTabs.SelectedItem == ContactsTab
+            ? PhonebookContactsListView.SelectedItem as ContactEntry
+            : DialContactsListView.SelectedItem as ContactEntry;
+
+        if (contact is not null)
+        {
+            UseSelectedContact(contact);
+        }
     }
 
-    private void UseSelectedContact()
+    private void UseSelectedContact(ContactEntry contact)
     {
-        if (ContactsListView.SelectedItem is ContactEntry contact)
+        DestinationTextBox.Text = contact.Number;
+        MainTabs.SelectedItem = PhoneTab;
+        NoticeText.Text = $"Ready to call {contact.Name}.";
+    }
+
+    private void PhonebookContactsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PhonebookContactsListView.SelectedItem is not ContactEntry contact)
         {
-            DestinationTextBox.Text = contact.Number;
-            NoticeText.Text = $"Ready to call {contact.Name}.";
+            return;
         }
+
+        _editingContact = contact;
+        ContactNameTextBox.Text = contact.Name;
+        ContactNumberTextBox.Text = contact.Number;
+        ContactCompanyTextBox.Text = contact.Company;
+        ContactNotesTextBox.Text = contact.Notes;
+        FooterStatusText.Text = $"Editing {contact.Name}.";
     }
 
     private void RecentCallsListView_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -310,7 +508,7 @@ public partial class MainWindow : Window
         if (CallHistoryListView.SelectedItem is CallHistoryEntry call)
         {
             DestinationTextBox.Text = call.Number;
-            MainTabs.SelectedIndex = 0;
+            MainTabs.SelectedItem = PhoneTab;
             NoticeText.Text = $"Ready to redial {call.Name}.";
         }
     }
@@ -326,31 +524,32 @@ public partial class MainWindow : Window
             return;
         }
 
-        var existing = _contacts.FirstOrDefault(contact => contact.Number == number);
+        var existing = _editingContact
+            ?? _contacts.FirstOrDefault(contact => contact.Number == number);
         if (existing is not null)
         {
             _contacts.Remove(existing);
         }
 
-        _contacts.Add(new ContactEntry
+        var savedContact = new ContactEntry
         {
             Name = name,
             Number = number,
             Company = ContactCompanyTextBox.Text.Trim(),
             Notes = ContactNotesTextBox.Text.Trim()
-        });
+        };
+
+        _contacts.Add(savedContact);
 
         await _contactStore.SaveAsync(_contacts);
-        ContactNameTextBox.Text = "";
-        ContactNumberTextBox.Text = "";
-        ContactCompanyTextBox.Text = "";
-        ContactNotesTextBox.Text = "";
+        PhonebookContactsListView.SelectedItem = savedContact;
+        _editingContact = savedContact;
         FooterStatusText.Text = "Contact saved.";
     }
 
     private async void DeleteContactButton_Click(object sender, RoutedEventArgs e)
     {
-        if (ContactsListView.SelectedItem is not ContactEntry contact)
+        if (PhonebookContactsListView.SelectedItem is not ContactEntry contact)
         {
             FooterStatusText.Text = "Select a contact first.";
             return;
@@ -358,20 +557,24 @@ public partial class MainWindow : Window
 
         _contacts.Remove(contact);
         await _contactStore.SaveAsync(_contacts);
+        _editingContact = null;
+        ContactNameTextBox.Text = "";
+        ContactNumberTextBox.Text = "";
+        ContactCompanyTextBox.Text = "";
+        ContactNotesTextBox.Text = "";
         FooterStatusText.Text = "Contact deleted.";
     }
 
     private async void ReconnectButton_Click(object sender, RoutedEventArgs e)
     {
-        var port = int.TryParse(PortTextBox.Text.Trim(), out var parsedPort) ? parsedPort : 5060;
         var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
         var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
         var videoSource = VideoSourceComboBox.SelectedItem as MediaDeviceInfo ?? _config.VideoSource;
         _config = _config with
         {
-            Server = ServerTextBox.Text.Trim(),
-            Port = port,
-            Domain = DomainTextBox.Text.Trim(),
+            Server = AppStartupConfig.FixedSipServer,
+            Port = AppStartupConfig.FixedSipPort,
+            Domain = AppStartupConfig.FixedSipServer,
             Extension = ExtensionTextBox.Text.Trim(),
             Username = UsernameTextBox.Text.Trim(),
             Password = PasswordBox.Password,
@@ -379,36 +582,100 @@ public partial class MainWindow : Window
             AudioOutput = audioOutput,
             VideoSource = videoSource
         };
+        _config = _config.WithFixedSipEndpoint();
 
         await _cacheService.SaveSettingsAsync(_config);
         SettingsOverlay.Visibility = Visibility.Collapsed;
         await RegisterSipAsync();
     }
 
+    private async void ProvisionAndReconnectButton_Click(object sender, RoutedEventArgs e)
+    {
+        ProvisionAndReconnectButton.IsEnabled = false;
+        FooterStatusText.Text = "Provisioning account.";
+
+        try
+        {
+            var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
+            var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
+            var videoSource = VideoSourceComboBox.SelectedItem as MediaDeviceInfo ?? _config.VideoSource;
+
+            var result = await _provisioningService.ProvisionAsync(
+                SettingsProvisioningCodeTextBox.Text,
+                _config.LicenseKey,
+                _config.LicenseStatus,
+                audioInput,
+                audioOutput,
+                videoSource);
+
+            if (!result.Success || result.Config is null)
+            {
+                FooterStatusText.Text = result.Message;
+                ServerStatusText.Text = result.Message;
+                return;
+            }
+
+            _config = result.Config.WithFixedSipEndpoint();
+            ApplyStartupConfig();
+            await _cacheService.SaveSettingsAsync(_config);
+            SettingsProvisioningCodeTextBox.Text = string.Empty;
+            SettingsOverlay.Visibility = Visibility.Collapsed;
+            FooterStatusText.Text = "Account provisioned.";
+            await RegisterSipAsync();
+        }
+        finally
+        {
+            ProvisionAndReconnectButton.IsEnabled = true;
+        }
+    }
+
     private void ShowDialButton_Click(object sender, RoutedEventArgs e)
     {
-        MainTabs.SelectedIndex = 0;
+        MainTabs.SelectedItem = PhoneTab;
     }
 
     private void ShowContactsButton_Click(object sender, RoutedEventArgs e)
     {
-        MainTabs.SelectedIndex = 0;
-        ContactsListView.Focus();
+        MainTabs.SelectedItem = ContactsTab;
+        PhonebookContactsListView.Focus();
     }
 
     private void ShowCallsButton_Click(object sender, RoutedEventArgs e)
     {
-        MainTabs.SelectedIndex = 1;
+        MainTabs.SelectedItem = CallsTab;
     }
 
-    private void OpenSettingsButton_Click(object sender, RoutedEventArgs e)
+    private async void OpenSettingsButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsOverlay.Visibility = Visibility.Visible;
+        SettingsTabs.SelectedItem = SettingsAccountTab;
+        await RefreshConnectionDiagnosticsAsync();
     }
 
     private void CloseSettingsButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void SettingsAccountButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsTabs.SelectedItem = SettingsAccountTab;
+    }
+
+    private void SettingsDevicesButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsTabs.SelectedItem = SettingsDevicesTab;
+    }
+
+    private async void SettingsStatusButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsTabs.SelectedItem = SettingsStatusTab;
+        await RefreshConnectionDiagnosticsAsync();
+    }
+
+    private void SettingsUpdatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsTabs.SelectedItem = SettingsUpdatesTab;
     }
 
     private async void ClearHistoryButton_Click(object sender, RoutedEventArgs e)
@@ -418,11 +685,86 @@ public partial class MainWindow : Window
         FooterStatusText.Text = "Call history cleared.";
     }
 
+    private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        CheckUpdatesButton.IsEnabled = false;
+        UpdateStatusText.Text = "Checking for updates...";
+
+        var result = await _updateService.CheckForUpdatesAsync();
+        UpdateStatusText.Text = result.Message;
+        FooterStatusText.Text = result.Message;
+
+        if (result.UpdateAvailable && !string.IsNullOrWhiteSpace(result.DownloadUrl))
+        {
+            var notes = string.IsNullOrWhiteSpace(result.Notes) ? "" : $"\n\n{result.Notes}";
+            var install = MessageBox.Show(
+                $"{result.Message}{notes}\n\nDownload and install now?",
+                "Update available",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (install == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    var progress = new Progress<int>(percent =>
+                    {
+                        UpdateStatusText.Text = $"Downloading update... {percent}%";
+                    });
+                    var installerPath = await _updateService.DownloadInstallerAsync(result, progress);
+                    UpdateStatusText.Text = "Starting installer...";
+                    Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{installerPath}\"")
+                    {
+                        UseShellExecute = true
+                    });
+                    Application.Current.Shutdown();
+                }
+                catch (Exception error)
+                {
+                    DebugLog.Write($"UPDATE INSTALL failed error={error.Message}");
+                    UpdateStatusText.Text = "Unable to download the update right now.";
+                    FooterStatusText.Text = UpdateStatusText.Text;
+                }
+            }
+        }
+
+        CheckUpdatesButton.IsEnabled = true;
+    }
+
+    private void SendErrorLogButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var logText = File.Exists(DebugLog.Path)
+                ? File.ReadAllText(DebugLog.Path)
+                : "No error log has been created yet.";
+
+            const int maxBodyLength = 12000;
+            if (logText.Length > maxBodyLength)
+            {
+                logText = logText[^maxBodyLength..];
+            }
+
+            var subject = Uri.EscapeDataString("Merlin SIP error log");
+            var body = Uri.EscapeDataString($"Please investigate this Merlin SIP error log.\r\n\r\n{logText}");
+            Process.Start(new ProcessStartInfo($"mailto:sip-log@chriskendall.media?subject={subject}&body={body}")
+            {
+                UseShellExecute = true
+            });
+
+            FooterStatusText.Text = "Error log email opened.";
+        }
+        catch (Exception error)
+        {
+            FooterStatusText.Text = $"Unable to open error log email: {error.Message}";
+        }
+    }
+
     private async void ResetCacheButton_Click(object sender, RoutedEventArgs e)
     {
         var confirm = MessageBox.Show(
-            "Clear saved SIP settings, contacts, and call history? Merlin SIP will close so setup can run again next time.",
-            "Cache reset",
+            "Clear saved account settings, contacts, and call history? Merlin SIP will close so setup can run again next time.",
+            "Reset app",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 

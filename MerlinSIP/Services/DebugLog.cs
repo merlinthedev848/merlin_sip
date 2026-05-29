@@ -5,7 +5,7 @@ namespace MerlinSip.Services;
 internal static class DebugLog
 {
     private static readonly object Sync = new();
-    private static readonly string Path = System.IO.Path.Combine(
+    public static readonly string Path = System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "MerlinSIP",
         "debug.log");

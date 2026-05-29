@@ -10,8 +10,15 @@
     <Authors>CK Media Services</Authors>
     <Company>CK Media Services</Company>
     <Product>Merlin SIP</Product>
-    <Copyright>Copyright © CK Media Services</Copyright>
+    <Version>1.0.5</Version>
+    <AssemblyVersion>1.0.5.0</AssemblyVersion>
+    <FileVersion>1.0.5.0</FileVersion>
+    <Copyright>Copyright (c) CK Media Services</Copyright>
     <PackageProjectUrl>https://ckmediaservices.co.uk</PackageProjectUrl>
-    <ApplicationIcon />
+    <ApplicationIcon>Assets\CKMedia-Icon.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Content Include="Assets\CKMedia-Icon.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\CKMedia-Icon.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

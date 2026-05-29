@@ -2,14 +2,17 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Merlin SIP Setup"
+        Icon="Assets/CKMedia-Icon.ico"
         Width="560"
-        Height="640"
+        Height="780"
         MinWidth="520"
-        MinHeight="600"
-        ResizeMode="NoResize"
+        MinHeight="660"
+        SizeToContent="Height"
+        ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
         Background="#F4F7FB">
-    <Grid Margin="24">
+    <Grid Margin="24" MaxWidth="620" HorizontalAlignment="Center">
         <Border Style="{StaticResource PanelStyle}">
             <Grid>
                 <Grid.RowDefinitions>
@@ -43,38 +46,57 @@
                                TextWrapping="Wrap" />
                 </StackPanel>
 
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="False">
                     <StackPanel>
                         <StackPanel x:Name="LicenseStepPanel">
                             <TextBlock Text="License key" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
-                            <TextBox x:Name="LicenseKeyTextBox"
-                                     Text="TEST-MERLIN-SIP"
-                                     Margin="0,6,0,8"
-                                     CharacterCasing="Upper" />
-                            <TextBlock Text="Use TEST-MERLIN-SIP while the accounts module activation endpoint is being built."
+                        <TextBox x:Name="LicenseKeyTextBox"
+                                 Margin="0,6,0,8"
+                                 CharacterCasing="Upper" />
+                            <TextBlock Text="Enter the license key provided with your account."
                                        Foreground="{StaticResource MutedBrush}"
                                        FontSize="12"
                                        TextWrapping="Wrap" />
                         </StackPanel>
 
                         <StackPanel x:Name="CredentialsStepPanel" Visibility="Collapsed">
-                            <TextBlock Text="SIP server" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
-                            <TextBox x:Name="ServerTextBox" Margin="0,6,0,12" ToolTip="Example: 192.168.1.10 or sip.company.local" />
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <RadioButton Grid.Column="0"
+                                             x:Name="ProvisionCodeRadioButton"
+                                             Content="Provisioning code"
+                                             IsChecked="True"
+                                             Checked="AuthenticationMode_Checked"
+                                             Margin="0,0,8,0" />
+                                <RadioButton Grid.Column="1"
+                                             x:Name="ManualSipRadioButton"
+                                             Content="SIP details"
+                                             Checked="AuthenticationMode_Checked" />
+                            </Grid>
 
-                            <TextBlock Text="SIP port" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
-                            <TextBox x:Name="PortTextBox" Text="5060" Margin="0,6,0,12" />
+                            <StackPanel x:Name="ProvisionCodePanel">
+                                <TextBlock Text="Provisioning code" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                                <TextBox x:Name="ProvisioningCodeTextBox"
+                                         Margin="0,6,0,12"
+                                         MaxLength="8" />
+                            </StackPanel>
 
-                            <TextBlock Text="SIP domain / realm" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
-                            <TextBox x:Name="DomainTextBox" Margin="0,6,0,12" ToolTip="Leave blank to use the SIP server." />
+                            <StackPanel x:Name="ManualSipPanel" Visibility="Collapsed">
+                                <TextBlock Text="User / extension" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                                <TextBox x:Name="ExtensionTextBox" Margin="0,6,0,12" />
 
-                            <TextBlock Text="Extension" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
-                            <TextBox x:Name="ExtensionTextBox" Text="1001" Margin="0,6,0,12" />
+                                <TextBlock Text="Auth username" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                                <TextBox x:Name="UsernameTextBox" Margin="0,6,0,12" />
 
-                            <TextBlock Text="Auth username" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
-                            <TextBox x:Name="UsernameTextBox" Margin="0,6,0,12" />
-
-                            <TextBlock Text="Password" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
-                            <PasswordBox x:Name="PasswordBox" Margin="0,6,0,12" />
+                                <TextBlock Text="Password" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                                <PasswordBox x:Name="PasswordBox" Margin="0,6,0,12" />
+                            </StackPanel>
 
                             <TextBlock Text="Audio input" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
                             <ComboBox x:Name="AudioInputComboBox" Margin="0,6,0,12" />

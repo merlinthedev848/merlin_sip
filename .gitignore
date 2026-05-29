@@ -10,3 +10,6 @@ publish/
 *.log
 .env
 .env.local
+.tools/
+_authenticator/
+installer/*.generated.wxs
