@@ -591,8 +591,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Content="Open dialer" Style="{StaticResource SoftButton}" Margin="0,0,8,0" Click="OpenIncomingDialerButton_Click" />
-                        <Button Grid.Column="1" Content="End call" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="HangupButton_Click" />
+                        <Button Grid.Column="0" Content="Answer" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Margin="0,0,8,0" Click="AnswerIncomingCallButton_Click" />
+                        <Button Grid.Column="1" Content="Decline" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="DeclineIncomingCallButton_Click" />
                     </Grid>
                 </StackPanel>
             </Border>

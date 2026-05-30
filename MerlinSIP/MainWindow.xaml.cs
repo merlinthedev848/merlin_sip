@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private bool _callConnected;
     private bool _incomingRinging;
     private ContactEntry? _editingContact;
+    private IncomingCallWindow? _incomingCallWindow;
 
     public MainWindow(AppStartupConfig config)
     {
@@ -66,8 +67,42 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        HideIncomingCallSurfaces();
         _ringtonePlayer.Dispose();
         _sipRegistrationService.Dispose();
+    }
+
+    private void ShowIncomingCallWindow(string callerName, string callerNumber)
+    {
+        _incomingCallWindow?.Close();
+        _incomingCallWindow = new IncomingCallWindow(callerName, callerNumber);
+        _incomingCallWindow.AnswerRequested += IncomingCallWindow_AnswerRequested;
+        _incomingCallWindow.DeclineRequested += IncomingCallWindow_DeclineRequested;
+        _incomingCallWindow.Closed += (_, _) => _incomingCallWindow = null;
+        _incomingCallWindow.Show();
+    }
+
+    private void HideIncomingCallSurfaces()
+    {
+        IncomingCallOverlay.Visibility = Visibility.Collapsed;
+        if (_incomingCallWindow is null)
+        {
+            return;
+        }
+
+        var window = _incomingCallWindow;
+        _incomingCallWindow = null;
+        window.Close();
+    }
+
+    private void IncomingCallWindow_AnswerRequested(object? sender, EventArgs e)
+    {
+        AnswerIncomingCall();
+    }
+
+    private void IncomingCallWindow_DeclineRequested(object? sender, EventArgs e)
+    {
+        DeclineIncomingCall();
     }
 
     private void SipRegistrationService_IncomingCall(object? sender, IncomingCallEventArgs e)
@@ -90,6 +125,7 @@ public partial class MainWindow : Window
             _callConnected = false;
             UpdateCallControls();
             _ringtonePlayer.Start(_config.AudioOutput);
+            ShowIncomingCallWindow(callerName, e.CallerNumber);
             _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming call received.");
         });
     }
@@ -100,7 +136,7 @@ public partial class MainWindow : Window
         {
             if (e.Connected)
             {
-                IncomingCallOverlay.Visibility = Visibility.Collapsed;
+                HideIncomingCallSurfaces();
                 NoticeText.Text = "Call connected.";
                 FooterStatusText.Text = "Call connected. Audio session is active.";
                 _incomingRinging = false;
@@ -126,7 +162,7 @@ public partial class MainWindow : Window
 
             if (e.Code >= 300)
             {
-                IncomingCallOverlay.Visibility = Visibility.Collapsed;
+                HideIncomingCallSurfaces();
                 NoticeText.Text = e.Message;
                 FooterStatusText.Text = e.Message;
                 _incomingRinging = false;
@@ -141,7 +177,7 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            IncomingCallOverlay.Visibility = Visibility.Collapsed;
+            HideIncomingCallSurfaces();
             _ringtonePlayer.Stop();
             NoticeText.Text = "Call ended.";
             FooterStatusText.Text = e.Message;
@@ -341,14 +377,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string NormalizeDialDestination(string value)
+    {
+        var trimmed = value.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return "";
+        }
+
+        var builder = new System.Text.StringBuilder(trimmed.Length);
+        foreach (var character in trimmed)
+        {
+            if (char.IsDigit(character) || character is '*' or '#')
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.Length > 0 ? builder.ToString() : trimmed;
+    }
+
     private async void DialButton_Click(object sender, RoutedEventArgs e)
     {
-        var destination = DestinationTextBox.Text.Trim();
+        var destination = NormalizeDialDestination(DestinationTextBox.Text);
         if (string.IsNullOrWhiteSpace(destination))
         {
             NoticeText.Text = "Enter a number first.";
             return;
         }
+
+        DestinationTextBox.Text = destination;
 
         var contact = _contactStore.FindByNumber(_contacts, destination);
         var name = contact?.Name ?? destination;
@@ -375,7 +433,7 @@ public partial class MainWindow : Window
     {
         var result = await _sipRegistrationService.EndCallAsync();
         _ringtonePlayer.Stop();
-        IncomingCallOverlay.Visibility = Visibility.Collapsed;
+        HideIncomingCallSurfaces();
         _muted = false;
         _held = false;
         _sipRegistrationService.SetMuted(false);
@@ -397,10 +455,44 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenIncomingDialerButton_Click(object sender, RoutedEventArgs e)
+    private void AnswerIncomingCallButton_Click(object sender, RoutedEventArgs e)
     {
-        IncomingCallOverlay.Visibility = Visibility.Collapsed;
+        AnswerIncomingCall();
+    }
+
+    private void DeclineIncomingCallButton_Click(object sender, RoutedEventArgs e)
+    {
+        DeclineIncomingCall();
+    }
+
+    private async void AnswerIncomingCall()
+    {
+        _ringtonePlayer.Stop();
+        HideIncomingCallSurfaces();
         MainTabs.SelectedItem = PhoneTab;
+        WindowState = WindowState.Normal;
+        Activate();
+
+        var result = await _sipRegistrationService.AnswerIncomingCallAsync();
+        FooterStatusText.Text = result.Message;
+        NoticeText.Text = result.Signalled ? "Call answered." : result.Message;
+        _incomingRinging = false;
+        _callInProgress = result.Signalled;
+        _callConnected = result.Signalled;
+        UpdateCallControls();
+    }
+
+    private async void DeclineIncomingCall()
+    {
+        var result = await _sipRegistrationService.EndCallAsync();
+        _ringtonePlayer.Stop();
+        HideIncomingCallSurfaces();
+        FooterStatusText.Text = result.Message;
+        NoticeText.Text = "Incoming call declined.";
+        _incomingRinging = false;
+        _callInProgress = false;
+        _callConnected = false;
+        UpdateCallControls();
     }
 
     private void ClearDestinationButton_Click(object sender, RoutedEventArgs e)
@@ -481,7 +573,7 @@ public partial class MainWindow : Window
             if (_sipRegistrationService.HasPendingIncomingCall)
             {
                 var result = await _sipRegistrationService.EndCallAsync();
-                IncomingCallOverlay.Visibility = Visibility.Collapsed;
+                HideIncomingCallSurfaces();
                 FooterStatusText.Text = result.Message;
                 rejectedCurrentCall = true;
                 _incomingRinging = false;
