@@ -229,9 +229,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
                                 <Setter TargetName="ItemChrome" Property="Background" Value="#E8F8F4" />
+                                <Setter Property="Foreground" Value="#111827" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="#DFF8EE" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#0F8F78" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.55" />

@@ -6,14 +6,27 @@ namespace MerlinSip.Services;
 public sealed class RingtonePlayer : IDisposable
 {
     private const int SampleRate = 8000;
+    public static readonly IReadOnlyList<RingtoneChoice> Choices =
+    [
+        new("classic", "Classic"),
+        new("bright", "Bright"),
+        new("pulse", "Pulse"),
+        new("soft", "Soft"),
+        new("urgent", "Urgent")
+    ];
+
     private readonly List<AudioBuffer> _buffers = [];
     private readonly object _sync = new();
     private CancellationTokenSource? _cancellation;
     private IntPtr _waveOut;
+    private string _ringtone = AppStartupConfig.DefaultRingtone;
 
-    public void Start(MediaDeviceInfo outputDevice)
+    public void Start(MediaDeviceInfo outputDevice, string? ringtone = null)
     {
         Stop();
+        _ringtone = Choices.Any(choice => choice.Id == ringtone)
+            ? ringtone!
+            : AppStartupConfig.DefaultRingtone;
 
         var format = WaveFormat.Pcm16Mono8k();
         var deviceId = int.TryParse(outputDevice.Id, out var parsed) ? parsed : -1;
@@ -24,7 +37,7 @@ public sealed class RingtonePlayer : IDisposable
             return;
         }
 
-        DebugLog.Write($"RINGTONE start device={outputDevice.Name}");
+        DebugLog.Write($"RINGTONE start device={outputDevice.Name} tone={_ringtone}");
         _cancellation = new CancellationTokenSource();
         _ = Task.Run(() => PlayLoopAsync(_cancellation.Token));
     }
@@ -63,14 +76,11 @@ public sealed class RingtonePlayer : IDisposable
     {
         while (!cancellationToken.IsCancellationRequested && _waveOut != IntPtr.Zero)
         {
-            QueueTone(659.25, 0.16, 0.26);
-            QueueTone(783.99, 0.16, 0.22);
-            QueueTone(987.77, 0.18, 0.18);
-            QueueTone(783.99, 0.14, 0.20);
+            var pause = PlayPattern();
 
             try
             {
-                await Task.Delay(1700, cancellationToken);
+                await Task.Delay(pause, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -78,6 +88,39 @@ public sealed class RingtonePlayer : IDisposable
             }
 
             TrimBuffers();
+        }
+    }
+
+    private int PlayPattern()
+    {
+        switch (_ringtone)
+        {
+            case "bright":
+                QueueTone(880.00, 0.12, 0.24);
+                QueueTone(1174.66, 0.12, 0.20);
+                QueueTone(1318.51, 0.16, 0.18);
+                return 1150;
+            case "pulse":
+                QueueTone(523.25, 0.22, 0.24);
+                QueueTone(523.25, 0.22, 0.24);
+                return 900;
+            case "soft":
+                QueueTone(392.00, 0.28, 0.14);
+                QueueTone(493.88, 0.28, 0.12);
+                QueueTone(587.33, 0.32, 0.10);
+                return 1900;
+            case "urgent":
+                QueueTone(1046.50, 0.10, 0.22);
+                QueueTone(880.00, 0.10, 0.22);
+                QueueTone(1046.50, 0.10, 0.22);
+                QueueTone(880.00, 0.10, 0.22);
+                return 650;
+            default:
+                QueueTone(659.25, 0.16, 0.26);
+                QueueTone(783.99, 0.16, 0.22);
+                QueueTone(987.77, 0.18, 0.18);
+                QueueTone(783.99, 0.14, 0.20);
+                return 1700;
         }
     }
 
@@ -119,3 +162,5 @@ public sealed class RingtonePlayer : IDisposable
         }
     }
 }
+
+public sealed record RingtoneChoice(string Id, string Name);

@@ -11,10 +11,12 @@ public sealed record AppStartupConfig(
     string LicenseStatus,
     MediaDeviceInfo AudioInput,
     MediaDeviceInfo AudioOutput,
-    MediaDeviceInfo VideoSource)
+    MediaDeviceInfo VideoSource,
+    string Ringtone = AppStartupConfig.DefaultRingtone)
 {
     public const string FixedSipServer = "pbx.chriskendall.media";
     public const int FixedSipPort = 5060;
+    public const string DefaultRingtone = "classic";
 
     public AppStartupConfig WithFixedSipEndpoint()
     {

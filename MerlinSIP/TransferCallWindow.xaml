@@ -1,0 +1,69 @@
+<Window x:Class="MerlinSip.TransferCallWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Transfer call"
+        Icon="Assets/CKMedia-Icon.ico"
+        Width="430"
+        Height="260"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Segoe UI Variable Text, Segoe UI">
+    <Border CornerRadius="18"
+            Background="#FCFEFF"
+            BorderBrush="#D8E1EE"
+            BorderThickness="1"
+            Padding="22">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="32" ShadowDepth="10" Opacity="0.18" Color="#07111E" />
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <DockPanel>
+                <Button DockPanel.Dock="Right"
+                        Content="Close"
+                        Width="82"
+                        Height="38"
+                        Click="CancelButton_Click" />
+                <StackPanel>
+                    <TextBlock Text="Transfer call" FontSize="24" FontWeight="Black" Foreground="#111827" />
+                    <TextBlock Text="Enter the extension or number." FontSize="13" Foreground="#667085" Margin="0,4,0,0" />
+                </StackPanel>
+            </DockPanel>
+
+            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                <TextBlock Text="Transfer to" FontSize="13" FontWeight="Bold" Foreground="#52627A" Margin="0,0,0,8" />
+                <TextBox x:Name="TransferTargetTextBox"
+                         MinHeight="44"
+                         FontSize="16"
+                         KeyDown="TransferTargetTextBox_KeyDown" />
+            </StackPanel>
+
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0"
+                        Content="Cancel"
+                        Height="44"
+                        Margin="0,0,8,0"
+                        Click="CancelButton_Click" />
+                <Button Grid.Column="1"
+                        Content="Transfer"
+                        Height="44"
+                        Margin="8,0,0,0"
+                        Background="{StaticResource PrimaryGradientBrush}"
+                        Foreground="White"
+                        Click="TransferButton_Click" />
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

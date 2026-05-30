@@ -25,8 +25,10 @@ public partial class MainWindow : Window
     private readonly ProvisioningService _provisioningService = new();
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
+    private readonly DispatcherTimer _callTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private AppStartupConfig _config;
     private DateTimeOffset? _activeCallStartedAt;
+    private DateTimeOffset? _activeCallConnectedAt;
     private string _activeCallDirection = "Outbound";
     private bool _dndEnabled;
     private bool _muted;
@@ -52,6 +54,7 @@ public partial class MainWindow : Window
         _sipRegistrationService.IncomingCall += SipRegistrationService_IncomingCall;
         _sipRegistrationService.CallProgress += SipRegistrationService_CallProgress;
         _sipRegistrationService.CallEnded += SipRegistrationService_CallEnded;
+        _callTimer.Tick += CallTimer_Tick;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
         UpdateCallControls();
@@ -70,6 +73,41 @@ public partial class MainWindow : Window
         HideIncomingCallSurfaces();
         _ringtonePlayer.Dispose();
         _sipRegistrationService.Dispose();
+    }
+
+    private void CallTimer_Tick(object? sender, EventArgs e)
+    {
+        UpdateCallTimer();
+    }
+
+    private void StartCallTimer()
+    {
+        _activeCallConnectedAt = DateTimeOffset.Now;
+        CallTimerPill.Visibility = Visibility.Visible;
+        UpdateCallTimer();
+        _callTimer.Start();
+    }
+
+    private void StopCallTimer()
+    {
+        _callTimer.Stop();
+        _activeCallConnectedAt = null;
+        CallTimerText.Text = "00:00";
+        CallTimerPill.Visibility = Visibility.Collapsed;
+    }
+
+    private void UpdateCallTimer()
+    {
+        if (_activeCallConnectedAt is null)
+        {
+            CallTimerText.Text = "00:00";
+            return;
+        }
+
+        var elapsed = DateTimeOffset.Now - _activeCallConnectedAt.Value;
+        CallTimerText.Text = elapsed.TotalHours >= 1
+            ? elapsed.ToString(@"hh\:mm\:ss")
+            : elapsed.ToString(@"mm\:ss");
     }
 
     private void ShowIncomingCallWindow(string callerName, string callerNumber)
@@ -124,7 +162,7 @@ public partial class MainWindow : Window
             _callInProgress = true;
             _callConnected = false;
             UpdateCallControls();
-            _ringtonePlayer.Start(_config.AudioOutput);
+            _ringtonePlayer.Start(_config.AudioOutput, _config.Ringtone);
             ShowIncomingCallWindow(callerName, e.CallerNumber);
             _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming call received.");
         });
@@ -142,6 +180,7 @@ public partial class MainWindow : Window
                 _incomingRinging = false;
                 _callInProgress = true;
                 _callConnected = true;
+                StartCallTimer();
                 UpdateCallControls();
                 return;
             }
@@ -187,6 +226,8 @@ public partial class MainWindow : Window
             _callConnected = false;
             _muted = false;
             _held = false;
+            StopCallTimer();
+            ClearDialpadAfterCall();
             MuteButton.Content = "Mute";
             HoldButton.Content = "Hold";
             UpdateCallControls();
@@ -207,9 +248,11 @@ public partial class MainWindow : Window
         AudioInputComboBox.ItemsSource = _deviceDiscoveryService.GetAudioInputs();
         AudioOutputComboBox.ItemsSource = _deviceDiscoveryService.GetAudioOutputs();
         VideoSourceComboBox.ItemsSource = _deviceDiscoveryService.GetVideoSources();
+        RingtoneComboBox.ItemsSource = RingtonePlayer.Choices;
         SelectDevice(AudioInputComboBox, _config.AudioInput);
         SelectDevice(AudioOutputComboBox, _config.AudioOutput);
         SelectDevice(VideoSourceComboBox, _config.VideoSource);
+        SelectRingtone(_config.Ringtone);
     }
 
     private void LoadDefaultDeviceSelectors()
@@ -217,9 +260,11 @@ public partial class MainWindow : Window
         AudioInputComboBox.ItemsSource = new[] { _config.AudioInput };
         AudioOutputComboBox.ItemsSource = new[] { _config.AudioOutput };
         VideoSourceComboBox.ItemsSource = new[] { _config.VideoSource };
+        RingtoneComboBox.ItemsSource = RingtonePlayer.Choices;
         AudioInputComboBox.SelectedIndex = 0;
         AudioOutputComboBox.SelectedIndex = 0;
         VideoSourceComboBox.SelectedIndex = 0;
+        SelectRingtone(_config.Ringtone);
     }
 
     private static void SelectDevice(ComboBox comboBox, MediaDeviceInfo selected)
@@ -234,6 +279,12 @@ public partial class MainWindow : Window
         }
 
         comboBox.SelectedIndex = comboBox.Items.Count > 0 ? 0 : -1;
+    }
+
+    private void SelectRingtone(string ringtone)
+    {
+        RingtoneComboBox.SelectedItem = RingtonePlayer.Choices.FirstOrDefault(choice => choice.Id == ringtone)
+            ?? RingtonePlayer.Choices.First(choice => choice.Id == AppStartupConfig.DefaultRingtone);
     }
 
     private async Task RegisterSipAsync()
@@ -453,6 +504,8 @@ public partial class MainWindow : Window
             await AddCallHistory(_activeCallDirection, contact?.Name ?? number, number, result.Signalled ? "Ended" : "Cleared", result.Message, _activeCallStartedAt.Value);
             _activeCallStartedAt = null;
         }
+        StopCallTimer();
+        ClearDialpadAfterCall();
     }
 
     private void AnswerIncomingCallButton_Click(object sender, RoutedEventArgs e)
@@ -479,6 +532,10 @@ public partial class MainWindow : Window
         _incomingRinging = false;
         _callInProgress = result.Signalled;
         _callConnected = result.Signalled;
+        if (result.Signalled)
+        {
+            StartCallTimer();
+        }
         UpdateCallControls();
     }
 
@@ -492,7 +549,16 @@ public partial class MainWindow : Window
         _incomingRinging = false;
         _callInProgress = false;
         _callConnected = false;
+        StopCallTimer();
+        ClearDialpadAfterCall();
         UpdateCallControls();
+    }
+
+    private void ClearDialpadAfterCall()
+    {
+        DestinationTextBox.Text = string.Empty;
+        DestinationPreviewText.Text = "Enter number";
+        CallerLookupText.Text = "No contact selected";
     }
 
     private void ClearDestinationButton_Click(object sender, RoutedEventArgs e)
@@ -514,7 +580,7 @@ public partial class MainWindow : Window
     {
         if (sender is ListBox listBox && listBox.SelectedItem is ContactEntry contact)
         {
-            UseSelectedContact(contact);
+            CallContact(contact);
         }
     }
 
@@ -548,17 +614,24 @@ public partial class MainWindow : Window
 
     private async void TransferButton_Click(object sender, RoutedEventArgs e)
     {
-        var target = Microsoft.VisualBasic.Interaction.InputBox(
-            "Enter the extension or number to transfer to.",
-            "Transfer call",
-            "");
+        var transferWindow = new TransferCallWindow(DestinationTextBox.Text)
+        {
+            Owner = this
+        };
 
-        if (string.IsNullOrWhiteSpace(target))
+        if (transferWindow.ShowDialog() != true)
         {
             return;
         }
 
-        var result = await _sipRegistrationService.TransferAsync(target.Trim());
+        var target = NormalizeDialDestination(transferWindow.TransferTarget);
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            FooterStatusText.Text = "Enter a number to transfer to.";
+            return;
+        }
+
+        var result = await _sipRegistrationService.TransferAsync(target);
         FooterStatusText.Text = result.Message;
     }
 
@@ -616,6 +689,12 @@ public partial class MainWindow : Window
         NoticeText.Text = $"Ready to call {contact.Name}.";
     }
 
+    private void CallContact(ContactEntry contact)
+    {
+        UseSelectedContact(contact);
+        DialButton_Click(this, new RoutedEventArgs());
+    }
+
     private void PhonebookContactsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (PhonebookContactsListView.SelectedItem is not ContactEntry contact)
@@ -635,8 +714,7 @@ public partial class MainWindow : Window
     {
         if (RecentCallsListView.SelectedItem is CallHistoryEntry call)
         {
-            DestinationTextBox.Text = call.Number;
-            NoticeText.Text = $"Ready to redial {call.Name}.";
+            RedialCall(call);
         }
     }
 
@@ -644,10 +722,16 @@ public partial class MainWindow : Window
     {
         if (CallHistoryListView.SelectedItem is CallHistoryEntry call)
         {
-            DestinationTextBox.Text = call.Number;
-            MainTabs.SelectedItem = PhoneTab;
-            NoticeText.Text = $"Ready to redial {call.Name}.";
+            RedialCall(call);
         }
+    }
+
+    private void RedialCall(CallHistoryEntry call)
+    {
+        DestinationTextBox.Text = call.Number;
+        MainTabs.SelectedItem = PhoneTab;
+        NoticeText.Text = $"Calling {call.Name}.";
+        DialButton_Click(this, new RoutedEventArgs());
     }
 
     private async void SaveContactButton_Click(object sender, RoutedEventArgs e)
@@ -707,6 +791,7 @@ public partial class MainWindow : Window
         var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
         var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
         var videoSource = VideoSourceComboBox.SelectedItem as MediaDeviceInfo ?? _config.VideoSource;
+        var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
         _config = _config with
         {
             Server = AppStartupConfig.FixedSipServer,
@@ -717,7 +802,8 @@ public partial class MainWindow : Window
             Password = PasswordBox.Password,
             AudioInput = audioInput,
             AudioOutput = audioOutput,
-            VideoSource = videoSource
+            VideoSource = videoSource,
+            Ringtone = ringtone?.Id ?? _config.Ringtone
         };
         _config = _config.WithFixedSipEndpoint();
 
@@ -738,6 +824,7 @@ public partial class MainWindow : Window
             var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
             var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
             var videoSource = VideoSourceComboBox.SelectedItem as MediaDeviceInfo ?? _config.VideoSource;
+            var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
 
             var result = await _provisioningService.ProvisionAsync(
                 SettingsProvisioningCodeTextBox.Text,
@@ -754,7 +841,10 @@ public partial class MainWindow : Window
                 return;
             }
 
-            _config = result.Config.WithFixedSipEndpoint();
+            _config = result.Config.WithFixedSipEndpoint() with
+            {
+                Ringtone = ringtone?.Id ?? _config.Ringtone
+            };
             ApplyStartupConfig();
             await _cacheService.SaveSettingsAsync(_config);
             SettingsProvisioningCodeTextBox.Text = string.Empty;

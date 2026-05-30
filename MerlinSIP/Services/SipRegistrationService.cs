@@ -362,6 +362,7 @@ public sealed class SipRegistrationService : IDisposable
 
             if (firstResponse.Code is not (401 or 407))
             {
+                _registered = false;
                 return new SipRegistrationResult(false, $"SIP server returned {firstResponse.Code} {firstResponse.Reason}".Trim());
             }
 
@@ -1126,23 +1127,48 @@ public sealed class SipRegistrationService : IDisposable
     {
         _ = Task.Run(async () =>
         {
+            await RefreshRegistrationAfterCallAsync(reason);
+        });
+    }
+
+    private async Task RefreshRegistrationAfterCallAsync(string reason)
+    {
+        await Task.Delay(TimeSpan.FromMilliseconds(900));
+
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
             try
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(900));
-                if (_client is null || _config is null || _activeCall is not null || _pendingResponse is not null)
+                if (_client is null || _config is null)
                 {
-                    DebugLog.Write($"REGISTER post-call refresh skipped reason={reason}");
+                    DebugLog.Write($"REGISTER post-call refresh abandoned reason={reason} attempt={attempt}");
                     return;
                 }
 
+                if (_activeCall is not null || _pendingResponse is not null)
+                {
+                    DebugLog.Write($"REGISTER post-call refresh waiting reason={reason} attempt={attempt}");
+                    await Task.Delay(TimeSpan.FromMilliseconds(750));
+                    continue;
+                }
+
                 var result = await RegisterCurrentSocketAsync(CancellationToken.None);
-                DebugLog.Write($"REGISTER post-call refresh reason={reason} connected={result.Connected} message={result.Message}");
+                DebugLog.Write($"REGISTER post-call refresh reason={reason} attempt={attempt} connected={result.Connected} message={result.Message}");
+                if (result.Connected)
+                {
+                    return;
+                }
             }
             catch (Exception error)
             {
-                DebugLog.Write($"REGISTER post-call refresh failed reason={reason} error={error.Message}");
+                DebugLog.Write($"REGISTER post-call refresh failed reason={reason} attempt={attempt} error={error.Message}");
             }
-        });
+
+            await Task.Delay(TimeSpan.FromMilliseconds(900 * attempt));
+        }
+
+        _registered = false;
+        DebugLog.Write($"REGISTER post-call refresh exhausted reason={reason}");
     }
 
     private static string GetLocalAddress()

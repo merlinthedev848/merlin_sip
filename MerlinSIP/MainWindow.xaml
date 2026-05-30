@@ -219,6 +219,15 @@
                                 </Grid.RowDefinitions>
 
                                 <DockPanel Margin="0,0,0,16">
+                                    <Border DockPanel.Dock="Right"
+                                            x:Name="CallTimerPill"
+                                            Visibility="Collapsed"
+                                            Background="#DFF8EE"
+                                            CornerRadius="8"
+                                            Padding="12,8"
+                                            VerticalAlignment="Top">
+                                        <TextBlock x:Name="CallTimerText" Text="00:00" FontWeight="Black" Foreground="#106247" />
+                                    </Border>
                                     <StackPanel>
                                         <TextBlock Text="Dial" Foreground="#64748B" FontWeight="Bold" />
                                         <TextBlock x:Name="DestinationPreviewText" Text="Enter number" Foreground="#111827" FontSize="34" FontWeight="Black" />
@@ -522,6 +531,8 @@
                                     <ComboBox x:Name="AudioInputComboBox" Margin="0,5,0,12" />
                                     <TextBlock Text="Audio output" Foreground="#64748B" FontWeight="Bold" />
                                     <ComboBox x:Name="AudioOutputComboBox" Margin="0,5,0,12" />
+                                    <TextBlock Text="Ringtone" Foreground="#64748B" FontWeight="Bold" />
+                                    <ComboBox x:Name="RingtoneComboBox" DisplayMemberPath="Name" Margin="0,5,0,12" />
                                     <TextBlock Text="Video source" Foreground="#64748B" FontWeight="Bold" />
                                     <ComboBox x:Name="VideoSourceComboBox" Margin="0,5,0,18" />
                                     <Button Content="Save and reconnect" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="ReconnectButton_Click" />

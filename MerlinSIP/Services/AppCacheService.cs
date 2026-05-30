@@ -46,7 +46,8 @@ public sealed class AppCacheService
             settings.LicenseStatus,
             settings.AudioInput,
             settings.AudioOutput,
-            settings.VideoSource).WithFixedSipEndpoint();
+            settings.VideoSource,
+            string.IsNullOrWhiteSpace(settings.Ringtone) ? AppStartupConfig.DefaultRingtone : settings.Ringtone).WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
@@ -62,7 +63,8 @@ public sealed class AppCacheService
             config.LicenseStatus,
             config.AudioInput,
             config.AudioOutput,
-            config.VideoSource);
+            config.VideoSource,
+            config.Ringtone);
 
         Directory.CreateDirectory(_root);
         await using var stream = File.Create(SettingsPath);
@@ -127,5 +129,6 @@ public sealed class AppCacheService
         string LicenseStatus,
         MediaDeviceInfo AudioInput,
         MediaDeviceInfo AudioOutput,
-        MediaDeviceInfo VideoSource);
+        MediaDeviceInfo VideoSource,
+        string? Ringtone = null);
 }

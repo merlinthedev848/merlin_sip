@@ -29,6 +29,7 @@ public sealed class RtpAudioSession : IDisposable
     private bool _held;
     private int _receivedPackets;
     private int _sentPackets;
+    private double _holdTonePhase;
 
     public int LocalPort { get; }
 
@@ -183,7 +184,14 @@ public sealed class RtpAudioSession : IDisposable
             return;
         }
 
-        if (_muted || _held)
+        if (_held)
+        {
+            SendHoldMusicPacket();
+            WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
+            return;
+        }
+
+        if (_muted)
         {
             WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
             return;
@@ -207,6 +215,41 @@ public sealed class RtpAudioSession : IDisposable
         }
         _timestamp += (uint)payload.Length;
         WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
+    }
+
+    private void SendHoldMusicPacket()
+    {
+        if (_remoteEndPoint is null)
+        {
+            return;
+        }
+
+        var payload = new byte[SamplesPerPacket];
+        for (var i = 0; i < payload.Length; i++)
+        {
+            var sample = GenerateHoldMusicSample();
+            payload[i] = _payloadType == 8 ? G711Codec.LinearToALaw(sample) : G711Codec.LinearToMuLaw(sample);
+        }
+
+        var packet = BuildRtpPacket(payload);
+        _rtpClient.Send(packet, packet.Length, _remoteEndPoint);
+        var sent = Interlocked.Increment(ref _sentPackets);
+        if (sent is 1 or 50 or 250)
+        {
+            DebugLog.Write($"RTP hold music sent packets={sent} bytes={packet.Length} remote={_remoteEndPoint}");
+        }
+        _timestamp += (uint)payload.Length;
+    }
+
+    private short GenerateHoldMusicSample()
+    {
+        var phase = _holdTonePhase;
+        var noteA = Math.Sin(phase * Math.Tau * 440 / SampleRate);
+        var noteB = Math.Sin(phase * Math.Tau * 554.37 / SampleRate);
+        var envelope = 0.78 + (0.22 * Math.Sin(phase * Math.Tau * 0.8 / SampleRate));
+        _holdTonePhase = phase + 1;
+
+        return (short)((noteA * 0.45 + noteB * 0.28) * envelope * 9000);
     }
 
     private byte[] BuildRtpPacket(byte[] payload)
