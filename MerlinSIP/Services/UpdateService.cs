@@ -11,6 +11,7 @@ public sealed class UpdateService
 {
     private const string UpdatesBaseUrl = "https://updates.chriskendall.media/merlin-sip/";
     private const string ReleasesUrl = "https://updates.chriskendall.media/merlin-sip/releases/";
+    private static readonly TimeSpan InstallerRetention = TimeSpan.FromDays(14);
     private static readonly HttpClient HttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(15)
@@ -52,6 +53,7 @@ public sealed class UpdateService
 
         var updateDir = Path.Combine(Path.GetTempPath(), "MerlinSIP", "Updates");
         Directory.CreateDirectory(updateDir);
+        CleanupOldInstallerDownloads(updateDir);
         var versionPart = string.IsNullOrWhiteSpace(update.Version) ? "latest" : update.Version;
         var installerPath = Path.Combine(updateDir, $"MerlinSIP-{versionPart}.msi");
 
@@ -76,6 +78,26 @@ public sealed class UpdateService
 
         progress?.Report(100);
         return installerPath;
+    }
+
+    private static void CleanupOldInstallerDownloads(string updateDir)
+    {
+        try
+        {
+            var cutoff = DateTimeOffset.Now.Subtract(InstallerRetention);
+            foreach (var file in Directory.EnumerateFiles(updateDir, "MerlinSIP-*.msi"))
+            {
+                var info = new FileInfo(file);
+                if (info.LastWriteTime < cutoff)
+                {
+                    info.Delete();
+                }
+            }
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"UPDATE cleanup failed error={error.Message}");
+        }
     }
 
     private static UpdateCheckResult BuildResult(Version current, MsiRelease latest)

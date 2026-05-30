@@ -31,6 +31,10 @@ public partial class MainWindow : Window
     private bool _dndEnabled;
     private bool _muted;
     private bool _held;
+    private bool _registered;
+    private bool _callInProgress;
+    private bool _callConnected;
+    private bool _incomingRinging;
     private ContactEntry? _editingContact;
 
     public MainWindow(AppStartupConfig config)
@@ -49,6 +53,7 @@ public partial class MainWindow : Window
         _sipRegistrationService.CallEnded += SipRegistrationService_CallEnded;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
+        UpdateCallControls();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -80,6 +85,10 @@ public partial class MainWindow : Window
             FooterStatusText.Text = "Incoming call received.";
             _activeCallStartedAt = DateTimeOffset.Now;
             _activeCallDirection = "Inbound";
+            _incomingRinging = true;
+            _callInProgress = true;
+            _callConnected = false;
+            UpdateCallControls();
             _ringtonePlayer.Start(_config.AudioOutput);
             _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming call received.");
         });
@@ -94,6 +103,10 @@ public partial class MainWindow : Window
                 IncomingCallOverlay.Visibility = Visibility.Collapsed;
                 NoticeText.Text = "Call connected.";
                 FooterStatusText.Text = "Call connected. Audio session is active.";
+                _incomingRinging = false;
+                _callInProgress = true;
+                _callConnected = true;
+                UpdateCallControls();
                 return;
             }
 
@@ -116,6 +129,10 @@ public partial class MainWindow : Window
                 IncomingCallOverlay.Visibility = Visibility.Collapsed;
                 NoticeText.Text = e.Message;
                 FooterStatusText.Text = e.Message;
+                _incomingRinging = false;
+                _callInProgress = false;
+                _callConnected = false;
+                UpdateCallControls();
             }
         });
     }
@@ -129,6 +146,14 @@ public partial class MainWindow : Window
             NoticeText.Text = "Call ended.";
             FooterStatusText.Text = e.Message;
             _activeCallStartedAt = null;
+            _incomingRinging = false;
+            _callInProgress = false;
+            _callConnected = false;
+            _muted = false;
+            _held = false;
+            MuteButton.Content = "Mute";
+            HoldButton.Content = "Hold";
+            UpdateCallControls();
         });
     }
 
@@ -193,18 +218,21 @@ public partial class MainWindow : Window
 
         if (result.Connected)
         {
+            _registered = true;
             SetConnectionState("Connected", "#DFF8EE", "#106247");
             ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
             FooterStatusText.Text = "Ready.";
         }
         else
         {
+            _registered = false;
             SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
             ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
             FooterStatusText.Text = "Connection status is available in Settings.";
         }
 
         await RefreshConnectionDiagnosticsAsync();
+        UpdateCallControls();
     }
 
     private void SetConnectionState(string text, string background, string foreground)
@@ -230,6 +258,7 @@ public partial class MainWindow : Window
             ? "Unknown"
             : $"{version.Major}.{version.Minor}.{version.Build}";
         UpdateStatusText.Text = $"Version {AppVersionText.Text}";
+        ProductIdText.Text = LicenseService.ProductId;
     }
 
     private async Task RefreshConnectionDiagnosticsAsync()
@@ -295,6 +324,7 @@ public partial class MainWindow : Window
     {
         var destination = DestinationTextBox.Text.Trim();
         DestinationPreviewText.Text = string.IsNullOrWhiteSpace(destination) ? "Enter number" : destination;
+        UpdateCallControls();
 
         var contact = _contactStore.FindByNumber(_contacts, destination);
         CallerLookupText.Text = contact is null
@@ -326,12 +356,18 @@ public partial class MainWindow : Window
         NoticeText.Text = $"Calling {name}.";
         _activeCallStartedAt = DateTimeOffset.Now;
         _activeCallDirection = "Outbound";
+        _callInProgress = true;
+        _callConnected = false;
+        UpdateCallControls();
         var result = await _sipRegistrationService.InviteAsync(destination);
         FooterStatusText.Text = result.Message;
         await AddCallHistory("Outbound", name, destination, result.Signalled ? "Signalled" : "Failed", result.Message);
         if (!result.Signalled)
         {
             NoticeText.Text = result.Message;
+            _callInProgress = false;
+            _callConnected = false;
+            UpdateCallControls();
         }
     }
 
@@ -346,6 +382,10 @@ public partial class MainWindow : Window
         _sipRegistrationService.SetHeld(false);
         MuteButton.Content = "Mute";
         HoldButton.Content = "Hold";
+        _incomingRinging = false;
+        _callInProgress = false;
+        _callConnected = false;
+        UpdateCallControls();
         NoticeText.Text = "Call ended.";
         FooterStatusText.Text = result.Message;
         if (_activeCallStartedAt is not null && !string.IsNullOrWhiteSpace(DestinationTextBox.Text))
@@ -444,6 +484,10 @@ public partial class MainWindow : Window
                 IncomingCallOverlay.Visibility = Visibility.Collapsed;
                 FooterStatusText.Text = result.Message;
                 rejectedCurrentCall = true;
+                _incomingRinging = false;
+                _callInProgress = false;
+                _callConnected = false;
+                UpdateCallControls();
             }
 
             if (rejectedCurrentCall)
@@ -454,6 +498,7 @@ public partial class MainWindow : Window
         }
 
         DndButton.Content = _dndEnabled ? "DND on" : "DND";
+        UpdateCallControls();
         if (!_dndEnabled || !_sipRegistrationService.HasPendingIncomingCall)
         {
             FooterStatusText.Text = _dndEnabled ? "Do not disturb is on." : "Do not disturb is off.";
@@ -586,6 +631,8 @@ public partial class MainWindow : Window
 
         await _cacheService.SaveSettingsAsync(_config);
         SettingsOverlay.Visibility = Visibility.Collapsed;
+        _registered = false;
+        UpdateCallControls();
         await RegisterSipAsync();
     }
 
@@ -621,6 +668,8 @@ public partial class MainWindow : Window
             SettingsProvisioningCodeTextBox.Text = string.Empty;
             SettingsOverlay.Visibility = Visibility.Collapsed;
             FooterStatusText.Text = "Account provisioned.";
+            _registered = false;
+            UpdateCallControls();
             await RegisterSipAsync();
         }
         finally
@@ -692,6 +741,7 @@ public partial class MainWindow : Window
 
         var result = await _updateService.CheckForUpdatesAsync();
         UpdateStatusText.Text = result.Message;
+        UpdateNotesText.Text = result.Notes ?? string.Empty;
         FooterStatusText.Text = result.Message;
 
         if (result.UpdateAvailable && !string.IsNullOrWhiteSpace(result.DownloadUrl))
@@ -713,6 +763,7 @@ public partial class MainWindow : Window
                     });
                     var installerPath = await _updateService.DownloadInstallerAsync(result, progress);
                     UpdateStatusText.Text = "Starting installer...";
+                    FooterStatusText.Text = "Starting update installer. Merlin SIP will close.";
                     Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{installerPath}\"")
                     {
                         UseShellExecute = true
@@ -729,6 +780,17 @@ public partial class MainWindow : Window
         }
 
         CheckUpdatesButton.IsEnabled = true;
+    }
+
+    private void UpdateCallControls()
+    {
+        var hasDestination = !string.IsNullOrWhiteSpace(DestinationTextBox.Text);
+        DialButton.IsEnabled = _registered && hasDestination && !_callInProgress && !_incomingRinging;
+        HangupButton.IsEnabled = _callInProgress || _incomingRinging;
+        MuteButton.IsEnabled = _callConnected && _sipRegistrationService.CanControlAudio;
+        HoldButton.IsEnabled = _callConnected && _sipRegistrationService.CanControlAudio;
+        TransferButton.IsEnabled = _callConnected;
+        DndButton.IsEnabled = true;
     }
 
     private void SendErrorLogButton_Click(object sender, RoutedEventArgs e)

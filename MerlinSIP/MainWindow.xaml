@@ -255,14 +255,14 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Content="Call" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="DialButton_Click" Margin="0,0,8,0" />
-                                    <Button Grid.Column="1" Content="End" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="HangupButton_Click" />
+                                    <Button Grid.Column="0" x:Name="DialButton" Content="Call" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="DialButton_Click" Margin="0,0,8,0" />
+                                    <Button Grid.Column="1" x:Name="HangupButton" Content="End" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="HangupButton_Click" />
                                 </Grid>
 
                                 <UniformGrid Grid.Row="4" Columns="4" Rows="1">
                                     <Button x:Name="MuteButton" Content="Mute" Style="{StaticResource SoftButton}" Click="MuteButton_Click" />
                                     <Button x:Name="HoldButton" Content="Hold" Style="{StaticResource SoftButton}" Click="HoldButton_Click" />
-                                    <Button Content="Transfer" Style="{StaticResource SoftButton}" Click="TransferButton_Click" />
+                                    <Button x:Name="TransferButton" Content="Transfer" Style="{StaticResource SoftButton}" Click="TransferButton_Click" />
                                     <Button x:Name="DndButton" Content="DND" Style="{StaticResource SoftButton}" Click="DndButton_Click" />
                                 </UniformGrid>
                             </Grid>
@@ -547,11 +547,14 @@
                                                 <Grid.RowDefinitions>
                                                     <RowDefinition Height="Auto" />
                                                     <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
                                                 </Grid.RowDefinitions>
                                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Latency" Foreground="#64748B" FontWeight="Bold" Margin="0,0,0,6" />
                                                 <TextBlock Grid.Row="0" Grid.Column="1" x:Name="PingStatusText" Text="Not checked yet" Foreground="#111827" FontWeight="Bold" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Version" Foreground="#64748B" FontWeight="Bold" />
-                                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AppVersionText" Text="-" Foreground="#111827" FontWeight="Bold" />
+                                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Version" Foreground="#64748B" FontWeight="Bold" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AppVersionText" Text="-" Foreground="#111827" FontWeight="Bold" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Product" Foreground="#64748B" FontWeight="Bold" />
+                                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="ProductIdText" Text="merlin-sip" Foreground="#111827" FontWeight="Bold" />
                                             </Grid>
                                         </StackPanel>
                                     </Border>
@@ -567,6 +570,7 @@
                                             <TextBlock Text="Updates" Foreground="#111827" FontSize="18" FontWeight="Black" VerticalAlignment="Center" />
                                         </DockPanel>
                                         <TextBlock x:Name="UpdateStatusText" Text="Version 1.0.5" Foreground="#64748B" FontWeight="Bold" Margin="0,10,0,0" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="UpdateNotesText" Foreground="#64748B" Margin="0,8,0,0" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
                             </TabItem>

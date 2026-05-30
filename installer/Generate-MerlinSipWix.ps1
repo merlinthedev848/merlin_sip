@@ -75,6 +75,13 @@ function Get-RelativePath {
 
 $publishRoot = (Resolve-Path -LiteralPath $PublishDir).Path.TrimEnd('\')
 $projectRoot = (Resolve-Path -LiteralPath $ProjectDir).Path.TrimEnd('\')
+$projectFile = Join-Path $projectRoot 'MerlinSIP\MerlinSIP.csproj'
+$projectXml = [xml](Get-Content -LiteralPath $projectFile)
+$productVersion = $projectXml.Project.PropertyGroup.Version | Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($productVersion)) {
+    throw "Unable to read product version from '$projectFile'."
+}
+
 $files = Get-ChildItem -LiteralPath $publishRoot -Recurse -File |
     Where-Object { $_.Name -ne 'MerlinSIP.exe' } |
     Sort-Object FullName
@@ -179,7 +186,7 @@ function Add-DirectoryContent {
 [void] $builder.AppendLine('  <Package')
 [void] $builder.AppendLine('    Name="Merlin SIP"')
 [void] $builder.AppendLine('    Manufacturer="CK Media Services"')
-[void] $builder.AppendLine('    Version="1.0.6"')
+[void] $builder.AppendLine("    Version=`"$productVersion`"")
 [void] $builder.AppendLine('    UpgradeCode="{8E5C2C6E-3A1E-4F83-9897-4E62EB06E0EC}"')
 [void] $builder.AppendLine('    Scope="perMachine">')
 [void] $builder.AppendLine('')

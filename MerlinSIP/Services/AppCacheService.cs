@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using MerlinSip.Models;
 
@@ -37,9 +39,9 @@ public sealed class AppCacheService
             AppStartupConfig.FixedSipServer,
             AppStartupConfig.FixedSipPort,
             AppStartupConfig.FixedSipServer,
-            settings.Extension,
-            settings.Username,
-            settings.Password,
+            Unprotect(settings.Extension, settings.EncryptedExtension),
+            Unprotect(settings.Username, settings.EncryptedUsername),
+            Unprotect(settings.Password, settings.EncryptedPassword),
             settings.LicenseKey,
             settings.LicenseStatus,
             settings.AudioInput,
@@ -50,9 +52,12 @@ public sealed class AppCacheService
     public async Task SaveSettingsAsync(AppStartupConfig config)
     {
         var settings = new SavedAppSettings(
-            config.Extension,
-            config.Username,
-            config.Password,
+            null,
+            null,
+            null,
+            Protect(config.Extension),
+            Protect(config.Username),
+            Protect(config.Password),
             config.LicenseKey,
             config.LicenseStatus,
             config.AudioInput,
@@ -79,10 +84,45 @@ public sealed class AppCacheService
         }
     }
 
+    private static string Protect(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var plainBytes = Encoding.UTF8.GetBytes(value);
+        var encrypted = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
+        return Convert.ToBase64String(encrypted);
+    }
+
+    private static string Unprotect(string? legacyPlainText, string? encrypted)
+    {
+        if (string.IsNullOrWhiteSpace(encrypted))
+        {
+            return legacyPlainText ?? string.Empty;
+        }
+
+        try
+        {
+            var encryptedBytes = Convert.FromBase64String(encrypted);
+            var plainBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(plainBytes);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"SETTINGS decrypt failed error={error.Message}");
+            return legacyPlainText ?? string.Empty;
+        }
+    }
+
     private sealed record SavedAppSettings(
-        string Extension,
-        string Username,
-        string Password,
+        string? Extension,
+        string? Username,
+        string? Password,
+        string? EncryptedExtension,
+        string? EncryptedUsername,
+        string? EncryptedPassword,
         string LicenseKey,
         string LicenseStatus,
         MediaDeviceInfo AudioInput,
