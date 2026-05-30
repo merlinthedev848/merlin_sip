@@ -483,6 +483,7 @@ public partial class MainWindow : Window
         }
 
         DestinationTextBox.Text = destination;
+        DebugLog.Write($"UI dial requested destination={destination}");
 
         var contact = _contactStore.FindByNumber(_contacts, destination);
         var name = contact?.Name ?? destination;
@@ -715,6 +716,12 @@ public partial class MainWindow : Window
         if (!_dndEnabled || !_sipRegistrationService.HasPendingIncomingCall)
         {
             FooterStatusText.Text = _dndEnabled ? "Do not disturb is on." : "Do not disturb is off.";
+        }
+
+        if (!_dndEnabled && !_registered && NetworkInterface.GetIsNetworkAvailable())
+        {
+            FooterStatusText.Text = "Reconnecting after do not disturb.";
+            await RegisterSipAsync();
         }
     }
 

@@ -283,24 +283,44 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <DockPanel Margin="0,0,0,14">
-                                    <Button DockPanel.Dock="Right" Content="Open full view" Style="{StaticResource SoftButton}" Width="130" Click="ShowCallsButton_Click" />
                                     <StackPanel>
-                                        <TextBlock Text="Quick access" Foreground="#111827" FontSize="24" FontWeight="Black" />
-                                        <TextBlock Text="Double-click to call." Foreground="#64748B" />
+                                        <TextBlock Text="Directory" Foreground="#111827" FontSize="24" FontWeight="Black" />
+                                        <TextBlock Text="Read-only quick dial tables." Foreground="#64748B" />
                                     </StackPanel>
                                 </DockPanel>
 
                                 <TabControl Grid.Row="1">
-                                    <TabItem Header="Recent calls">
+                                    <TabItem Header="History">
                                         <ListBox x:Name="RecentCallsListView" BorderThickness="0" Background="Transparent" MouseDoubleClick="RecentCallsListView_MouseDoubleClick">
+                                            <ListBox.Template>
+                                                <ControlTemplate TargetType="ListBox">
+                                                    <DockPanel>
+                                                        <Grid DockPanel.Dock="Top" Background="#EAF1F8" Margin="0,0,0,2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="1.2*" />
+                                                                <ColumnDefinition Width="1*" />
+                                                                <ColumnDefinition Width="95" />
+                                                                <ColumnDefinition Width="90" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Name" FontWeight="Black" Foreground="#475569" Margin="12,8" />
+                                                            <TextBlock Grid.Column="1" Text="Number" FontWeight="Black" Foreground="#475569" Margin="8" />
+                                                            <TextBlock Grid.Column="2" Text="Duration" FontWeight="Black" Foreground="#475569" HorizontalAlignment="Center" Margin="8" />
+                                                            <TextBlock Grid.Column="3" Text="Status" FontWeight="Black" Foreground="#475569" HorizontalAlignment="Center" Margin="8" />
+                                                        </Grid>
+                                                        <ScrollViewer Focusable="False">
+                                                            <ItemsPresenter />
+                                                        </ScrollViewer>
+                                                    </DockPanel>
+                                                </ControlTemplate>
+                                            </ListBox.Template>
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <Grid Margin="0,0,0,1" Background="#F8FBFE">
                                                         <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="1.3*" />
+                                                            <ColumnDefinition Width="1.2*" />
                                                             <ColumnDefinition Width="1*" />
+                                                            <ColumnDefinition Width="95" />
                                                             <ColumnDefinition Width="90" />
-                                                            <ColumnDefinition Width="80" />
                                                         </Grid.ColumnDefinitions>
                                                         <StackPanel Grid.Column="0" Margin="12,10">
                                                             <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="Black" TextTrimming="CharacterEllipsis" />
@@ -318,29 +338,41 @@
                                     </TabItem>
 
                                     <TabItem Header="Contacts">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="*" />
-                                                <RowDefinition Height="Auto" />
-                                            </Grid.RowDefinitions>
-                                            <ListBox x:Name="DialContactsListView" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource ContactCard}" MouseDoubleClick="ContactsListView_MouseDoubleClick">
-                                                <ListBox.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <DockPanel>
-                                                            <Border DockPanel.Dock="Right" Background="#E8F8F4" CornerRadius="8" Padding="12,8">
-                                                                <TextBlock Text="{Binding Number}" Foreground="#0E987E" FontWeight="Black" />
-                                                            </Border>
-                                                            <StackPanel>
-                                                                <TextBlock Text="{Binding Name}" Foreground="#111827" FontSize="17" FontWeight="Black" />
-                                                                <TextBlock Text="{Binding Company}" Foreground="#64748B" />
-                                                                <TextBlock Text="{Binding Notes}" Foreground="#94A3B8" FontSize="12" />
-                                                            </StackPanel>
-                                                        </DockPanel>
-                                                    </DataTemplate>
-                                                </ListBox.ItemTemplate>
-                                            </ListBox>
-                                            <Button Grid.Row="1" Content="Use selected" Style="{StaticResource SoftButton}" Margin="0,12,0,0" Click="UseSelectedContactButton_Click" />
-                                        </Grid>
+                                        <ListBox x:Name="DialContactsListView" BorderThickness="0" Background="Transparent" MouseDoubleClick="ContactsListView_MouseDoubleClick">
+                                            <ListBox.Template>
+                                                <ControlTemplate TargetType="ListBox">
+                                                    <DockPanel>
+                                                        <Grid DockPanel.Dock="Top" Background="#EAF1F8" Margin="0,0,0,2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="1.2*" />
+                                                                <ColumnDefinition Width="1*" />
+                                                                <ColumnDefinition Width="1*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Name" FontWeight="Black" Foreground="#475569" Margin="12,8" />
+                                                            <TextBlock Grid.Column="1" Text="Company" FontWeight="Black" Foreground="#475569" Margin="8" />
+                                                            <TextBlock Grid.Column="2" Text="Number" FontWeight="Black" Foreground="#475569" Margin="8" />
+                                                        </Grid>
+                                                        <ScrollViewer Focusable="False">
+                                                            <ItemsPresenter />
+                                                        </ScrollViewer>
+                                                    </DockPanel>
+                                                </ControlTemplate>
+                                            </ListBox.Template>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,1" Background="#F8FBFE">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="1.2*" />
+                                                            <ColumnDefinition Width="1*" />
+                                                            <ColumnDefinition Width="1*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="Black" Margin="12,10" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Company}" Foreground="#64748B" Margin="8,10" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding Number}" Foreground="#0E987E" FontWeight="Black" Margin="8,10" TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
                                     </TabItem>
                                 </TabControl>
                             </Grid>

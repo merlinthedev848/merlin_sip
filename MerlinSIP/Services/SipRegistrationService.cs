@@ -363,6 +363,7 @@ public sealed class SipRegistrationService : IDisposable
         try
         {
             await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+            await SendByeAfterTransferAsync(_activeCall, cancellationToken);
         }
         catch (Exception error)
         {
@@ -375,6 +376,19 @@ public sealed class SipRegistrationService : IDisposable
         QueueRegistrationRefresh("transfer");
         CallEnded?.Invoke(this, new CallEndedEventArgs("Call transferred. Extension remains registered."));
         return new SipCallResult(true, $"Transfer requested to {destination}. Call cleared locally.");
+    }
+
+    private async Task SendByeAfterTransferAsync(ActiveCall call, CancellationToken cancellationToken)
+    {
+        if (_client is null || _config is null)
+        {
+            return;
+        }
+
+        var bye = BuildBye(call);
+        var payload = Encoding.UTF8.GetBytes(bye);
+        DebugLog.Write($"SEND BYE after transfer callId={call.CallId} bytes={payload.Length}");
+        await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
     }
 
     public void Dispose()
@@ -928,6 +942,13 @@ public sealed class SipRegistrationService : IDisposable
 
                     if (response.Code >= 200 && _activeCall is not null && response.Headers.GetValueOrDefault("call-id", "") == _activeCall.CallId)
                     {
+                        var cseqMethod = ExtractCSeqMethod(response.Headers.GetValueOrDefault("cseq", ""));
+                        if (!string.Equals(cseqMethod, "INVITE", StringComparison.OrdinalIgnoreCase))
+                        {
+                            DebugLog.Write($"RECV dialog response ignored method={cseqMethod} code={response.Code} callId={_activeCall.CallId}");
+                            continue;
+                        }
+
                         _activeCall = _activeCall with { Established = response.Code < 300, RemoteTag = ExtractTag(response.Headers.GetValueOrDefault("to", "")) };
                         if (response.Code < 300)
                         {
@@ -973,6 +994,11 @@ public sealed class SipRegistrationService : IDisposable
                     CallEnded?.Invoke(this, new CallEndedEventArgs("Incoming call was cancelled. Extension remains registered."));
                     QueueRegistrationRefresh("remote CANCEL");
                 }
+                else if (message.StartsWith("NOTIFY ", StringComparison.OrdinalIgnoreCase))
+                {
+                    DebugLog.Write("RECV NOTIFY");
+                    await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -996,6 +1022,7 @@ public sealed class SipRegistrationService : IDisposable
         {
             await SendSimpleResponseAsync(message, remoteEndPoint, 486, "Busy Here", cancellationToken, localTag);
             DebugLog.Write("RECV INVITE rejected because DND is enabled");
+            QueueRegistrationRefresh("DND incoming reject");
             return;
         }
 
@@ -1157,6 +1184,12 @@ public sealed class SipRegistrationService : IDisposable
     {
         var parts = cseq.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return parts.Length > 0 && int.TryParse(parts[0], out var value) ? value : 1;
+    }
+
+    private static string ExtractCSeqMethod(string cseq)
+    {
+        var parts = cseq.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 1 ? parts[1] : "";
     }
 
     private static string EnsureToTag(string to, string localTag)
