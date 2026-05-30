@@ -8,12 +8,18 @@
         MinWidth="520"
         MinHeight="660"
         SizeToContent="Height"
-        ResizeMode="CanResize"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
         WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI Variable Text, Segoe UI"
-        Background="#F4F7FB">
-    <Grid Margin="24" MaxWidth="620" HorizontalAlignment="Center">
-        <Border Style="{StaticResource PanelStyle}">
+        Background="Transparent">
+    <Border Background="#F4F7FB" CornerRadius="22" BorderBrush="#D7E1EC" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="32" ShadowDepth="10" Opacity="0.18" Color="#07111E" />
+        </Border.Effect>
+        <Grid Margin="20" MaxWidth="620" HorizontalAlignment="Center">
+            <Border Style="{StaticResource PanelStyle}" CornerRadius="18">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -22,19 +28,20 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Margin="0,0,0,18">
-                    <Border Width="54"
-                            Height="54"
-                            CornerRadius="8"
-                            Background="#2DD4BF"
-                            HorizontalAlignment="Left"
-                            Margin="0,0,0,12">
-                        <TextBlock Text="MS"
-                                   Foreground="#101622"
-                                   FontWeight="Black"
-                                   FontSize="18"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
+                    <Grid Margin="0,0,0,14">
+                        <Border Width="54"
+                                Height="54"
+                                CornerRadius="14"
+                                Background="#101622"
+                                HorizontalAlignment="Left">
+                            <Image Source="Assets/CKMedia-Icon.png" Width="34" Height="34" Stretch="Uniform" />
+                        </Border>
+                        <Button Content="Close"
+                                HorizontalAlignment="Right"
+                                Width="80"
+                                Padding="10,7"
+                                Click="CancelButton_Click" />
+                    </Grid>
                     <TextBlock Text="Merlin SIP"
                                Foreground="{StaticResource InkBrush}"
                                FontSize="30"
@@ -133,6 +140,7 @@
                             Click="ContinueButton_Click" />
                 </Grid>
             </Grid>
-        </Border>
-    </Grid>
+            </Border>
+        </Grid>
+    </Border>
 </Window>

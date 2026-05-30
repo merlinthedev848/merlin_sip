@@ -7,7 +7,12 @@ namespace MerlinSip.Services;
 
 public sealed class ProvisioningService
 {
-    private const string ProvisioningUrl = "https://dev.chriskendall.media/sip/provision";
+    private static readonly Uri[] ProvisioningUrls =
+    [
+        new("https://accounts.chriskendall.media/sip/provision"),
+        new("https://accounts.chriskendall.media/index.php/sip/provision")
+    ];
+
     private static readonly HttpClient HttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(20)
@@ -30,38 +35,51 @@ public sealed class ProvisioningService
 
         try
         {
-            using var response = await HttpClient.PostAsJsonAsync(
-                ProvisioningUrl,
-                new ProvisioningRequest(cleanedCode, LicenseService.ProductId),
-                cancellationToken);
-            var payload = await response.Content.ReadFromJsonAsync<ProvisioningResponse>(cancellationToken: cancellationToken);
+            ProvisioningResult? lastFailure = null;
 
-            if (!response.IsSuccessStatusCode || payload is null || !payload.Success || payload.Sip is null)
+            foreach (var url in ProvisioningUrls)
             {
-                return ProvisioningResult.Fail(ToCustomerMessage(payload?.Error, response.StatusCode));
+                using var response = await HttpClient.PostAsJsonAsync(url, new ProvisioningRequest(cleanedCode), cancellationToken);
+                var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+                var isJson = contentType.Contains("json", StringComparison.OrdinalIgnoreCase);
+
+                if (!isJson)
+                {
+                    DebugLog.Write($"PROVISION endpoint returned non-json status={(int)response.StatusCode} url={url}");
+                    lastFailure = ProvisioningResult.Fail("The provisioning service is not available right now.");
+                    continue;
+                }
+
+                var payload = await response.Content.ReadFromJsonAsync<ProvisioningResponse>(cancellationToken: cancellationToken);
+                if (!response.IsSuccessStatusCode || payload is null || !payload.Success || payload.Sip is null)
+                {
+                    return ProvisioningResult.Fail(ToCustomerMessage(payload?.Error, response.StatusCode));
+                }
+
+                if (string.IsNullOrWhiteSpace(payload.Sip.Extension) ||
+                    string.IsNullOrWhiteSpace(payload.Sip.AuthName) ||
+                    string.IsNullOrWhiteSpace(payload.Sip.SipPassword))
+                {
+                    return ProvisioningResult.Fail("The provisioning code did not return complete account details.");
+                }
+
+                var config = new AppStartupConfig(
+                    AppStartupConfig.FixedSipServer,
+                    AppStartupConfig.FixedSipPort,
+                    AppStartupConfig.FixedSipServer,
+                    payload.Sip.Extension.Trim(),
+                    payload.Sip.AuthName.Trim(),
+                    payload.Sip.SipPassword,
+                    licenseKey,
+                    licenseStatus,
+                    audioInput,
+                    audioOutput,
+                    videoSource).WithFixedSipEndpoint();
+
+                return ProvisioningResult.Ok(config);
             }
 
-            if (string.IsNullOrWhiteSpace(payload.Sip.Extension) ||
-                string.IsNullOrWhiteSpace(payload.Sip.AuthName) ||
-                string.IsNullOrWhiteSpace(payload.Sip.SipPassword))
-            {
-                return ProvisioningResult.Fail("The provisioning code did not return complete account details.");
-            }
-
-            var config = new AppStartupConfig(
-                AppStartupConfig.FixedSipServer,
-                AppStartupConfig.FixedSipPort,
-                AppStartupConfig.FixedSipServer,
-                payload.Sip.Extension.Trim(),
-                payload.Sip.AuthName.Trim(),
-                payload.Sip.SipPassword,
-                licenseKey,
-                licenseStatus,
-                audioInput,
-                audioOutput,
-                videoSource).WithFixedSipEndpoint();
-
-            return ProvisioningResult.Ok(config);
+            return lastFailure ?? ProvisioningResult.Fail("The provisioning service is not available right now.");
         }
         catch (Exception error)
         {
@@ -86,9 +104,7 @@ public sealed class ProvisioningService
         return "The provisioning code could not be accepted.";
     }
 
-    private sealed record ProvisioningRequest(
-        [property: JsonPropertyName("code")] string Code,
-        [property: JsonPropertyName("product_id")] string ProductId);
+    private sealed record ProvisioningRequest([property: JsonPropertyName("code")] string Code);
 
     private sealed record ProvisioningResponse(
         [property: JsonPropertyName("success")] bool Success,

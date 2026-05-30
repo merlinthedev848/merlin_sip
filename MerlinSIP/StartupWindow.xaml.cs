@@ -76,7 +76,7 @@ public partial class StartupWindow : Window
         LicenseStepPanel.Visibility = Visibility.Collapsed;
         CredentialsStepPanel.Visibility = Visibility.Visible;
         SubtitleText.Text = "License accepted. Now choose how to authenticate this device.";
-        ContinueButton.Content = "Open Merlin SIP";
+        ContinueButton.Content = "Provision";
     }
 
     private async Task AcceptCredentialsStep()
