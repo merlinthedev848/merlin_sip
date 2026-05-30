@@ -84,6 +84,8 @@ public partial class MainWindow : Window
     {
         _activeCallConnectedAt = DateTimeOffset.Now;
         CallTimerPill.Visibility = Visibility.Visible;
+        CallTimerPill.Background = (Brush)new BrushConverter().ConvertFromString("#DFF8EE")!;
+        CallTimerText.Foreground = (Brush)new BrushConverter().ConvertFromString("#106247")!;
         UpdateCallTimer();
         _callTimer.Start();
     }
@@ -92,8 +94,10 @@ public partial class MainWindow : Window
     {
         _callTimer.Stop();
         _activeCallConnectedAt = null;
-        CallTimerText.Text = "00:00";
-        CallTimerPill.Visibility = Visibility.Collapsed;
+        CallTimerText.Text = "Inactive";
+        CallTimerPill.Visibility = Visibility.Visible;
+        CallTimerPill.Background = (Brush)new BrushConverter().ConvertFromString("#FFE2E2")!;
+        CallTimerText.Foreground = (Brush)new BrushConverter().ConvertFromString("#9B1C1C")!;
     }
 
     private void UpdateCallTimer()
@@ -105,9 +109,10 @@ public partial class MainWindow : Window
         }
 
         var elapsed = DateTimeOffset.Now - _activeCallConnectedAt.Value;
-        CallTimerText.Text = elapsed.TotalHours >= 1
+        var time = elapsed.TotalHours >= 1
             ? elapsed.ToString(@"hh\:mm\:ss")
             : elapsed.ToString(@"mm\:ss");
+        CallTimerText.Text = $"Active {time}";
     }
 
     private void ShowIncomingCallWindow(string callerName, string callerNumber)
@@ -292,6 +297,16 @@ public partial class MainWindow : Window
         SetConnectionState("Connecting...", "#FFF1D6", "#8A4F08");
         ServerStatusText.Text = "Checking account connection.";
         await RefreshConnectionDiagnosticsAsync();
+        if (!NetworkInterface.GetIsNetworkAvailable())
+        {
+            _registered = false;
+            SetConnectionState("No network", "#FFE2E2", "#9B1C1C");
+            ServerStatusText.Text = "No network connectivity detected.";
+            FooterStatusText.Text = "No network connectivity.";
+            UpdateCallControls();
+            return;
+        }
+
         SipRegistrationResult result;
         try
         {
@@ -355,14 +370,22 @@ public partial class MainWindow : Window
         {
             using var ping = new Ping();
             var reply = await ping.SendPingAsync(AppStartupConfig.FixedSipServer, 2500);
-            PingStatusText.Text = reply.Status == IPStatus.Success
-                ? $"{reply.RoundtripTime} ms"
-                : reply.Status.ToString();
+            if (reply.Status == IPStatus.Success)
+            {
+                PingStatusText.Text = $"{reply.RoundtripTime} ms";
+                return;
+            }
+
+            PingStatusText.Text = NetworkInterface.GetIsNetworkAvailable()
+                ? reply.Status.ToString()
+                : "No network connectivity";
         }
         catch (Exception error)
         {
             DebugLog.Write($"PING failed error={error.Message}");
-            PingStatusText.Text = "Unavailable";
+            PingStatusText.Text = NetworkInterface.GetIsNetworkAvailable()
+                ? "Unavailable"
+                : "No network connectivity";
         }
     }
 
@@ -375,7 +398,9 @@ public partial class MainWindow : Window
 
         if (message.Contains("No such host", StringComparison.OrdinalIgnoreCase))
         {
-            return "Unable to reach the service.";
+            return NetworkInterface.GetIsNetworkAvailable()
+                ? "Unable to reach the service."
+                : "No network connectivity detected.";
         }
 
         if (message.Contains("Timed out", StringComparison.OrdinalIgnoreCase))
@@ -488,7 +513,7 @@ public partial class MainWindow : Window
         _muted = false;
         _held = false;
         _sipRegistrationService.SetMuted(false);
-        _sipRegistrationService.SetHeld(false);
+        _sipRegistrationService.SetHeldLocal(false);
         MuteButton.Content = "Mute";
         HoldButton.Content = "Hold";
         _incomingRinging = false;
@@ -598,7 +623,7 @@ public partial class MainWindow : Window
         FooterStatusText.Text = _muted ? "Microphone muted." : "Microphone unmuted.";
     }
 
-    private void HoldButton_Click(object sender, RoutedEventArgs e)
+    private async void HoldButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_sipRegistrationService.CanControlAudio)
         {
@@ -606,10 +631,21 @@ public partial class MainWindow : Window
             return;
         }
 
-        _held = !_held;
-        _sipRegistrationService.SetHeld(_held);
+        var nextHeld = !_held;
+        HoldButton.IsEnabled = false;
+        var result = await _sipRegistrationService.SetHeldAsync(nextHeld);
+        HoldButton.IsEnabled = true;
+        if (!result.Signalled)
+        {
+            FooterStatusText.Text = result.Message;
+            return;
+        }
+
+        _held = nextHeld;
         HoldButton.Content = _held ? "Resume" : "Hold";
-        FooterStatusText.Text = _held ? "Call audio paused." : "Call audio resumed.";
+        FooterStatusText.Text = _held
+            ? "Call is on hold. PBX hold music will be used if enabled."
+            : "Call resumed.";
     }
 
     private async void TransferButton_Click(object sender, RoutedEventArgs e)
@@ -633,6 +669,18 @@ public partial class MainWindow : Window
 
         var result = await _sipRegistrationService.TransferAsync(target);
         FooterStatusText.Text = result.Message;
+        if (result.Signalled)
+        {
+            _muted = false;
+            _held = false;
+            MuteButton.Content = "Mute";
+            HoldButton.Content = "Hold";
+            _callInProgress = false;
+            _callConnected = false;
+            StopCallTimer();
+            ClearDialpadAfterCall();
+            UpdateCallControls();
+        }
     }
 
     private async void DndButton_Click(object sender, RoutedEventArgs e)
@@ -788,10 +836,7 @@ public partial class MainWindow : Window
 
     private async void ReconnectButton_Click(object sender, RoutedEventArgs e)
     {
-        var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
-        var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
-        var videoSource = VideoSourceComboBox.SelectedItem as MediaDeviceInfo ?? _config.VideoSource;
-        var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
+        var mediaConfig = BuildConfigFromSettings();
         _config = _config with
         {
             Server = AppStartupConfig.FixedSipServer,
@@ -800,10 +845,10 @@ public partial class MainWindow : Window
             Extension = ExtensionTextBox.Text.Trim(),
             Username = UsernameTextBox.Text.Trim(),
             Password = PasswordBox.Password,
-            AudioInput = audioInput,
-            AudioOutput = audioOutput,
-            VideoSource = videoSource,
-            Ringtone = ringtone?.Id ?? _config.Ringtone
+            AudioInput = mediaConfig.AudioInput,
+            AudioOutput = mediaConfig.AudioOutput,
+            VideoSource = mediaConfig.VideoSource,
+            Ringtone = mediaConfig.Ringtone
         };
         _config = _config.WithFixedSipEndpoint();
 
@@ -812,6 +857,41 @@ public partial class MainWindow : Window
         _registered = false;
         UpdateCallControls();
         await RegisterSipAsync();
+    }
+
+    private AppStartupConfig BuildConfigFromSettings()
+    {
+        var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
+        var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
+        var videoSource = VideoSourceComboBox.SelectedItem as MediaDeviceInfo ?? _config.VideoSource;
+        var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
+        return _config with
+        {
+            AudioInput = audioInput,
+            AudioOutput = audioOutput,
+            VideoSource = videoSource,
+            Ringtone = ringtone?.Id ?? _config.Ringtone
+        };
+    }
+
+    private async void SaveDevicesButton_Click(object sender, RoutedEventArgs e)
+    {
+        var previousInput = _config.AudioInput;
+        var previousOutput = _config.AudioOutput;
+        var previousVideo = _config.VideoSource;
+        _config = BuildConfigFromSettings().WithFixedSipEndpoint();
+        await _cacheService.SaveSettingsAsync(_config);
+
+        var mediaDeviceChanged =
+            previousInput.Id != _config.AudioInput.Id ||
+            previousOutput.Id != _config.AudioOutput.Id ||
+            previousVideo.Id != _config.VideoSource.Id;
+
+        SettingsOverlay.Visibility = Visibility.Collapsed;
+        FooterStatusText.Text = mediaDeviceChanged
+            ? "Device settings saved. Current registration stays active."
+            : "Ringtone saved. Extension remains connected.";
+        UpdateCallControls();
     }
 
     private async void ProvisionAndReconnectButton_Click(object sender, RoutedEventArgs e)

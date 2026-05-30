@@ -2,7 +2,7 @@
   <Package
     Name="Merlin SIP"
     Manufacturer="CK Media Services"
-    Version="1.0.8"
+    Version="1.0.9"
     UpgradeCode="{8E5C2C6E-3A1E-4F83-9897-4E62EB06E0EC}"
     Scope="perMachine">
 

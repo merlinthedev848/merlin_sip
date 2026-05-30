@@ -221,12 +221,11 @@
                                 <DockPanel Margin="0,0,0,16">
                                     <Border DockPanel.Dock="Right"
                                             x:Name="CallTimerPill"
-                                            Visibility="Collapsed"
-                                            Background="#DFF8EE"
+                                            Background="#FFE2E2"
                                             CornerRadius="8"
                                             Padding="12,8"
                                             VerticalAlignment="Top">
-                                        <TextBlock x:Name="CallTimerText" Text="00:00" FontWeight="Black" Foreground="#106247" />
+                                        <TextBlock x:Name="CallTimerText" Text="Inactive" FontWeight="Black" Foreground="#9B1C1C" />
                                     </Border>
                                     <StackPanel>
                                         <TextBlock Text="Dial" Foreground="#64748B" FontWeight="Bold" />
@@ -277,74 +276,75 @@
                             </Grid>
                         </Border>
 
-                        <Grid Grid.Column="1">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="220" />
-                            </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Style="{StaticResource Surface}" Margin="0,0,0,20">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                    </Grid.RowDefinitions>
-                                    <DockPanel Margin="0,0,0,14">
-                                        <Button DockPanel.Dock="Right" Content="Use selected" Style="{StaticResource SoftButton}" Width="130" Click="UseSelectedContactButton_Click" />
-                                        <StackPanel>
-                                            <TextBlock Text="Contacts" Foreground="#111827" FontSize="24" FontWeight="Black" />
-                                            <TextBlock Text="Quick dial and caller lookup." Foreground="#64748B" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                    <ListBox x:Name="DialContactsListView" Grid.Row="1" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource ContactCard}" MouseDoubleClick="ContactsListView_MouseDoubleClick">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <DockPanel>
-                                                    <Border DockPanel.Dock="Right" Background="#E8F8F4" CornerRadius="8" Padding="12,8">
-                                                        <TextBlock Text="{Binding Number}" Foreground="#0E987E" FontWeight="Black" />
-                                                    </Border>
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Name}" Foreground="#111827" FontSize="17" FontWeight="Black" />
-                                                        <TextBlock Text="{Binding Company}" Foreground="#64748B" />
-                                                        <TextBlock Text="{Binding Notes}" Foreground="#94A3B8" FontSize="12" />
-                                                    </StackPanel>
-                                                </DockPanel>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </Grid>
-                            </Border>
+                        <Border Grid.Column="1" Style="{StaticResource Surface}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Open full view" Style="{StaticResource SoftButton}" Width="130" Click="ShowCallsButton_Click" />
+                                    <StackPanel>
+                                        <TextBlock Text="Quick access" Foreground="#111827" FontSize="24" FontWeight="Black" />
+                                        <TextBlock Text="Double-click to call." Foreground="#64748B" />
+                                    </StackPanel>
+                                </DockPanel>
 
-                            <Border Grid.Row="1" Style="{StaticResource Surface}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                    </Grid.RowDefinitions>
-                                    <DockPanel Margin="0,0,0,12">
-                                        <Button DockPanel.Dock="Right" Content="View all" Style="{StaticResource SoftButton}" Width="110" Click="ShowCallsButton_Click" />
-                                        <TextBlock Text="Recent calls" Foreground="#111827" FontSize="22" FontWeight="Black" />
-                                    </DockPanel>
-                                    <ListBox x:Name="RecentCallsListView" Grid.Row="1" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource ContactCard}" MouseDoubleClick="RecentCallsListView_MouseDoubleClick">
-                                        <ListBox.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel />
-                                            </ItemsPanelTemplate>
-                                        </ListBox.ItemsPanel>
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <DockPanel Width="250">
-                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Result}" Foreground="#2750A7" FontWeight="Black" />
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="Black" />
-                                                        <TextBlock Text="{Binding Number}" Foreground="#64748B" />
-                                                    </StackPanel>
-                                                </DockPanel>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </Grid>
-                            </Border>
-                        </Grid>
+                                <TabControl Grid.Row="1">
+                                    <TabItem Header="Recent calls">
+                                        <ListBox x:Name="RecentCallsListView" BorderThickness="0" Background="Transparent" MouseDoubleClick="RecentCallsListView_MouseDoubleClick">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,1" Background="#F8FBFE">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="1.3*" />
+                                                            <ColumnDefinition Width="1*" />
+                                                            <ColumnDefinition Width="90" />
+                                                            <ColumnDefinition Width="80" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0" Margin="12,10">
+                                                            <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="Black" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Direction}" Foreground="#64748B" FontSize="12" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#475569" VerticalAlignment="Center" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding Duration}" Foreground="#64748B" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                                        <Border Grid.Column="3" Background="#EEF4FB" CornerRadius="7" Padding="8,5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                            <TextBlock Text="{Binding Result}" Foreground="#2750A7" FontWeight="Black" FontSize="12" />
+                                                        </Border>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </TabItem>
+
+                                    <TabItem Header="Contacts">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <ListBox x:Name="DialContactsListView" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource ContactCard}" MouseDoubleClick="ContactsListView_MouseDoubleClick">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <DockPanel>
+                                                            <Border DockPanel.Dock="Right" Background="#E8F8F4" CornerRadius="8" Padding="12,8">
+                                                                <TextBlock Text="{Binding Number}" Foreground="#0E987E" FontWeight="Black" />
+                                                            </Border>
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Name}" Foreground="#111827" FontSize="17" FontWeight="Black" />
+                                                                <TextBlock Text="{Binding Company}" Foreground="#64748B" />
+                                                                <TextBlock Text="{Binding Notes}" Foreground="#94A3B8" FontSize="12" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                            <Button Grid.Row="1" Content="Use selected" Style="{StaticResource SoftButton}" Margin="0,12,0,0" Click="UseSelectedContactButton_Click" />
+                                        </Grid>
+                                    </TabItem>
+                                </TabControl>
+                            </Grid>
+                        </Border>
                     </Grid>
                 </TabItem>
 
@@ -419,28 +419,28 @@
                                     <TextBlock Text="Call history." Foreground="#64748B" />
                                 </StackPanel>
                             </DockPanel>
-                            <ListBox x:Name="CallHistoryListView" Grid.Row="1" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource ContactCard}" MouseDoubleClick="CallHistoryListView_MouseDoubleClick">
+                            <ListBox x:Name="CallHistoryListView" Grid.Row="1" BorderThickness="0" Background="Transparent" MouseDoubleClick="CallHistoryListView_MouseDoubleClick">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <DockPanel>
-                                            <Border DockPanel.Dock="Right" Background="#EEF4FB" CornerRadius="8" Padding="12,8">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Result}" Foreground="#2750A7" FontWeight="Black" HorizontalAlignment="Right" />
-                                                    <TextBlock Text="{Binding Duration}" Foreground="#64748B" HorizontalAlignment="Right" />
-                                                </StackPanel>
-                                            </Border>
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Name}" Foreground="#111827" FontSize="17" FontWeight="Black" />
-                                                <TextBlock Foreground="#64748B">
-                                                    <Run Text="{Binding Direction}" />
-                                                    <Run Text="  " />
-                                                    <Run Text="{Binding Number}" />
-                                                    <Run Text="  " />
-                                                    <Run Text="{Binding StartedAt}" />
-                                                </TextBlock>
-                                                <TextBlock Text="{Binding Detail}" Foreground="#94A3B8" FontSize="12" />
+                                        <Grid Margin="0,0,0,1" Background="#F8FBFE">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.25*" />
+                                                <ColumnDefinition Width="1*" />
+                                                <ColumnDefinition Width="1*" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="100" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="12,10">
+                                                <TextBlock Text="{Binding Name}" Foreground="#111827" FontSize="15" FontWeight="Black" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Direction}" Foreground="#64748B" FontSize="12" />
                                             </StackPanel>
-                                        </DockPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#475569" VerticalAlignment="Center" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Text="{Binding StartedAt}" Foreground="#64748B" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Text="{Binding Duration}" Foreground="#64748B" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                            <Border Grid.Column="4" Background="#EEF4FB" CornerRadius="7" Padding="9,5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding Result}" Foreground="#2750A7" FontWeight="Black" FontSize="12" />
+                                            </Border>
+                                        </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
@@ -535,7 +535,7 @@
                                     <ComboBox x:Name="RingtoneComboBox" DisplayMemberPath="Name" Margin="0,5,0,12" />
                                     <TextBlock Text="Video source" Foreground="#64748B" FontWeight="Bold" />
                                     <ComboBox x:Name="VideoSourceComboBox" Margin="0,5,0,18" />
-                                    <Button Content="Save and reconnect" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="ReconnectButton_Click" />
+                                    <Button Content="Save devices" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveDevicesButton_Click" />
                                 </StackPanel>
                             </TabItem>
 

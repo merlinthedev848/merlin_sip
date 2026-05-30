@@ -49,7 +49,53 @@ public sealed class SipRegistrationService : IDisposable
         _audioSession?.SetMuted(muted);
     }
 
-    public void SetHeld(bool held)
+    public async Task<SipCallResult> SetHeldAsync(bool held, CancellationToken cancellationToken = default)
+    {
+        if (_client is null || _config is null || _activeCall is null || !_activeCall.Established)
+        {
+            return new SipCallResult(false, "Connect a call before using hold.");
+        }
+
+        var cseq = _inviteCseq++;
+        var branch = CreateBranch();
+        var reInvite = BuildReInvite(_activeCall, cseq, branch, held, null);
+        _activeCall = _activeCall with { CSeq = cseq, InviteBranch = branch };
+        DebugLog.Write($"SEND HOLD REINVITE callId={_activeCall.CallId} held={held}");
+        var response = await SendAndWaitFromListenerAsync(reInvite, cancellationToken);
+
+        if (response.Code is 401 or 407)
+        {
+            await SendAckForFinalInviteResponseAsync(response, cancellationToken);
+            var challengeHeader = response.Headers.TryGetValue("www-authenticate", out var wwwAuthenticate)
+                ? wwwAuthenticate
+                : response.Headers.GetValueOrDefault("proxy-authenticate", "");
+            var authCseq = _inviteCseq++;
+            var authBranch = CreateBranch();
+            var authorization = BuildDigestAuthorization("INVITE", $"sip:{_activeCall.Target}", challengeHeader);
+            var authInvite = BuildReInvite(_activeCall, authCseq, authBranch, held, authorization);
+            _activeCall = _activeCall with { CSeq = authCseq, InviteBranch = authBranch };
+            DebugLog.Write($"SEND AUTH HOLD REINVITE callId={_activeCall.CallId} held={held}");
+            response = await SendAndWaitFromListenerAsync(authInvite, cancellationToken);
+        }
+
+        if (response.Code is >= 200 and < 300)
+        {
+            _activeCall = _activeCall with { RemoteTag = ExtractTag(response.Headers.GetValueOrDefault("to", "")) };
+            await SendAckForInviteResponseAsync(response, cancellationToken, false);
+            _audioSession?.SetHeld(held);
+            DebugLog.Write($"HOLD state accepted held={held} callId={_activeCall.CallId}");
+            return new SipCallResult(true, held ? "Call placed on hold." : "Call resumed.");
+        }
+
+        if (response.Code >= 300)
+        {
+            await SendAckForFinalInviteResponseAsync(response, cancellationToken);
+        }
+
+        return new SipCallResult(false, $"Hold request failed: {response.Code} {response.Reason}".Trim());
+    }
+
+    public void SetHeldLocal(bool held)
     {
         _audioSession?.SetHeld(held);
     }
@@ -323,7 +369,12 @@ public sealed class SipRegistrationService : IDisposable
             DebugLog.Write($"SEND REFER failed callId={_activeCall.CallId} error={error.Message}");
             return new SipCallResult(false, $"Unable to transfer call: {error.Message}");
         }
-        return new SipCallResult(true, $"Transfer requested to {destination}.");
+        _audioSession?.Dispose();
+        _audioSession = null;
+        _activeCall = null;
+        QueueRegistrationRefresh("transfer");
+        CallEnded?.Invoke(this, new CallEndedEventArgs("Call transferred. Extension remains registered."));
+        return new SipCallResult(true, $"Transfer requested to {destination}. Call cleared locally.");
     }
 
     public void Dispose()
@@ -498,6 +549,56 @@ public sealed class SipRegistrationService : IDisposable
             "",
             sdp
         ]);
+    }
+
+    private string BuildReInvite(ActiveCall call, int cseq, string branch, bool held, string? authorization)
+    {
+        var direction = held ? "sendonly" : "sendrecv";
+        var sdp = string.Join("\r\n", [
+            "v=0",
+            $"o=MerlinSIP 0 0 IN IP4 {_localAddress}",
+            "s=Merlin SIP call",
+            $"c=IN IP4 {_localAddress}",
+            "t=0 0",
+            $"m=audio {_audioSession?.LocalPort ?? 40000} RTP/AVP 0 8 101",
+            "a=rtpmap:0 PCMU/8000",
+            "a=rtpmap:8 PCMA/8000",
+            "a=rtpmap:101 telephone-event/8000",
+            "a=fmtp:101 0-16",
+            $"a={direction}"
+        ]) + "\r\n";
+
+        var to = $"<sip:{call.Target}>";
+        if (!string.IsNullOrWhiteSpace(call.RemoteTag))
+        {
+            to += $";tag={call.RemoteTag}";
+        }
+
+        var lines = new List<string>
+        {
+            $"INVITE sip:{call.Target} SIP/2.0",
+            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={branch};rport",
+            "Max-Forwards: 70",
+            $"From: <sip:{_config!.Extension}@{_domain}>;tag={call.LocalTag}",
+            $"To: {to}",
+            $"Call-ID: {call.CallId}",
+            $"CSeq: {cseq} INVITE",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            "User-Agent: Merlin SIP",
+            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY",
+            "Supported: replaces, timer",
+            "Content-Type: application/sdp",
+            $"Content-Length: {Encoding.UTF8.GetByteCount(sdp)}",
+            "",
+            sdp
+        };
+
+        if (!string.IsNullOrWhiteSpace(authorization))
+        {
+            lines.Insert(8, $"Authorization: {authorization}");
+        }
+
+        return string.Join("\r\n", lines);
     }
 
     private string BuildCancel(ActiveCall call)
@@ -718,10 +819,20 @@ public sealed class SipRegistrationService : IDisposable
             return;
         }
 
-        var ack = BuildAck(_activeCall, true);
+        await SendAckForInviteResponseAsync(response, cancellationToken, true);
+    }
+
+    private async Task SendAckForInviteResponseAsync(SipResponse response, CancellationToken cancellationToken, bool reuseInviteBranch)
+    {
+        if (_activeCall is null || _client is null || _config is null)
+        {
+            return;
+        }
+
+        var ack = BuildAck(_activeCall, reuseInviteBranch);
         var payload = Encoding.UTF8.GetBytes(ack);
         await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
-        DebugLog.Write($"SEND ACK final-error callId={_activeCall.CallId} code={response.Code} bytes={payload.Length}");
+        DebugLog.Write($"SEND ACK callId={_activeCall.CallId} code={response.Code} bytes={payload.Length}");
     }
 
     private string BuildAck(ActiveCall call, bool reuseInviteBranch)
