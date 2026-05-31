@@ -47,7 +47,9 @@ public sealed class AppCacheService
             settings.AudioInput,
             settings.AudioOutput,
             settings.VideoSource,
-            string.IsNullOrWhiteSpace(settings.Ringtone) ? AppStartupConfig.DefaultRingtone : settings.Ringtone).WithFixedSipEndpoint();
+            string.IsNullOrWhiteSpace(settings.Ringtone) ? AppStartupConfig.DefaultRingtone : settings.Ringtone,
+            ClampVolume(settings.MicrophoneVolume),
+            ClampVolume(settings.HeadphoneVolume)).WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
@@ -64,7 +66,9 @@ public sealed class AppCacheService
             config.AudioInput,
             config.AudioOutput,
             config.VideoSource,
-            config.Ringtone);
+            config.Ringtone,
+            config.MicrophoneVolume,
+            config.HeadphoneVolume);
 
         Directory.CreateDirectory(_root);
         await using var stream = File.Create(SettingsPath);
@@ -118,6 +122,11 @@ public sealed class AppCacheService
         }
     }
 
+    private static double ClampVolume(double? value)
+    {
+        return Math.Clamp(value ?? 1.0, 0.25, 2.0);
+    }
+
     private sealed record SavedAppSettings(
         string? Extension,
         string? Username,
@@ -130,5 +139,7 @@ public sealed class AppCacheService
         MediaDeviceInfo AudioInput,
         MediaDeviceInfo AudioOutput,
         MediaDeviceInfo VideoSource,
-        string? Ringtone = null);
+        string? Ringtone = null,
+        double? MicrophoneVolume = null,
+        double? HeadphoneVolume = null);
 }

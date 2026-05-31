@@ -26,6 +26,9 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
     private readonly DispatcherTimer _callTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _connectionWatchdog = new() { Interval = TimeSpan.FromSeconds(15) };
+    private bool _connectionCheckInProgress;
+    private bool _startupUpdateCheckCompleted;
     private AppStartupConfig _config;
     private DateTimeOffset? _activeCallStartedAt;
     private DateTimeOffset? _activeCallConnectedAt;
@@ -55,6 +58,7 @@ public partial class MainWindow : Window
         _sipRegistrationService.CallProgress += SipRegistrationService_CallProgress;
         _sipRegistrationService.CallEnded += SipRegistrationService_CallEnded;
         _callTimer.Tick += CallTimer_Tick;
+        _connectionWatchdog.Tick += ConnectionWatchdog_Tick;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
         UpdateCallControls();
@@ -66,13 +70,60 @@ public partial class MainWindow : Window
         await LoadCallHistoryAsync();
         await Dispatcher.InvokeAsync(LoadDeviceSelectors, DispatcherPriority.Background);
         _ = RegisterSipAsync();
+        _connectionWatchdog.Start();
+        _ = CheckForUpdatesOnStartupAsync();
     }
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
         HideIncomingCallSurfaces();
+        _connectionWatchdog.Stop();
         _ringtonePlayer.Dispose();
         _sipRegistrationService.Dispose();
+    }
+
+    private async void ConnectionWatchdog_Tick(object? sender, EventArgs e)
+    {
+        await EnsureConnectionReadyAsync();
+    }
+
+    private async Task EnsureConnectionReadyAsync()
+    {
+        if (_connectionCheckInProgress || _callInProgress || _incomingRinging)
+        {
+            return;
+        }
+
+        _connectionCheckInProgress = true;
+        try
+        {
+            if (!NetworkInterface.GetIsNetworkAvailable())
+            {
+                _registered = false;
+                SetConnectionState("No network", "#FFE2E2", "#9B1C1C");
+                FooterStatusText.Text = "No network connectivity.";
+                UpdateCallControls();
+                return;
+            }
+
+            if (!_registered)
+            {
+                await RegisterSipAsync();
+                return;
+            }
+
+            var result = await _sipRegistrationService.RefreshRegistrationAsync();
+            if (!result.Connected)
+            {
+                _registered = false;
+                SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
+                await RegisterSipAsync();
+            }
+        }
+        finally
+        {
+            _connectionCheckInProgress = false;
+        }
     }
 
     private void CallTimer_Tick(object? sender, EventArgs e)
@@ -167,7 +218,7 @@ public partial class MainWindow : Window
             _callInProgress = true;
             _callConnected = false;
             UpdateCallControls();
-            _ringtonePlayer.Start(_config.AudioOutput, _config.Ringtone);
+            _ringtonePlayer.Start(_config.AudioOutput, _config.Ringtone, _config.HeadphoneVolume);
             ShowIncomingCallWindow(callerName, e.CallerNumber);
             _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming call received.");
         });
@@ -258,6 +309,7 @@ public partial class MainWindow : Window
         SelectDevice(AudioOutputComboBox, _config.AudioOutput);
         SelectDevice(VideoSourceComboBox, _config.VideoSource);
         SelectRingtone(_config.Ringtone);
+        LoadVolumeSliders();
     }
 
     private void LoadDefaultDeviceSelectors()
@@ -270,6 +322,7 @@ public partial class MainWindow : Window
         AudioOutputComboBox.SelectedIndex = 0;
         VideoSourceComboBox.SelectedIndex = 0;
         SelectRingtone(_config.Ringtone);
+        LoadVolumeSliders();
     }
 
     private static void SelectDevice(ComboBox comboBox, MediaDeviceInfo selected)
@@ -290,6 +343,29 @@ public partial class MainWindow : Window
     {
         RingtoneComboBox.SelectedItem = RingtonePlayer.Choices.FirstOrDefault(choice => choice.Id == ringtone)
             ?? RingtonePlayer.Choices.First(choice => choice.Id == AppStartupConfig.DefaultRingtone);
+    }
+
+    private void LoadVolumeSliders()
+    {
+        HeadphoneVolumeSlider.Value = _config.HeadphoneVolume * 100;
+        MicrophoneVolumeSlider.Value = _config.MicrophoneVolume * 100;
+        UpdateVolumeText();
+    }
+
+    private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateVolumeText();
+    }
+
+    private void UpdateVolumeText()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        HeadphoneVolumeText.Text = $"{HeadphoneVolumeSlider.Value:0}%";
+        MicrophoneVolumeText.Text = $"{MicrophoneVolumeSlider.Value:0}%";
     }
 
     private async Task RegisterSipAsync()
@@ -877,8 +953,22 @@ public partial class MainWindow : Window
             AudioInput = audioInput,
             AudioOutput = audioOutput,
             VideoSource = videoSource,
-            Ringtone = ringtone?.Id ?? _config.Ringtone
+            Ringtone = ringtone?.Id ?? _config.Ringtone,
+            MicrophoneVolume = Math.Clamp(MicrophoneVolumeSlider.Value / 100, 0.25, 2.0),
+            HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0)
         };
+    }
+
+    private void TestToneButton_Click(object sender, RoutedEventArgs e)
+    {
+        var output = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
+        var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
+        _ringtonePlayer.Start(output, ringtone?.Id ?? _config.Ringtone, HeadphoneVolumeSlider.Value / 100);
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(2200);
+            await Dispatcher.InvokeAsync(() => _ringtonePlayer.Stop());
+        });
     }
 
     private async void SaveDevicesButton_Click(object sender, RoutedEventArgs e)
@@ -897,7 +987,7 @@ public partial class MainWindow : Window
         SettingsOverlay.Visibility = Visibility.Collapsed;
         FooterStatusText.Text = mediaDeviceChanged
             ? "Device settings saved. Current registration stays active."
-            : "Ringtone saved. Extension remains connected.";
+            : "Ringtone saved.";
         UpdateCallControls();
     }
 
@@ -956,6 +1046,16 @@ public partial class MainWindow : Window
     {
         MainTabs.SelectedItem = ContactsTab;
         PhonebookContactsListView.Focus();
+    }
+
+    private void ShowDirectoryHistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        DirectoryTabs.SelectedItem = DirectoryHistoryTab;
+    }
+
+    private void ShowDirectoryContactsButton_Click(object sender, RoutedEventArgs e)
+    {
+        DirectoryTabs.SelectedItem = DirectoryContactsTab;
     }
 
     private void ShowCallsButton_Click(object sender, RoutedEventArgs e)
@@ -1049,6 +1149,52 @@ public partial class MainWindow : Window
         }
 
         CheckUpdatesButton.IsEnabled = true;
+    }
+
+    private async Task CheckForUpdatesOnStartupAsync()
+    {
+        if (_startupUpdateCheckCompleted)
+        {
+            return;
+        }
+
+        _startupUpdateCheckCompleted = true;
+        await Task.Delay(TimeSpan.FromSeconds(8));
+
+        var result = await _updateService.CheckForUpdatesAsync();
+        if (!result.UpdateAvailable || string.IsNullOrWhiteSpace(result.DownloadUrl))
+        {
+            return;
+        }
+
+        UpdateStatusText.Text = result.Message;
+        UpdateNotesText.Text = result.Notes ?? string.Empty;
+        FooterStatusText.Text = "A Merlin SIP update is available.";
+
+        var notes = string.IsNullOrWhiteSpace(result.Notes) ? "" : $"\n\n{result.Notes}";
+        var install = MessageBox.Show(
+            $"{result.Message}{notes}\n\nInstall this update now?",
+            "Merlin SIP update available",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
+
+        if (install == MessageBoxResult.Yes)
+        {
+            try
+            {
+                var installerPath = await _updateService.DownloadInstallerAsync(result);
+                Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{installerPath}\"")
+                {
+                    UseShellExecute = true
+                });
+                Application.Current.Shutdown();
+            }
+            catch (Exception error)
+            {
+                DebugLog.Write($"STARTUP UPDATE failed error={error.Message}");
+                FooterStatusText.Text = "Unable to start the update right now.";
+            }
+        }
     }
 
     private void UpdateCallControls()

@@ -154,7 +154,7 @@ public sealed class SipRegistrationService : IDisposable
         var cseq = _inviteCseq++;
         var inviteBranch = CreateBranch();
         _audioSession?.Dispose();
-        _audioSession = new RtpAudioSession(_config.AudioInput, _config.AudioOutput);
+        _audioSession = new RtpAudioSession(_config.AudioInput, _config.AudioOutput, _config.MicrophoneVolume, _config.HeadphoneVolume);
         try
         {
             _audioSession.PrepareDevices();
@@ -253,7 +253,7 @@ public sealed class SipRegistrationService : IDisposable
         }
 
         _audioSession?.Dispose();
-        _audioSession = new RtpAudioSession(_config.AudioInput, _config.AudioOutput);
+        _audioSession = new RtpAudioSession(_config.AudioInput, _config.AudioOutput, _config.MicrophoneVolume, _config.HeadphoneVolume);
         try
         {
             _audioSession.PrepareDevices();
@@ -318,7 +318,7 @@ public sealed class SipRegistrationService : IDisposable
             _audioSession?.Dispose();
             _audioSession = null;
             QueueRegistrationRefresh("incoming call rejected");
-            return new SipCallResult(true, "Incoming call rejected. Extension remains registered.");
+            return new SipCallResult(true, "Incoming call declined.");
         }
 
         if (_activeCall is null)
@@ -346,7 +346,7 @@ public sealed class SipRegistrationService : IDisposable
         }
         _activeCall = null;
         QueueRegistrationRefresh("local hangup");
-        return new SipCallResult(true, $"{method} sent to SIP server. Extension remains registered.");
+        return new SipCallResult(true, "Call ended.");
     }
 
     public async Task<SipCallResult> TransferAsync(string destination, CancellationToken cancellationToken = default)
@@ -374,7 +374,7 @@ public sealed class SipRegistrationService : IDisposable
         _audioSession = null;
         _activeCall = null;
         QueueRegistrationRefresh("transfer");
-        CallEnded?.Invoke(this, new CallEndedEventArgs("Call transferred. Extension remains registered."));
+        CallEnded?.Invoke(this, new CallEndedEventArgs("Call transferred."));
         return new SipCallResult(true, $"Transfer requested to {destination}. Call cleared locally.");
     }
 
@@ -394,6 +394,11 @@ public sealed class SipRegistrationService : IDisposable
     public void Dispose()
     {
         DisposeClient();
+    }
+
+    public Task<SipRegistrationResult> RefreshRegistrationAsync(CancellationToken cancellationToken = default)
+    {
+        return RegisterCurrentSocketAsync(cancellationToken);
     }
 
     private async Task<SipRegistrationResult> RegisterCurrentSocketAsync(CancellationToken cancellationToken)
@@ -980,7 +985,7 @@ public sealed class SipRegistrationService : IDisposable
                     _audioSession = null;
                     _activeCall = null;
                     _pendingIncomingCall = null;
-                    CallEnded?.Invoke(this, new CallEndedEventArgs("Remote side ended the call. Extension remains registered."));
+                    CallEnded?.Invoke(this, new CallEndedEventArgs("Call ended."));
                     QueueRegistrationRefresh("remote BYE");
                 }
                 else if (message.StartsWith("CANCEL ", StringComparison.OrdinalIgnoreCase))
@@ -991,7 +996,7 @@ public sealed class SipRegistrationService : IDisposable
                     _audioSession = null;
                     _activeCall = null;
                     _pendingIncomingCall = null;
-                    CallEnded?.Invoke(this, new CallEndedEventArgs("Incoming call was cancelled. Extension remains registered."));
+                    CallEnded?.Invoke(this, new CallEndedEventArgs("Incoming call was cancelled."));
                     QueueRegistrationRefresh("remote CANCEL");
                 }
                 else if (message.StartsWith("NOTIFY ", StringComparison.OrdinalIgnoreCase))

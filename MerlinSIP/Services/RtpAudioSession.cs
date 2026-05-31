@@ -11,6 +11,8 @@ public sealed class RtpAudioSession : IDisposable
     private const int SamplesPerPacket = 160;
     private readonly MediaDeviceInfo _inputDevice;
     private readonly MediaDeviceInfo _outputDevice;
+    private readonly double _inputGain;
+    private readonly double _outputGain;
     private readonly UdpClient _rtpClient;
     private readonly List<AudioBuffer> _inputBuffers = [];
     private readonly List<AudioBuffer> _outputBuffers = [];
@@ -32,10 +34,12 @@ public sealed class RtpAudioSession : IDisposable
 
     public int LocalPort { get; }
 
-    public RtpAudioSession(MediaDeviceInfo inputDevice, MediaDeviceInfo outputDevice)
+    public RtpAudioSession(MediaDeviceInfo inputDevice, MediaDeviceInfo outputDevice, double inputGain = 1.0, double outputGain = 1.0)
     {
         _inputDevice = inputDevice;
         _outputDevice = outputDevice;
+        _inputGain = Math.Clamp(inputGain, 0.25, 2.0);
+        _outputGain = Math.Clamp(outputGain, 0.25, 2.0);
         _waveInCallback = WaveInCallback;
         _rtpClient = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
         LocalPort = ((IPEndPoint)_rtpClient.Client.LocalEndPoint!).Port;
@@ -201,6 +205,7 @@ public sealed class RtpAudioSession : IDisposable
         for (var i = 0; i < payload.Length; i++)
         {
             var sample = BitConverter.ToInt16(pcm, i * 2);
+            sample = ApplyGain(sample, _inputGain);
             payload[i] = _payloadType == 8 ? G711Codec.LinearToALaw(sample) : G711Codec.LinearToMuLaw(sample);
         }
 
@@ -256,6 +261,7 @@ public sealed class RtpAudioSession : IDisposable
                 for (var i = 0; i < payload.Length; i++)
                 {
                     var sample = payloadType == 8 ? G711Codec.ALawToLinear(payload[i]) : G711Codec.MuLawToLinear(payload[i]);
+                    sample = ApplyGain(sample, _outputGain);
                     var bytes = BitConverter.GetBytes(sample);
                     pcm[i * 2] = bytes[0];
                     pcm[i * 2 + 1] = bytes[1];
@@ -319,6 +325,11 @@ public sealed class RtpAudioSession : IDisposable
     private static int ParseDeviceId(string id)
     {
         return int.TryParse(id, out var value) ? value : -1;
+    }
+
+    private static short ApplyGain(short sample, double gain)
+    {
+        return (short)Math.Clamp(sample * gain, short.MinValue, short.MaxValue);
     }
 
     private static void WriteUInt16(byte[] target, int offset, ushort value)
