@@ -32,6 +32,7 @@ public sealed class SipRegistrationService : IDisposable
     private PendingIncomingCall? _pendingIncomingCall;
     private RtpAudioSession? _audioSession;
     private bool _rejectIncomingCalls;
+    private SipResponse? _lastCallFailureResponse;
 
     public event EventHandler<IncomingCallEventArgs>? IncomingCall;
     public event EventHandler<IncomingMessageEventArgs>? IncomingMessage;
@@ -41,6 +42,25 @@ public sealed class SipRegistrationService : IDisposable
     public bool CanControlAudio => _audioSession is not null;
 
     public bool HasPendingIncomingCall => _pendingIncomingCall is not null;
+
+    public string LastCallFailureReason => _lastCallFailureResponse is null
+        ? "No outbound route failure has been recorded in this session."
+        : $"{_lastCallFailureResponse.Code} {_lastCallFailureResponse.Reason}".Trim();
+
+    public string RtpStatus
+    {
+        get
+        {
+            if (_audioSession is null)
+            {
+                return "No active RTP session. Place a test call to verify live audio packets.";
+            }
+
+            return _audioSession.ReceivedPackets > 0
+                ? $"RTP is receiving audio packets. Received {_audioSession.ReceivedPackets}, sent {_audioSession.SentPackets}."
+                : $"RTP is active but no inbound audio packets have been received yet. Sent {_audioSession.SentPackets}.";
+        }
+    }
 
     public void SetRejectIncomingCalls(bool reject)
     {
@@ -222,6 +242,7 @@ public sealed class SipRegistrationService : IDisposable
 
             _activeCall = _activeCall with { RemoteTag = ExtractTag(secondResponse.Headers.GetValueOrDefault("to", "")) };
             await SendAckForFinalInviteResponseAsync(secondResponse, cancellationToken);
+            _lastCallFailureResponse = secondResponse;
             _activeCall = null;
             _audioSession?.Dispose();
             _audioSession = null;
@@ -230,10 +251,31 @@ public sealed class SipRegistrationService : IDisposable
 
         _activeCall = _activeCall with { RemoteTag = ExtractTag(firstResponse.Headers.GetValueOrDefault("to", "")) };
         await SendAckForFinalInviteResponseAsync(firstResponse, cancellationToken);
+        _lastCallFailureResponse = firstResponse;
         _activeCall = null;
         _audioSession?.Dispose();
         _audioSession = null;
         return new SipCallResult(false, $"Call failed: {firstResponse.Code} {firstResponse.Reason}".Trim());
+    }
+
+    public async Task<SipCallResult> SendOptionsAsync(string? destination = null, CancellationToken cancellationToken = default)
+    {
+        if (_client is null || _config is null)
+        {
+            return new SipCallResult(false, "Register the SIP account first.");
+        }
+
+        var target = string.IsNullOrWhiteSpace(destination)
+            ? _domain
+            : destination.Contains('@') ? destination : $"{destination}@{_domain}";
+        var options = BuildOptions(target, $"{Guid.NewGuid():N}@merlin-sip", _messageCseq++);
+        DebugLog.Write($"SEND OPTIONS target={target}");
+        var response = await SendAndWaitFromListenerAsync(options, cancellationToken);
+        DebugLog.Write($"OPTIONS RESPONSE code={response.Code} reason={response.Reason}");
+
+        return response.Code is >= 200 and < 300
+            ? new SipCallResult(true, $"OPTIONS accepted: {response.Code} {response.Reason}".Trim())
+            : new SipCallResult(false, $"OPTIONS failed: {response.Code} {response.Reason}".Trim());
     }
 
     public async Task<SipCallResult> SendMessageAsync(string destination, string message, CancellationToken cancellationToken = default)
@@ -472,7 +514,13 @@ public sealed class SipRegistrationService : IDisposable
         if (_activeCall is not null)
         {
             DebugLog.Write("REGISTER skipped because a call is active");
-            return new SipRegistrationResult(_registered, "Registration refresh skipped during active call.");
+            return new SipRegistrationResult(true, "Call in progress.");
+        }
+
+        if (_pendingResponse is not null)
+        {
+            DebugLog.Write("REGISTER skipped because a SIP transaction is active");
+            return new SipRegistrationResult(true, "Connection check in progress.");
         }
 
         await _registrationLock.WaitAsync(cancellationToken);
@@ -778,6 +826,25 @@ public sealed class SipRegistrationService : IDisposable
         }
 
         return string.Join("\r\n", lines);
+    }
+
+    private string BuildOptions(string target, string callId, int cseq)
+    {
+        return string.Join("\r\n", [
+            $"OPTIONS sip:{target} SIP/2.0",
+            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={CreateBranch()};rport",
+            "Max-Forwards: 70",
+            $"From: <sip:{_config!.Extension}@{_domain}>;tag={Guid.NewGuid():N}",
+            $"To: <sip:{target}>",
+            $"Call-ID: {callId}",
+            $"CSeq: {cseq} OPTIONS",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            "User-Agent: CK Media Services Merlin SIP",
+            "Accept: application/sdp",
+            "Content-Length: 0",
+            "",
+            ""
+        ]);
     }
 
     private async Task<SipResponse> SendAndReceiveDirectAsync(string message, CancellationToken cancellationToken)

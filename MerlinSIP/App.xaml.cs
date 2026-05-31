@@ -2,7 +2,7 @@ using System.Windows;
 
 namespace MerlinSip;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     private async void Application_Startup(object sender, StartupEventArgs e)
     {
@@ -26,7 +26,7 @@ public partial class App : Application
 
         var mainWindow = new MainWindow(config);
         MainWindow = mainWindow;
-        ShutdownMode = ShutdownMode.OnMainWindowClose;
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         mainWindow.Show();
     }
 }

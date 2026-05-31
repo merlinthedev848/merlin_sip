@@ -778,6 +778,28 @@
                                             </Grid>
                                         </StackPanel>
                                     </Border>
+                                    <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,12">
+                                                <Button DockPanel.Dock="Right"
+                                                        x:Name="RunPbxDiagnosticsButton"
+                                                        Content="Run test"
+                                                        Style="{StaticResource SoftButton}"
+                                                        Width="96"
+                                                        Click="RunPbxDiagnosticsButton_Click" />
+                                                <TextBlock Text="PBX diagnostics" Foreground="#111827" FontSize="18" FontWeight="Black" VerticalAlignment="Center" />
+                                            </DockPanel>
+                                            <TextBlock Text="Checks registration, server response, messaging, audio packets, routing clues, and router compatibility."
+                                                       Foreground="#64748B"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,0,12" />
+                                            <TextBlock x:Name="PbxDiagnosticsText"
+                                                       Text="Diagnostics have not been run yet."
+                                                       Foreground="#334155"
+                                                       FontWeight="Bold"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
                                     <Button Content="Send error log" Style="{StaticResource SoftButton}" Click="SendErrorLogButton_Click" />
                                 </StackPanel>
                             </TabItem>

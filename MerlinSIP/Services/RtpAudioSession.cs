@@ -34,6 +34,10 @@ public sealed class RtpAudioSession : IDisposable
 
     public int LocalPort { get; }
 
+    public int ReceivedPackets => Volatile.Read(ref _receivedPackets);
+
+    public int SentPackets => Volatile.Read(ref _sentPackets);
+
     public RtpAudioSession(MediaDeviceInfo inputDevice, MediaDeviceInfo outputDevice, double inputGain = 1.0, double outputGain = 1.0)
     {
         _inputDevice = inputDevice;

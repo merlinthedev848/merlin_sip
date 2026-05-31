@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.NetworkInformation;
 using System.Reflection;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,6 +11,13 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MerlinSip.Models;
 using MerlinSip.Services;
+using DrawingIcon = System.Drawing.Icon;
+using DrawingSystemIcons = System.Drawing.SystemIcons;
+using WinForms = System.Windows.Forms;
+using WpfBrush = System.Windows.Media.Brush;
+using WpfButton = System.Windows.Controls.Button;
+using WpfListBox = System.Windows.Controls.ListBox;
+using WpfMessageBox = System.Windows.MessageBox;
 
 namespace MerlinSip;
 
@@ -24,6 +32,7 @@ public partial class MainWindow : Window
     private readonly RingtonePlayer _ringtonePlayer = new();
     private readonly UpdateService _updateService = new();
     private readonly ProvisioningService _provisioningService = new();
+    private WinForms.NotifyIcon? _trayIcon;
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
     private readonly ObservableCollection<ChatMessageEntry> _chatMessages = [];
@@ -42,6 +51,7 @@ public partial class MainWindow : Window
     private bool _callInProgress;
     private bool _callConnected;
     private bool _incomingRinging;
+    private bool _allowExit;
     private ContactEntry? _editingContact;
     private IncomingCallWindow? _incomingCallWindow;
 
@@ -64,8 +74,10 @@ public partial class MainWindow : Window
         _sipRegistrationService.CallEnded += SipRegistrationService_CallEnded;
         _callTimer.Tick += CallTimer_Tick;
         _connectionWatchdog.Tick += ConnectionWatchdog_Tick;
+        Closing += MainWindow_Closing;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
+        InitializeTrayIcon();
         UpdateCallControls();
     }
 
@@ -84,8 +96,56 @@ public partial class MainWindow : Window
     {
         HideIncomingCallSurfaces();
         _connectionWatchdog.Stop();
+        _trayIcon?.Dispose();
+        _trayIcon = null;
         _ringtonePlayer.Dispose();
         _sipRegistrationService.Dispose();
+    }
+
+    private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_allowExit)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        Hide();
+        ShowInTaskbar = false;
+        FooterStatusText.Text = "Merlin SIP is running in the notification area.";
+        _trayIcon?.ShowBalloonTip(1800, "Merlin SIP", "Still running for calls and messages.", WinForms.ToolTipIcon.Info);
+    }
+
+    private void InitializeTrayIcon()
+    {
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "CKMedia-Icon.ico");
+        var icon = File.Exists(iconPath) ? new DrawingIcon(iconPath) : DrawingSystemIcons.Application;
+        var menu = new WinForms.ContextMenuStrip();
+        menu.Items.Add("Open Merlin SIP", null, (_, _) => Dispatcher.Invoke(RestoreFromTray));
+        menu.Items.Add("Exit Merlin SIP", null, (_, _) => Dispatcher.Invoke(ExitFromTray));
+
+        _trayIcon = new WinForms.NotifyIcon
+        {
+            Text = "Merlin SIP",
+            Icon = icon,
+            Visible = true,
+            ContextMenuStrip = menu
+        };
+        _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreFromTray);
+    }
+
+    private void RestoreFromTray()
+    {
+        ShowInTaskbar = true;
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private void ExitFromTray()
+    {
+        _allowExit = true;
+        Close();
     }
 
     private async void ConnectionWatchdog_Tick(object? sender, EventArgs e)
@@ -124,7 +184,11 @@ public partial class MainWindow : Window
                 _registered = false;
                 SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
                 await RegisterSipAsync();
+                return;
             }
+
+            _registered = true;
+            SetConnectionState("Connected", "#DFF8EE", "#106247");
         }
         finally
         {
@@ -141,8 +205,8 @@ public partial class MainWindow : Window
     {
         _activeCallConnectedAt = DateTimeOffset.Now;
         CallTimerPill.Visibility = Visibility.Visible;
-        CallTimerPill.Background = (Brush)new BrushConverter().ConvertFromString("#DFF8EE")!;
-        CallTimerText.Foreground = (Brush)new BrushConverter().ConvertFromString("#106247")!;
+        CallTimerPill.Background = (WpfBrush)new BrushConverter().ConvertFromString("#DFF8EE")!;
+        CallTimerText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString("#106247")!;
         UpdateCallTimer();
         _callTimer.Start();
     }
@@ -153,8 +217,8 @@ public partial class MainWindow : Window
         _activeCallConnectedAt = null;
         CallTimerText.Text = "Inactive";
         CallTimerPill.Visibility = Visibility.Visible;
-        CallTimerPill.Background = (Brush)new BrushConverter().ConvertFromString("#FFE2E2")!;
-        CallTimerText.Foreground = (Brush)new BrushConverter().ConvertFromString("#9B1C1C")!;
+        CallTimerPill.Background = (WpfBrush)new BrushConverter().ConvertFromString("#FFE2E2")!;
+        CallTimerText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString("#9B1C1C")!;
     }
 
     private void UpdateCallTimer()
@@ -343,7 +407,7 @@ public partial class MainWindow : Window
         LoadVolumeSliders();
     }
 
-    private static void SelectDevice(ComboBox comboBox, MediaDeviceInfo selected)
+    private static void SelectDevice(System.Windows.Controls.ComboBox comboBox, MediaDeviceInfo selected)
     {
         foreach (var item in comboBox.Items.OfType<MediaDeviceInfo>())
         {
@@ -434,8 +498,8 @@ public partial class MainWindow : Window
     private void SetConnectionState(string text, string background, string foreground)
     {
         ConnectionStatusText.Text = text;
-        ConnectionPill.Background = (Brush)new BrushConverter().ConvertFromString(background)!;
-        ConnectionStatusText.Foreground = (Brush)new BrushConverter().ConvertFromString(foreground)!;
+        ConnectionPill.Background = (WpfBrush)new BrushConverter().ConvertFromString(background)!;
+        ConnectionStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(foreground)!;
 
         var mainText = text.Equals("Connected", StringComparison.OrdinalIgnoreCase)
             ? "Connected"
@@ -443,8 +507,8 @@ public partial class MainWindow : Window
                 ? "Checking"
                 : "Not connected";
         MainConnectionStatusText.Text = mainText;
-        MainConnectionPill.Background = (Brush)new BrushConverter().ConvertFromString(background)!;
-        MainConnectionStatusText.Foreground = (Brush)new BrushConverter().ConvertFromString(foreground)!;
+        MainConnectionPill.Background = (WpfBrush)new BrushConverter().ConvertFromString(background)!;
+        MainConnectionStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(foreground)!;
     }
 
     private void ApplyAppVersion()
@@ -502,6 +566,12 @@ public partial class MainWindow : Window
             return "Connection timed out.";
         }
 
+        if (message.Contains("Call in progress", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("Connection check in progress", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Connection is being maintained.";
+        }
+
         return message
             .Replace("SIP server returned 0 ", "", StringComparison.OrdinalIgnoreCase)
             .Replace("SIP registration failed: ", "", StringComparison.OrdinalIgnoreCase)
@@ -540,7 +610,7 @@ public partial class MainWindow : Window
 
     private void DialpadButton_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button button)
+        if (sender is WpfButton button)
         {
             DestinationTextBox.Text += button.Content?.ToString();
             DestinationTextBox.CaretIndex = DestinationTextBox.Text.Length;
@@ -696,7 +766,7 @@ public partial class MainWindow : Window
         DestinationTextBox.Focus();
     }
 
-    private void DestinationTextBox_KeyDown(object sender, KeyEventArgs e)
+    private void DestinationTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
@@ -707,7 +777,7 @@ public partial class MainWindow : Window
 
     private void ContactsListView_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (sender is ListBox listBox && listBox.SelectedItem is ContactEntry contact)
+        if (sender is WpfListBox listBox && listBox.SelectedItem is ContactEntry contact)
         {
             CallContact(contact);
         }
@@ -1107,6 +1177,7 @@ public partial class MainWindow : Window
         SettingsOverlay.Visibility = Visibility.Visible;
         SettingsTabs.SelectedItem = SettingsAccountTab;
         await RefreshConnectionDiagnosticsAsync();
+        await EnsureConnectionReadyAsync();
     }
 
     private void CloseSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -1128,6 +1199,7 @@ public partial class MainWindow : Window
     {
         SettingsTabs.SelectedItem = SettingsStatusTab;
         await RefreshConnectionDiagnosticsAsync();
+        await EnsureConnectionReadyAsync();
     }
 
     private async void SaveNetworkModeButton_Click(object sender, RoutedEventArgs e)
@@ -1147,6 +1219,67 @@ public partial class MainWindow : Window
             _registered = false;
             await RegisterSipAsync();
         }
+    }
+
+    private async void RunPbxDiagnosticsButton_Click(object sender, RoutedEventArgs e)
+    {
+        RunPbxDiagnosticsButton.IsEnabled = false;
+        PbxDiagnosticsText.Text = "Running PBX compatibility checks...";
+        FooterStatusText.Text = "Running PBX compatibility checks.";
+
+        try
+        {
+            PbxDiagnosticsText.Text = await RunPbxDiagnosticsAsync();
+            FooterStatusText.Text = "PBX diagnostics complete.";
+        }
+        finally
+        {
+            RunPbxDiagnosticsButton.IsEnabled = true;
+        }
+    }
+
+    private async Task<string> RunPbxDiagnosticsAsync()
+    {
+        DebugLog.Write("PBX diagnostics started. Internal note: Yeastar S100 reaches EOL on 2027-07-01; plan P-Series migration support.");
+        var report = new StringBuilder();
+
+        if (!NetworkInterface.GetIsNetworkAvailable())
+        {
+            report.AppendLine("Network: No network connectivity detected.");
+            report.AppendLine("Registration: Not tested because the PC is offline.");
+            return report.ToString().Trim();
+        }
+
+        var registration = await _sipRegistrationService.RefreshRegistrationAsync();
+        if (registration.Connected)
+        {
+            _registered = true;
+            SetConnectionState("Connected", "#DFF8EE", "#106247");
+            report.AppendLine("Registration: OK.");
+        }
+        else
+        {
+            report.AppendLine($"Registration: Failed. {ToCustomerConnectionMessage(registration.Message)}");
+        }
+
+        var options = await _sipRegistrationService.SendOptionsAsync();
+        report.AppendLine(options.Signalled
+            ? "PBX response: OK. The server answered OPTIONS."
+            : $"PBX response: Failed. {options.Message}");
+
+        var message = await _sipRegistrationService.SendMessageAsync(_config.Extension, "PBX compatibility test from CK Media Services.");
+        report.AppendLine(message.Signalled
+            ? "Extension messaging: OK. SIP MESSAGE was accepted."
+            : $"Extension messaging: Failed. {message.Message}");
+
+        report.AppendLine($"RTP audio: {_sipRegistrationService.RtpStatus}");
+        report.AppendLine($"Outbound route clue: {_sipRegistrationService.LastCallFailureReason}");
+        report.AppendLine(_config.SipAlgCompatibilityMode
+            ? "SIP ALG protection: On. Merlin SIP is using rport, short registrations, keepalives, and recovery checks."
+            : "SIP ALG protection: Off. Enable compatibility mode if the customer router interferes with SIP.");
+        report.AppendLine("Video: H.264 readiness is noted, but video calling remains disabled until real video RTP/SDP negotiation is implemented.");
+
+        return report.ToString().Trim();
     }
 
     private void SettingsUpdatesButton_Click(object sender, RoutedEventArgs e)
@@ -1174,7 +1307,7 @@ public partial class MainWindow : Window
         if (result.UpdateAvailable && !string.IsNullOrWhiteSpace(result.DownloadUrl))
         {
             var notes = string.IsNullOrWhiteSpace(result.Notes) ? "" : $"\n\n{result.Notes}";
-            var install = MessageBox.Show(
+            var install = WpfMessageBox.Show(
                 $"{result.Message}{notes}\n\nDownload and install now?",
                 "Update available",
                 MessageBoxButton.YesNo,
@@ -1195,7 +1328,7 @@ public partial class MainWindow : Window
                     {
                         UseShellExecute = true
                     });
-                    Application.Current.Shutdown();
+                    System.Windows.Application.Current.Shutdown();
                 }
                 catch (Exception error)
                 {
@@ -1230,7 +1363,7 @@ public partial class MainWindow : Window
         FooterStatusText.Text = "A Merlin SIP update is available.";
 
         var notes = string.IsNullOrWhiteSpace(result.Notes) ? "" : $"\n\n{result.Notes}";
-        var install = MessageBox.Show(
+        var install = WpfMessageBox.Show(
             $"{result.Message}{notes}\n\nInstall this update now?",
             "Merlin SIP update available",
             MessageBoxButton.YesNo,
@@ -1245,7 +1378,7 @@ public partial class MainWindow : Window
                 {
                     UseShellExecute = true
                 });
-                Application.Current.Shutdown();
+                System.Windows.Application.Current.Shutdown();
             }
             catch (Exception error)
             {
@@ -1297,7 +1430,7 @@ public partial class MainWindow : Window
 
     private async void ResetCacheButton_Click(object sender, RoutedEventArgs e)
     {
-        var confirm = MessageBox.Show(
+        var confirm = WpfMessageBox.Show(
             "Clear saved account settings, contacts, and call history? Merlin SIP will close so setup can run again next time.",
             "Reset app",
             MessageBoxButton.YesNo,
@@ -1313,7 +1446,7 @@ public partial class MainWindow : Window
         _callHistory.Clear();
         _chatMessages.Clear();
         await Task.Delay(50);
-        Application.Current.Shutdown();
+        System.Windows.Application.Current.Shutdown();
     }
 
     private async Task AddCallHistory(string direction, string name, string number, string result, string detail, DateTimeOffset? startedAt = null)
@@ -1373,7 +1506,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void MessageBodyTextBox_KeyDown(object sender, KeyEventArgs e)
+    private void MessageBodyTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
         {
@@ -1404,7 +1537,7 @@ public partial class MainWindow : Window
 
         var contact = _contactStore.FindByNumber(_contacts, destination);
         var displayName = contact?.Name ?? destination;
-        var confirm = MessageBox.Show(
+        var confirm = WpfMessageBox.Show(
             $"Clear message history with {displayName}?",
             "Clear conversation",
             MessageBoxButton.YesNo,
