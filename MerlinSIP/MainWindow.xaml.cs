@@ -17,6 +17,7 @@ public partial class MainWindow : Window
 {
     private readonly ContactStore _contactStore = new();
     private readonly CallHistoryStore _callHistoryStore = new();
+    private readonly ChatMessageStore _chatMessageStore = new();
     private readonly AppCacheService _cacheService = new();
     private readonly DeviceDiscoveryService _deviceDiscoveryService = new();
     private readonly SipRegistrationService _sipRegistrationService = new();
@@ -25,6 +26,7 @@ public partial class MainWindow : Window
     private readonly ProvisioningService _provisioningService = new();
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
+    private readonly ObservableCollection<ChatMessageEntry> _chatMessages = [];
     private readonly DispatcherTimer _callTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _connectionWatchdog = new() { Interval = TimeSpan.FromSeconds(15) };
     private bool _connectionCheckInProgress;
@@ -52,9 +54,12 @@ public partial class MainWindow : Window
         LoadDefaultDeviceSelectors();
         DialContactsListView.ItemsSource = _contacts;
         PhonebookContactsListView.ItemsSource = _contacts;
+        ChatContactsListView.ItemsSource = _contacts;
         RecentCallsListView.ItemsSource = _callHistory;
         CallHistoryListView.ItemsSource = _callHistory;
+        ChatMessagesListView.ItemsSource = _chatMessages;
         _sipRegistrationService.IncomingCall += SipRegistrationService_IncomingCall;
+        _sipRegistrationService.IncomingMessage += SipRegistrationService_IncomingMessage;
         _sipRegistrationService.CallProgress += SipRegistrationService_CallProgress;
         _sipRegistrationService.CallEnded += SipRegistrationService_CallEnded;
         _callTimer.Tick += CallTimer_Tick;
@@ -68,6 +73,7 @@ public partial class MainWindow : Window
     {
         await LoadContactsAsync();
         await LoadCallHistoryAsync();
+        await LoadChatMessagesAsync();
         await Dispatcher.InvokeAsync(LoadDeviceSelectors, DispatcherPriority.Background);
         _ = RegisterSipAsync();
         _connectionWatchdog.Start();
@@ -155,7 +161,7 @@ public partial class MainWindow : Window
     {
         if (_activeCallConnectedAt is null)
         {
-            CallTimerText.Text = "00:00";
+            CallTimerText.Text = "Inactive";
             return;
         }
 
@@ -290,12 +296,24 @@ public partial class MainWindow : Window
         });
     }
 
+    private void SipRegistrationService_IncomingMessage(object? sender, IncomingMessageEventArgs e)
+    {
+        Dispatcher.Invoke(async () =>
+        {
+            var contact = _contactStore.FindByNumber(_contacts, e.SenderNumber);
+            var senderName = contact?.Name ?? e.SenderNumber;
+            await AddChatMessage("Inbound", senderName, e.SenderNumber, e.Message, "Received");
+            FooterStatusText.Text = $"Message received from {senderName}.";
+        });
+    }
+
     private void ApplyStartupConfig()
     {
         _config = _config.WithFixedSipEndpoint();
         ExtensionTextBox.Text = _config.Extension;
         UsernameTextBox.Text = _config.Username;
         PasswordBox.Password = _config.Password;
+        SipAlgCompatibilityCheckBox.IsChecked = _config.SipAlgCompatibilityMode;
         LicenseStatusText.Text = "Licensed";
     }
 
@@ -526,6 +544,15 @@ public partial class MainWindow : Window
         {
             DestinationTextBox.Text += button.Content?.ToString();
             DestinationTextBox.CaretIndex = DestinationTextBox.Text.Length;
+        }
+    }
+
+    private async Task LoadChatMessagesAsync()
+    {
+        _chatMessages.Clear();
+        foreach (var message in await _chatMessageStore.LoadAsync())
+        {
+            _chatMessages.Add(message);
         }
     }
 
@@ -931,7 +958,10 @@ public partial class MainWindow : Window
             AudioInput = mediaConfig.AudioInput,
             AudioOutput = mediaConfig.AudioOutput,
             VideoSource = mediaConfig.VideoSource,
-            Ringtone = mediaConfig.Ringtone
+            Ringtone = mediaConfig.Ringtone,
+            MicrophoneVolume = mediaConfig.MicrophoneVolume,
+            HeadphoneVolume = mediaConfig.HeadphoneVolume,
+            SipAlgCompatibilityMode = mediaConfig.SipAlgCompatibilityMode
         };
         _config = _config.WithFixedSipEndpoint();
 
@@ -955,7 +985,8 @@ public partial class MainWindow : Window
             VideoSource = videoSource,
             Ringtone = ringtone?.Id ?? _config.Ringtone,
             MicrophoneVolume = Math.Clamp(MicrophoneVolumeSlider.Value / 100, 0.25, 2.0),
-            HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0)
+            HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0),
+            SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true
         };
     }
 
@@ -1020,7 +1051,10 @@ public partial class MainWindow : Window
 
             _config = result.Config.WithFixedSipEndpoint() with
             {
-                Ringtone = ringtone?.Id ?? _config.Ringtone
+                Ringtone = ringtone?.Id ?? _config.Ringtone,
+                MicrophoneVolume = Math.Clamp(MicrophoneVolumeSlider.Value / 100, 0.25, 2.0),
+                HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0),
+                SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true
             };
             ApplyStartupConfig();
             await _cacheService.SaveSettingsAsync(_config);
@@ -1063,6 +1097,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = CallsTab;
     }
 
+    private void ShowMessagesButton_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = MessagesTab;
+    }
+
     private async void OpenSettingsButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsOverlay.Visibility = Visibility.Visible;
@@ -1089,6 +1128,25 @@ public partial class MainWindow : Window
     {
         SettingsTabs.SelectedItem = SettingsStatusTab;
         await RefreshConnectionDiagnosticsAsync();
+    }
+
+    private async void SaveNetworkModeButton_Click(object sender, RoutedEventArgs e)
+    {
+        _config = _config with
+        {
+            SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true
+        };
+
+        await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
+        FooterStatusText.Text = _config.SipAlgCompatibilityMode
+            ? "SIP ALG compatibility mode is on."
+            : "Standard network mode is on.";
+
+        if (!_callInProgress && NetworkInterface.GetIsNetworkAvailable())
+        {
+            _registered = false;
+            await RegisterSipAsync();
+        }
     }
 
     private void SettingsUpdatesButton_Click(object sender, RoutedEventArgs e)
@@ -1253,6 +1311,7 @@ public partial class MainWindow : Window
         _cacheService.Reset();
         _contacts.Clear();
         _callHistory.Clear();
+        _chatMessages.Clear();
         await Task.Delay(50);
         Application.Current.Shutdown();
     }
@@ -1276,5 +1335,117 @@ public partial class MainWindow : Window
 
         _callHistory.Insert(0, entry);
         await _callHistoryStore.SaveAsync(_callHistory);
+    }
+
+    private async void SendMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        var destination = NormalizeDialDestination(MessageToTextBox.Text);
+        var message = MessageBodyTextBox.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(destination))
+        {
+            FooterStatusText.Text = "Enter an extension to message.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            FooterStatusText.Text = "Enter a message first.";
+            return;
+        }
+
+        SendMessageButton.IsEnabled = false;
+        try
+        {
+            var contact = _contactStore.FindByNumber(_contacts, destination);
+            var name = contact?.Name ?? destination;
+            var result = await _sipRegistrationService.SendMessageAsync(destination, message);
+            await AddChatMessage("Outbound", name, destination, message, result.Signalled ? "Sent" : "Failed");
+            FooterStatusText.Text = result.Message;
+            if (result.Signalled)
+            {
+                MessageBodyTextBox.Text = string.Empty;
+            }
+        }
+        finally
+        {
+            SendMessageButton.IsEnabled = true;
+        }
+    }
+
+    private void MessageBodyTextBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            e.Handled = true;
+            SendMessageButton_Click(sender, e);
+        }
+    }
+
+    private void ChatContactsListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ChatContactsListView.SelectedItem is not ContactEntry contact)
+        {
+            return;
+        }
+
+        MessageToTextBox.Text = contact.Number;
+        MessageBodyTextBox.Focus();
+    }
+
+    private async void ClearChatThreadButton_Click(object sender, RoutedEventArgs e)
+    {
+        var destination = NormalizeDialDestination(MessageToTextBox.Text);
+        if (string.IsNullOrWhiteSpace(destination))
+        {
+            FooterStatusText.Text = "Choose a conversation first.";
+            return;
+        }
+
+        var contact = _contactStore.FindByNumber(_contacts, destination);
+        var displayName = contact?.Name ?? destination;
+        var confirm = MessageBox.Show(
+            $"Clear message history with {displayName}?",
+            "Clear conversation",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var threadMessages = _chatMessages
+            .Where(message => MessageBelongsToThread(message, destination))
+            .ToList();
+
+        foreach (var message in threadMessages)
+        {
+            _chatMessages.Remove(message);
+        }
+
+        await _chatMessageStore.SaveAsync(_chatMessages);
+        FooterStatusText.Text = $"Conversation with {displayName} cleared.";
+    }
+
+    private static bool MessageBelongsToThread(ChatMessageEntry message, string destination)
+    {
+        return NormalizeDialDestination(message.Number).Equals(destination, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task AddChatMessage(string direction, string name, string number, string message, string result)
+    {
+        var entry = new ChatMessageEntry
+        {
+            Direction = direction,
+            Name = name,
+            Number = number,
+            Message = message,
+            SentAt = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+            Result = result
+        };
+
+        _chatMessages.Insert(0, entry);
+        await _chatMessageStore.SaveAsync(_chatMessages);
     }
 }

@@ -14,7 +14,8 @@ public sealed record AppStartupConfig(
     MediaDeviceInfo VideoSource,
     string Ringtone = AppStartupConfig.DefaultRingtone,
     double MicrophoneVolume = 1.0,
-    double HeadphoneVolume = 1.0)
+    double HeadphoneVolume = 1.0,
+    bool SipAlgCompatibilityMode = true)
 {
     public const string FixedSipServer = "pbx.chriskendall.media";
     public const int FixedSipPort = 5060;

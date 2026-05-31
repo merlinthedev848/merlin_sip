@@ -10,7 +10,8 @@ namespace MerlinSip.Services;
 
 public sealed class SipRegistrationService : IDisposable
 {
-    private const int RegisterExpiresSeconds = 3600;
+    private const int StandardRegisterExpiresSeconds = 3600;
+    private const int CompatibilityRegisterExpiresSeconds = 120;
     private static readonly TimeSpan RegisterRefreshInterval = TimeSpan.FromMinutes(10);
     private UdpClient? _client;
     private AppStartupConfig? _config;
@@ -19,18 +20,21 @@ public sealed class SipRegistrationService : IDisposable
     private int _localPort;
     private CancellationTokenSource? _listenCancellation;
     private CancellationTokenSource? _registrationRefreshCancellation;
+    private CancellationTokenSource? _natKeepAliveCancellation;
     private TaskCompletionSource<SipResponse>? _pendingResponse;
     private readonly SemaphoreSlim _registrationLock = new(1, 1);
     private bool _listenerStarted;
     private bool _registered;
     private int _inviteCseq = 1;
     private int _registerCseq = 1;
+    private int _messageCseq = 1;
     private ActiveCall? _activeCall;
     private PendingIncomingCall? _pendingIncomingCall;
     private RtpAudioSession? _audioSession;
     private bool _rejectIncomingCalls;
 
     public event EventHandler<IncomingCallEventArgs>? IncomingCall;
+    public event EventHandler<IncomingMessageEventArgs>? IncomingMessage;
     public event EventHandler<CallProgressEventArgs>? CallProgress;
     public event EventHandler<CallEndedEventArgs>? CallEnded;
 
@@ -125,6 +129,7 @@ public sealed class SipRegistrationService : IDisposable
             _registered = true;
             StartListening();
             StartRegistrationRefresh();
+            StartNatKeepAlive();
         }
 
         return result;
@@ -229,6 +234,62 @@ public sealed class SipRegistrationService : IDisposable
         _audioSession?.Dispose();
         _audioSession = null;
         return new SipCallResult(false, $"Call failed: {firstResponse.Code} {firstResponse.Reason}".Trim());
+    }
+
+    public async Task<SipCallResult> SendMessageAsync(string destination, string message, CancellationToken cancellationToken = default)
+    {
+        if (_client is null || _config is null)
+        {
+            return new SipCallResult(false, "Register the SIP account first.");
+        }
+
+        if (string.IsNullOrWhiteSpace(destination))
+        {
+            return new SipCallResult(false, "Choose an extension before sending.");
+        }
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return new SipCallResult(false, "Enter a message before sending.");
+        }
+
+        if (!_registered)
+        {
+            var registration = await RegisterCurrentSocketAsync(cancellationToken);
+            if (!registration.Connected)
+            {
+                return new SipCallResult(false, $"Registration check failed: {registration.Message}");
+            }
+
+            _registered = true;
+        }
+
+        var target = destination.Contains('@') ? destination : $"{destination}@{_domain}";
+        var callId = $"{Guid.NewGuid():N}@merlin-sip";
+        var localTag = Guid.NewGuid().ToString("N")[..12];
+        var first = BuildMessage(target, callId, localTag, _messageCseq++, message, null);
+        DebugLog.Write($"SEND MESSAGE target={target} callId={callId} length={message.Length}");
+        var firstResponse = await SendAndWaitFromListenerAsync(first, cancellationToken);
+        DebugLog.Write($"MESSAGE RESPONSE code={firstResponse.Code} reason={firstResponse.Reason}");
+
+        if (firstResponse.Code is 401 or 407)
+        {
+            var challengeHeader = firstResponse.Headers.TryGetValue("www-authenticate", out var wwwAuthenticate)
+                ? wwwAuthenticate
+                : firstResponse.Headers.GetValueOrDefault("proxy-authenticate", "");
+            var authorization = BuildDigestAuthorization("MESSAGE", $"sip:{target}", challengeHeader);
+            var second = BuildMessage(target, callId, localTag, _messageCseq++, message, authorization);
+            DebugLog.Write($"SEND AUTH MESSAGE target={target} callId={callId}");
+            var secondResponse = await SendAndWaitFromListenerAsync(second, cancellationToken);
+            DebugLog.Write($"AUTH MESSAGE RESPONSE code={secondResponse.Code} reason={secondResponse.Reason}");
+            return secondResponse.Code is >= 200 and < 300
+                ? new SipCallResult(true, "Message sent.")
+                : new SipCallResult(false, $"Message failed: {secondResponse.Code} {secondResponse.Reason}".Trim());
+        }
+
+        return firstResponse.Code is >= 200 and < 300
+            ? new SipCallResult(true, "Message sent.")
+            : new SipCallResult(false, $"Message failed: {firstResponse.Code} {firstResponse.Reason}".Trim());
     }
 
     public async Task<SipCallResult> AnswerIncomingCallAsync(CancellationToken cancellationToken = default)
@@ -464,6 +525,9 @@ public sealed class SipRegistrationService : IDisposable
         var branch = $"z9hG4bK-{Guid.NewGuid():N}";
         var tag = Guid.NewGuid().ToString("N")[..12];
         var contact = $"sip:{_config!.Extension}@{_localAddress}:{_localPort};transport=udp";
+        var expires = _config.SipAlgCompatibilityMode
+            ? CompatibilityRegisterExpiresSeconds
+            : StandardRegisterExpiresSeconds;
         var lines = new List<string>
         {
             $"REGISTER sip:{_domain} SIP/2.0",
@@ -474,9 +538,9 @@ public sealed class SipRegistrationService : IDisposable
             $"Call-ID: {callId}",
             $"CSeq: {cseq} REGISTER",
             $"Contact: <{contact}>",
-            $"Expires: {RegisterExpiresSeconds}",
-            "User-Agent: Merlin SIP",
-            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY",
+            $"Expires: {expires}",
+            "User-Agent: CK Media Services Merlin SIP",
+            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY, MESSAGE",
             "Content-Length: 0"
         };
 
@@ -492,8 +556,8 @@ public sealed class SipRegistrationService : IDisposable
     {
         var sdp = string.Join("\r\n", [
             "v=0",
-            $"o=MerlinSIP 0 0 IN IP4 {_localAddress}",
-            "s=Merlin SIP call",
+            $"o=CKMediaServices 0 0 IN IP4 {_localAddress}",
+            "s=CK Media Services call",
             $"c=IN IP4 {_localAddress}",
             "t=0 0",
             $"m=audio {_audioSession?.LocalPort ?? 40000} RTP/AVP 0 8 101",
@@ -514,8 +578,8 @@ public sealed class SipRegistrationService : IDisposable
             $"Call-ID: {callId}",
             $"CSeq: {cseq} INVITE",
             $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
-            "User-Agent: Merlin SIP",
-            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY",
+            "User-Agent: CK Media Services Merlin SIP",
+            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY, MESSAGE",
             "Supported: replaces, timer",
             "Content-Type: application/sdp",
             $"Content-Length: {Encoding.UTF8.GetByteCount(sdp)}",
@@ -544,8 +608,8 @@ public sealed class SipRegistrationService : IDisposable
 
         var sdp = string.Join("\r\n", [
             "v=0",
-            $"o=MerlinSIP 0 0 IN IP4 {_localAddress}",
-            "s=Merlin SIP call",
+            $"o=CKMediaServices 0 0 IN IP4 {_localAddress}",
+            "s=CK Media Services call",
             $"c=IN IP4 {_localAddress}",
             "t=0 0",
             $"m=audio {_audioSession?.LocalPort ?? 40000} RTP/AVP {payloadType}",
@@ -561,8 +625,8 @@ public sealed class SipRegistrationService : IDisposable
             $"Call-ID: {call.CallId}",
             $"CSeq: {cseq}",
             $"Contact: <sip:{_config!.Extension}@{_localAddress}:{_localPort};transport=udp>",
-            "User-Agent: Merlin SIP",
-            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY",
+            "User-Agent: CK Media Services Merlin SIP",
+            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY, MESSAGE",
             "Content-Type: application/sdp",
             $"Content-Length: {Encoding.UTF8.GetByteCount(sdp)}",
             "",
@@ -575,8 +639,8 @@ public sealed class SipRegistrationService : IDisposable
         var direction = held ? "sendonly" : "sendrecv";
         var sdp = string.Join("\r\n", [
             "v=0",
-            $"o=MerlinSIP 0 0 IN IP4 {_localAddress}",
-            "s=Merlin SIP call",
+            $"o=CKMediaServices 0 0 IN IP4 {_localAddress}",
+            "s=CK Media Services call",
             $"c=IN IP4 {_localAddress}",
             "t=0 0",
             $"m=audio {_audioSession?.LocalPort ?? 40000} RTP/AVP 0 8 101",
@@ -603,8 +667,8 @@ public sealed class SipRegistrationService : IDisposable
             $"Call-ID: {call.CallId}",
             $"CSeq: {cseq} INVITE",
             $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
-            "User-Agent: Merlin SIP",
-            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY",
+            "User-Agent: CK Media Services Merlin SIP",
+            "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY, MESSAGE",
             "Supported: replaces, timer",
             "Content-Type: application/sdp",
             $"Content-Length: {Encoding.UTF8.GetByteCount(sdp)}",
@@ -630,7 +694,7 @@ public sealed class SipRegistrationService : IDisposable
             $"To: <sip:{call.Target}>",
             $"Call-ID: {call.CallId}",
             $"CSeq: {call.CSeq} CANCEL",
-            "User-Agent: Merlin SIP",
+            "User-Agent: CK Media Services Merlin SIP",
             "Content-Length: 0",
             "",
             ""
@@ -654,7 +718,7 @@ public sealed class SipRegistrationService : IDisposable
             $"To: {to}",
             $"Call-ID: {call.CallId}",
             $"CSeq: {_inviteCseq++} BYE",
-            "User-Agent: Merlin SIP",
+            "User-Agent: CK Media Services Merlin SIP",
             "Content-Length: 0",
             "",
             ""
@@ -681,11 +745,39 @@ public sealed class SipRegistrationService : IDisposable
             $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
             $"Refer-To: <sip:{transferTarget}>",
             $"Referred-By: <sip:{_config.Extension}@{_domain}>",
-            "User-Agent: Merlin SIP",
+            "User-Agent: CK Media Services Merlin SIP",
             "Content-Length: 0",
             "",
             ""
         ]);
+    }
+
+    private string BuildMessage(string target, string callId, string localTag, int cseq, string message, string? authorization)
+    {
+        var body = message.Trim();
+        var lines = new List<string>
+        {
+            $"MESSAGE sip:{target} SIP/2.0",
+            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={CreateBranch()};rport",
+            "Max-Forwards: 70",
+            $"From: <sip:{_config!.Extension}@{_domain}>;tag={localTag}",
+            $"To: <sip:{target}>",
+            $"Call-ID: {callId}",
+            $"CSeq: {cseq} MESSAGE",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            "User-Agent: CK Media Services Merlin SIP",
+            "Content-Type: text/plain; charset=utf-8",
+            $"Content-Length: {Encoding.UTF8.GetByteCount(body)}",
+            "",
+            body
+        };
+
+        if (!string.IsNullOrWhiteSpace(authorization))
+        {
+            lines.Insert(8, $"Authorization: {authorization}");
+        }
+
+        return string.Join("\r\n", lines);
     }
 
     private async Task<SipResponse> SendAndReceiveDirectAsync(string message, CancellationToken cancellationToken)
@@ -872,7 +964,7 @@ public sealed class SipRegistrationService : IDisposable
             $"Call-ID: {call.CallId}",
             $"CSeq: {call.CSeq} ACK",
             $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
-            "User-Agent: Merlin SIP",
+            "User-Agent: CK Media Services Merlin SIP",
             "Content-Length: 0",
             "",
             ""
@@ -897,6 +989,44 @@ public sealed class SipRegistrationService : IDisposable
         _registrationRefreshCancellation?.Dispose();
         _registrationRefreshCancellation = new CancellationTokenSource();
         _ = Task.Run(() => RegistrationRefreshLoopAsync(_registrationRefreshCancellation.Token));
+    }
+
+    private void StartNatKeepAlive()
+    {
+        _natKeepAliveCancellation?.Cancel();
+        _natKeepAliveCancellation?.Dispose();
+        _natKeepAliveCancellation = new CancellationTokenSource();
+        _ = Task.Run(() => NatKeepAliveLoopAsync(_natKeepAliveCancellation.Token));
+    }
+
+    private async Task NatKeepAliveLoopAsync(CancellationToken cancellationToken)
+    {
+        var payload = Encoding.UTF8.GetBytes("\r\n\r\n");
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                var interval = _config?.SipAlgCompatibilityMode == true
+                    ? TimeSpan.FromSeconds(15)
+                    : TimeSpan.FromSeconds(25);
+                await Task.Delay(interval, cancellationToken);
+                if (_client is null || _config is null || _activeCall is not null || _pendingResponse is not null)
+                {
+                    continue;
+                }
+
+                await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+                DebugLog.Write("SEND NAT keepalive");
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception error)
+            {
+                DebugLog.Write($"NAT keepalive failed error={error.Message}");
+            }
+        }
     }
 
     private async Task RegistrationRefreshLoopAsync(CancellationToken cancellationToken)
@@ -1004,6 +1134,11 @@ public sealed class SipRegistrationService : IDisposable
                     DebugLog.Write("RECV NOTIFY");
                     await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
                 }
+                else if (message.StartsWith("MESSAGE ", StringComparison.OrdinalIgnoreCase))
+                {
+                    DebugLog.Write("RECV MESSAGE");
+                    await HandleIncomingMessageAsync(message, result.RemoteEndPoint, cancellationToken);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -1045,6 +1180,21 @@ public sealed class SipRegistrationService : IDisposable
         IncomingCall?.Invoke(this, new IncomingCallEventArgs(ExtractCaller(from), from));
     }
 
+    private async Task HandleIncomingMessageAsync(string message, IPEndPoint remoteEndPoint, CancellationToken cancellationToken)
+    {
+        var headers = ParseHeaders(message);
+        var from = headers.GetValueOrDefault("from", "Unknown sender");
+        var body = ExtractBody(message).Trim();
+        await SendSimpleResponseAsync(message, remoteEndPoint, 200, "OK", cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return;
+        }
+
+        IncomingMessage?.Invoke(this, new IncomingMessageEventArgs(ExtractCaller(from), from, body));
+    }
+
     private async Task SendSimpleResponseAsync(
         string request,
         IPEndPoint remoteEndPoint,
@@ -1077,7 +1227,7 @@ public sealed class SipRegistrationService : IDisposable
             $"To: {to}",
             $"Call-ID: {callId}",
             $"CSeq: {cseq}",
-            "User-Agent: Merlin SIP",
+            "User-Agent: CK Media Services Merlin SIP",
             "Content-Length: 0",
             "",
             ""
@@ -1171,6 +1321,18 @@ public sealed class SipRegistrationService : IDisposable
     {
         var match = Regex.Match(fromHeader, @"sip:([^@>;]+)", RegexOptions.IgnoreCase);
         return match.Success ? match.Groups[1].Value : fromHeader;
+    }
+
+    private static string ExtractBody(string raw)
+    {
+        var bodyStart = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+        if (bodyStart >= 0)
+        {
+            return raw[(bodyStart + 4)..];
+        }
+
+        bodyStart = raw.IndexOf("\n\n", StringComparison.Ordinal);
+        return bodyStart >= 0 ? raw[(bodyStart + 2)..] : "";
     }
 
     private static string ExtractRemoteTarget(IReadOnlyDictionary<string, string> headers)
@@ -1350,6 +1512,9 @@ public sealed class SipRegistrationService : IDisposable
         _registrationRefreshCancellation?.Cancel();
         _registrationRefreshCancellation?.Dispose();
         _registrationRefreshCancellation = null;
+        _natKeepAliveCancellation?.Cancel();
+        _natKeepAliveCancellation?.Dispose();
+        _natKeepAliveCancellation = null;
         _pendingResponse?.TrySetCanceled();
         _pendingResponse = null;
         _pendingIncomingCall = null;
@@ -1366,6 +1531,8 @@ public sealed record SipRegistrationResult(bool Connected, string Message);
 public sealed record SipCallResult(bool Signalled, string Message);
 
 public sealed record IncomingCallEventArgs(string CallerNumber, string RawFromHeader);
+
+public sealed record IncomingMessageEventArgs(string SenderNumber, string RawFromHeader, string Message);
 
 public sealed record CallProgressEventArgs(int Code, string Reason, bool Connected, string Message);
 

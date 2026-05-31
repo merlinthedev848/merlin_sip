@@ -49,7 +49,8 @@ public sealed class AppCacheService
             settings.VideoSource,
             string.IsNullOrWhiteSpace(settings.Ringtone) ? AppStartupConfig.DefaultRingtone : settings.Ringtone,
             ClampVolume(settings.MicrophoneVolume),
-            ClampVolume(settings.HeadphoneVolume)).WithFixedSipEndpoint();
+            ClampVolume(settings.HeadphoneVolume),
+            settings.SipAlgCompatibilityMode ?? true).WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
@@ -68,7 +69,8 @@ public sealed class AppCacheService
             config.VideoSource,
             config.Ringtone,
             config.MicrophoneVolume,
-            config.HeadphoneVolume);
+            config.HeadphoneVolume,
+            config.SipAlgCompatibilityMode);
 
         Directory.CreateDirectory(_root);
         await using var stream = File.Create(SettingsPath);
@@ -141,5 +143,6 @@ public sealed class AppCacheService
         MediaDeviceInfo VideoSource,
         string? Ringtone = null,
         double? MicrophoneVolume = null,
-        double? HeadphoneVolume = null);
+        double? HeadphoneVolume = null,
+        bool? SipAlgCompatibilityMode = null);
 }
