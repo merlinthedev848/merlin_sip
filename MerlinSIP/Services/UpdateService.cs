@@ -102,9 +102,11 @@ public sealed class UpdateService
 
     private static UpdateCheckResult BuildResult(Version current, MsiRelease latest)
     {
+        var currentNormalized = NormalizeVersion(current);
+        var latestNormalized = NormalizeVersion(latest.Version);
         var updateAvailable = latest.AuthoritativeFeed
-            ? latest.Version != current
-            : latest.Version > current;
+            ? latestNormalized != currentNormalized
+            : latestNormalized > currentNormalized;
 
         if (updateAvailable)
         {
@@ -118,6 +120,15 @@ public sealed class UpdateService
         }
 
         return new UpdateCheckResult(true, false, "You are up to date.", current.ToString());
+    }
+
+    private static Version NormalizeVersion(Version version)
+    {
+        return new Version(
+            Math.Max(version.Major, 0),
+            Math.Max(version.Minor, 0),
+            Math.Max(version.Build, 0),
+            Math.Max(version.Revision, 0));
     }
 
     private static async Task<MsiRelease?> TryLoadLatestReleaseAsync(CancellationToken cancellationToken)
