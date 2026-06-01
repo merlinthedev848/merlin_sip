@@ -27,6 +27,7 @@ public sealed class RtpAudioSession : IDisposable
     private int _payloadType;
     private bool _running;
     private bool _devicesPrepared;
+    private bool _transmitMicrophone;
     private bool _muted;
     private bool _held;
     private int _receivedPackets;
@@ -62,24 +63,38 @@ public sealed class RtpAudioSession : IDisposable
         DebugLog.Write($"RTP devices prepared input={_inputDevice.Name} output={_outputDevice.Name} localPort={LocalPort}");
     }
 
-    public async Task StartAsync(string remoteAddress, int remotePort, int payloadType)
+    public async Task StartAsync(string remoteAddress, int remotePort, int payloadType, bool transmitMicrophone = true)
     {
         if (_running)
         {
-            DebugLog.Write("RTP start ignored because audio is already running");
+            var updatedAddress = await ResolveRemoteAddressAsync(remoteAddress);
+            _remoteEndPoint = new IPEndPoint(updatedAddress, remotePort);
+            _payloadType = payloadType;
+            _transmitMicrophone = transmitMicrophone;
+            if (transmitMicrophone)
+            {
+                var startResult = WinMm.waveInStart(_waveIn);
+                DebugLog.Write($"RTP microphone resume result={startResult}");
+            }
+
+            DebugLog.Write($"RTP remote updated while running remote={_remoteEndPoint} payload={payloadType} transmit={transmitMicrophone}");
             return;
         }
 
         var address = await ResolveRemoteAddressAsync(remoteAddress);
         _remoteEndPoint = new IPEndPoint(address, remotePort);
         _payloadType = payloadType;
-        DebugLog.Write($"RTP start remote={_remoteEndPoint} payload={payloadType} input={_inputDevice.Name} output={_outputDevice.Name}");
+        _transmitMicrophone = transmitMicrophone;
+        DebugLog.Write($"RTP start remote={_remoteEndPoint} payload={payloadType} transmit={transmitMicrophone} input={_inputDevice.Name} output={_outputDevice.Name}");
         PrepareDevices();
         _running = true;
         _receiveCancellation = new CancellationTokenSource();
         _ = Task.Run(() => ReceiveLoopAsync(_receiveCancellation.Token));
-        var startResult = WinMm.waveInStart(_waveIn);
-        DebugLog.Write($"RTP microphone start result={startResult}");
+        if (transmitMicrophone)
+        {
+            var startResult = WinMm.waveInStart(_waveIn);
+            DebugLog.Write($"RTP microphone start result={startResult}");
+        }
     }
 
     public void Stop()
@@ -191,7 +206,7 @@ public sealed class RtpAudioSession : IDisposable
             return;
         }
 
-        if (_held)
+        if (!_transmitMicrophone || _held)
         {
             WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
             return;

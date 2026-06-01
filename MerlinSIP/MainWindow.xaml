@@ -506,6 +506,7 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <StackPanel Margin="0,0,0,16">
                                     <TextBlock x:Name="ChatThreadTitleText" Text="Choose a conversation" FontSize="28" FontWeight="Black" Foreground="#111827" />
@@ -535,6 +536,39 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
+                                <Border Grid.Row="2" Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,14,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="120" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="MessageBodyTextBox"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="46"
+                                                 MaxHeight="98"
+                                                 BorderThickness="0"
+                                                 Background="Transparent"
+                                                 VerticalContentAlignment="Center"
+                                                 KeyDown="MessageBodyTextBox_KeyDown" />
+                                        <Button Grid.Column="1"
+                                                x:Name="SendMessageButton"
+                                                Content="Send"
+                                                Style="{StaticResource SoftButton}"
+                                                Background="{StaticResource PrimaryBrush}"
+                                                Foreground="White"
+                                                Margin="10,0,0,0"
+                                                Click="SendMessageButton_Click" />
+                                        <Button Grid.Column="2"
+                                                Content="Clear chat"
+                                                Style="{StaticResource SoftButton}"
+                                                Background="{StaticResource DangerBrush}"
+                                                Foreground="White"
+                                                Margin="10,0,0,0"
+                                                Click="ClearChatThreadButton_Click" />
+                                    </Grid>
+                                </Border>
                             </Grid>
                         </Border>
 
@@ -542,49 +576,27 @@
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="180" />
-                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <StackPanel Margin="0,0,0,16">
-                                    <TextBlock Text="New message" FontSize="24" FontWeight="Black" Foreground="#111827" />
-                                    <TextBlock Text="Send direct extension messages." Foreground="#64748B" />
+                                    <TextBlock Text="Conversations" FontSize="24" FontWeight="Black" Foreground="#111827" />
+                                    <TextBlock Text="Choose an extension to message." Foreground="#64748B" />
                                 </StackPanel>
-                                <StackPanel Grid.Row="1">
-                                    <TextBlock Text="To extension" Foreground="#64748B" FontWeight="Bold" />
-                                    <TextBox x:Name="MessageToTextBox" Margin="0,5,0,12" />
-                                    <TextBlock Text="Message" Foreground="#64748B" FontWeight="Bold" />
-                                    <TextBox x:Name="MessageBodyTextBox" AcceptsReturn="True" TextWrapping="Wrap" Height="82" Margin="0,5,0,0" KeyDown="MessageBodyTextBox_KeyDown" />
-                                </StackPanel>
-                                <Grid Grid.Row="2" Margin="0,0,0,18">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" x:Name="SendMessageButton" Content="Send message" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Margin="0,0,8,0" Click="SendMessageButton_Click" />
-                                    <Button Grid.Column="1" Content="Clear thread" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="ClearChatThreadButton_Click" />
-                                </Grid>
-                                <Grid Grid.Row="3">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Text="Contacts" Foreground="#111827" FontSize="18" FontWeight="Black" Margin="0,0,0,10" />
-                                    <ListBox x:Name="ChatContactsListView" Grid.Row="1" BorderThickness="0" Background="Transparent" SelectionChanged="ChatContactsListView_SelectionChanged" MouseDoubleClick="ChatContactsListView_MouseDoubleClick">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Background="#F8FBFE" Margin="0,0,0,1">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="115" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="Black" Margin="10,8" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#0E987E" FontWeight="Black" Margin="8" TextTrimming="CharacterEllipsis" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </Grid>
+                                <TextBox x:Name="MessageToTextBox" Visibility="Collapsed" />
+                                <ListBox x:Name="ChatContactsListView" Grid.Row="1" BorderThickness="0" Background="Transparent" SelectionChanged="ChatContactsListView_SelectionChanged" MouseDoubleClick="ChatContactsListView_MouseDoubleClick">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Background="#F8FBFE" Margin="0,0,0,1">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="115" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="Black" Margin="10,8" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#0E987E" FontWeight="Black" Margin="8" TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
                             </Grid>
                         </Border>
                     </Grid>

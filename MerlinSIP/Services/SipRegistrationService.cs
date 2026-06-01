@@ -20,7 +20,7 @@ public sealed class SipRegistrationService : IDisposable
     private CancellationTokenSource? _listenCancellation;
     private CancellationTokenSource? _registrationRefreshCancellation;
     private CancellationTokenSource? _natKeepAliveCancellation;
-    private TaskCompletionSource<SipResponse>? _pendingResponse;
+    private PendingSipTransaction? _pendingResponse;
     private readonly SemaphoreSlim _registrationLock = new(1, 1);
     private bool _listenerStarted;
     private bool _registered;
@@ -207,6 +207,10 @@ public sealed class SipRegistrationService : IDisposable
         _activeCall = new ActiveCall(callId, target, localTag, cseq, inviteBranch, false, null);
         var firstResponse = await SendAndWaitFromListenerAsync(invite, cancellationToken);
         DebugLog.Write($"INVITE RESPONSE code={firstResponse.Code} reason={firstResponse.Reason}");
+        if (!IsCurrentCall(callId))
+        {
+            return new SipCallResult(false, "Call ended.");
+        }
 
         if (firstResponse.Code is >= 100 and < 300)
         {
@@ -235,6 +239,10 @@ public sealed class SipRegistrationService : IDisposable
             _activeCall = new ActiveCall(callId, target, localTag, authCseq, authBranch, false, null);
             var secondResponse = await SendAndWaitFromListenerAsync(secondInvite, cancellationToken);
             DebugLog.Write($"AUTH INVITE RESPONSE code={secondResponse.Code} reason={secondResponse.Reason}");
+            if (!IsCurrentCall(callId))
+            {
+                return new SipCallResult(false, "Call ended.");
+            }
 
             if (secondResponse.Code is >= 100 and < 300)
             {
@@ -914,8 +922,11 @@ public sealed class SipRegistrationService : IDisposable
             return new SipResponse(0, "SIP client is not initialized.", new Dictionary<string, string>(), "");
         }
 
+        var requestHeaders = ParseHeaders(message);
+        var expectedCallId = requestHeaders.GetValueOrDefault("call-id", "");
+        var expectedMethod = ExtractCSeqMethod(requestHeaders.GetValueOrDefault("cseq", ""));
         var waitSource = new TaskCompletionSource<SipResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pendingResponse = waitSource;
+        _pendingResponse = new PendingSipTransaction(waitSource, expectedCallId, expectedMethod);
         var payload = Encoding.UTF8.GetBytes(message);
         try
         {
@@ -924,6 +935,11 @@ public sealed class SipRegistrationService : IDisposable
         catch (Exception error)
         {
             DebugLog.Write($"SEND LISTENER failed error={error.Message}");
+            if (ReferenceEquals(_pendingResponse?.ResponseSource, waitSource))
+            {
+                _pendingResponse = null;
+            }
+
             return new SipResponse(0, error.Message, new Dictionary<string, string>(), "");
         }
         DebugLog.Write($"SEND LISTENER bytes={payload.Length}");
@@ -953,16 +969,21 @@ public sealed class SipRegistrationService : IDisposable
                     return response;
                 }
 
+                if (isInvite && response.Code == 183)
+                {
+                    await StartEarlyMediaAsync(response, cancellationToken);
+                }
+
                 RaiseCallProgress(response);
                 waitSource = new TaskCompletionSource<SipResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _pendingResponse = waitSource;
+                _pendingResponse = new PendingSipTransaction(waitSource, expectedCallId, expectedMethod);
             }
 
             return lastResponse;
         }
         finally
         {
-            if (ReferenceEquals(_pendingResponse, waitSource))
+            if (ReferenceEquals(_pendingResponse?.ResponseSource, waitSource))
             {
                 _pendingResponse = null;
             }
@@ -1108,6 +1129,29 @@ public sealed class SipRegistrationService : IDisposable
         }
     }
 
+    private async Task StartEarlyMediaAsync(SipResponse response, CancellationToken cancellationToken)
+    {
+        if (_activeCall is null || _audioSession is null)
+        {
+            return;
+        }
+
+        if (!TryParseRemoteAudio(response.Raw, out var remoteAddress, out var remotePort, out var payloadType))
+        {
+            return;
+        }
+
+        try
+        {
+            await _audioSession.StartAsync(remoteAddress, remotePort, payloadType, false);
+            DebugLog.Write($"RTP early-media start callId={_activeCall.CallId}");
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"RTP early-media start failed callId={_activeCall.CallId} error={error.Message}");
+        }
+    }
+
     private async Task RegistrationRefreshLoopAsync(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
@@ -1148,7 +1192,7 @@ public sealed class SipRegistrationService : IDisposable
                 {
                     var response = ParseResponse(message);
                     DebugLog.Write($"RECV SIP RESPONSE code={response.Code} reason={response.Reason} callId={response.Headers.GetValueOrDefault("call-id", "")}");
-                    var isAwaitedResponse = _pendingResponse?.TrySetResult(response) == true;
+                    var isAwaitedResponse = TryCompletePendingResponse(response);
                     if (isAwaitedResponse)
                     {
                         continue;
@@ -1520,6 +1564,31 @@ public sealed class SipRegistrationService : IDisposable
         CallProgress?.Invoke(this, new CallProgressEventArgs(response.Code, response.Reason, connected, DescribeCallProgress(response)));
     }
 
+    private bool IsCurrentCall(string callId)
+    {
+        return _activeCall is not null &&
+            string.Equals(_activeCall.CallId, callId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool TryCompletePendingResponse(SipResponse response)
+    {
+        if (_pendingResponse is null)
+        {
+            return false;
+        }
+
+        var callId = response.Headers.GetValueOrDefault("call-id", "");
+        var method = ExtractCSeqMethod(response.Headers.GetValueOrDefault("cseq", ""));
+        if (!string.Equals(callId, _pendingResponse.CallId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(method, _pendingResponse.CSeqMethod, StringComparison.OrdinalIgnoreCase))
+        {
+            DebugLog.Write($"RECV SIP RESPONSE ignored for pending transaction callId={callId} method={method} expectedCallId={_pendingResponse.CallId} expectedMethod={_pendingResponse.CSeqMethod}");
+            return false;
+        }
+
+        return _pendingResponse.ResponseSource.TrySetResult(response);
+    }
+
     private static string DescribeCallProgress(SipResponse response)
     {
         return response.Code switch
@@ -1614,7 +1683,7 @@ public sealed class SipRegistrationService : IDisposable
         _natKeepAliveCancellation?.Cancel();
         _natKeepAliveCancellation?.Dispose();
         _natKeepAliveCancellation = null;
-        _pendingResponse?.TrySetCanceled();
+        _pendingResponse?.ResponseSource.TrySetCanceled();
         _pendingResponse = null;
         _pendingIncomingCall = null;
         _client?.Dispose();
@@ -1638,6 +1707,8 @@ public sealed record CallProgressEventArgs(int Code, string Reason, bool Connect
 public sealed record CallEndedEventArgs(string Message);
 
 internal sealed record SipResponse(int Code, string Reason, IReadOnlyDictionary<string, string> Headers, string Raw);
+
+internal sealed record PendingSipTransaction(TaskCompletionSource<SipResponse> ResponseSource, string CallId, string CSeqMethod);
 
 internal sealed record ActiveCall(string CallId, string Target, string LocalTag, int CSeq, string InviteBranch, bool Established, string? RemoteTag);
 
