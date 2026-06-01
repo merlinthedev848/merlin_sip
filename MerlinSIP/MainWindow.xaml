@@ -751,13 +751,13 @@
                                                 <TextBlock Text="Network assistance" Foreground="#111827" FontSize="18" FontWeight="Black" VerticalAlignment="Center" />
                                             </DockPanel>
                                             <CheckBox x:Name="SipAlgCompatibilityCheckBox"
-                                                      Content="SIP ALG compatibility mode"
+                                                      Content="Router keepalive assist"
                                                       Foreground="#111827"
                                                       FontWeight="Black"
                                                       Margin="0,12,0,4"
                                                       Checked="SipAlgCompatibilityCheckBox_Changed"
                                                       Unchecked="SipAlgCompatibilityCheckBox_Changed" />
-                                            <TextBlock Text="Keeps the connection warm and refreshes signalling more often for routers that interfere with SIP."
+                                            <TextBlock Text="Adds extra keepalive traffic for routers that interfere with SIP. Standard SIP registration stays unchanged."
                                                        Foreground="#64748B"
                                                        TextWrapping="Wrap" />
                                             <Grid Margin="0,12,0,0">

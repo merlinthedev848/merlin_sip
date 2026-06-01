@@ -248,6 +248,11 @@ public partial class MainWindow : Window
         _incomingCallWindow.Show();
     }
 
+    private bool ShouldUseDesktopIncomingPopup()
+    {
+        return !IsVisible || WindowState == WindowState.Minimized || !IsActive;
+    }
+
     private void HideIncomingCallSurfaces()
     {
         IncomingCallOverlay.Visibility = Visibility.Collapsed;
@@ -277,10 +282,11 @@ public partial class MainWindow : Window
         {
             var contact = _contactStore.FindByNumber(_contacts, e.CallerNumber);
             var callerName = contact?.Name ?? e.CallerNumber;
+            var useDesktopPopup = ShouldUseDesktopIncomingPopup();
             DestinationTextBox.Text = e.CallerNumber;
             IncomingCallerNameText.Text = callerName;
             IncomingCallerNumberText.Text = e.CallerNumber;
-            IncomingCallOverlay.Visibility = Visibility.Visible;
+            IncomingCallOverlay.Visibility = useDesktopPopup ? Visibility.Collapsed : Visibility.Visible;
             CallerLookupText.Text = contact is null ? "Unknown caller" : $"{contact.Name}  {contact.Company}".Trim();
             NoticeText.Text = $"Incoming call from {callerName}.";
             FooterStatusText.Text = "Incoming call received.";
@@ -291,7 +297,11 @@ public partial class MainWindow : Window
             _callConnected = false;
             UpdateCallControls();
             _ringtonePlayer.Start(_config.AudioOutput, _config.Ringtone, _config.HeadphoneVolume);
-            ShowIncomingCallWindow(callerName, e.CallerNumber);
+            if (useDesktopPopup)
+            {
+                ShowIncomingCallWindow(callerName, e.CallerNumber);
+            }
+
             _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming call received.");
         });
     }
@@ -1219,22 +1229,17 @@ public partial class MainWindow : Window
 
     private async void SaveNetworkModeButton_Click(object sender, RoutedEventArgs e)
     {
-        var previousMode = _config.SipAlgCompatibilityMode;
         _config = _config with
         {
             SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true
         };
 
         await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
+        _sipRegistrationService.UpdateNetworkAssistance(_config.SipAlgCompatibilityMode);
         UpdateNetworkAssistanceText();
         FooterStatusText.Text = _config.SipAlgCompatibilityMode
-            ? "SIP ALG compatibility mode is on."
+            ? "Router keepalive assist is on."
             : "Standard network mode is on.";
-
-        if (previousMode != _config.SipAlgCompatibilityMode && !_callInProgress && NetworkInterface.GetIsNetworkAvailable())
-        {
-            await EnsureConnectionReadyAsync();
-        }
     }
 
     private void SipAlgCompatibilityCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -1305,8 +1310,8 @@ public partial class MainWindow : Window
         report.AppendLine($"RTP audio: {_sipRegistrationService.RtpStatus}");
         report.AppendLine($"Outbound route clue: {_sipRegistrationService.LastCallFailureReason}");
         report.AppendLine(_config.SipAlgCompatibilityMode
-            ? "SIP ALG protection: On. Merlin SIP is using rport, short registrations, keepalives, and recovery checks."
-            : "SIP ALG protection: Off. Enable compatibility mode if the customer router interferes with SIP.");
+            ? "Router keepalive assist: On. Standard SIP registration is unchanged; extra keepalive traffic is being added."
+            : "Router keepalive assist: Off. Merlin SIP is using standard SIP registration.");
         report.AppendLine("Video: H.264 readiness is noted, but video calling remains disabled until real video RTP/SDP negotiation is implemented.");
 
         return report.ToString().Trim();

@@ -11,7 +11,6 @@ namespace MerlinSip.Services;
 public sealed class SipRegistrationService : IDisposable
 {
     private const int StandardRegisterExpiresSeconds = 3600;
-    private const int CompatibilityRegisterExpiresSeconds = 120;
     private static readonly TimeSpan RegisterRefreshInterval = TimeSpan.FromMinutes(10);
     private UdpClient? _client;
     private AppStartupConfig? _config;
@@ -66,6 +65,17 @@ public sealed class SipRegistrationService : IDisposable
     {
         _rejectIncomingCalls = reject;
         DebugLog.Write($"DND rejectIncomingCalls={reject}");
+    }
+
+    public void UpdateNetworkAssistance(bool enabled)
+    {
+        if (_config is null)
+        {
+            return;
+        }
+
+        _config = _config with { SipAlgCompatibilityMode = enabled };
+        DebugLog.Write($"Network assistance updated keepaliveAssist={enabled}");
     }
 
     public void SetMuted(bool muted)
@@ -573,9 +583,7 @@ public sealed class SipRegistrationService : IDisposable
         var branch = $"z9hG4bK-{Guid.NewGuid():N}";
         var tag = Guid.NewGuid().ToString("N")[..12];
         var contact = $"sip:{_config!.Extension}@{_localAddress}:{_localPort};transport=udp";
-        var expires = _config.SipAlgCompatibilityMode
-            ? CompatibilityRegisterExpiresSeconds
-            : StandardRegisterExpiresSeconds;
+        var expires = StandardRegisterExpiresSeconds;
         var lines = new List<string>
         {
             $"REGISTER sip:{_domain} SIP/2.0",
@@ -920,7 +928,8 @@ public sealed class SipRegistrationService : IDisposable
         }
         DebugLog.Write($"SEND LISTENER bytes={payload.Length}");
 
-        var timeoutAt = DateTimeOffset.Now.AddSeconds(12);
+        var isInvite = message.StartsWith("INVITE ", StringComparison.OrdinalIgnoreCase);
+        var timeoutAt = DateTimeOffset.Now.AddSeconds(isInvite ? 45 : 12);
         SipResponse lastResponse = new(0, "Timed out waiting for SIP call response.", new Dictionary<string, string>(), "");
         try
         {
@@ -929,7 +938,7 @@ public sealed class SipRegistrationService : IDisposable
                 var completed = await Task.WhenAny(waitSource.Task, Task.Delay(TimeSpan.FromSeconds(2), cancellationToken));
                 if (completed != waitSource.Task)
                 {
-                    if (lastResponse.Code > 0)
+                    if (!isInvite && lastResponse.Code > 0)
                     {
                         return lastResponse;
                     }
@@ -1181,12 +1190,22 @@ public sealed class SipRegistrationService : IDisposable
                 {
                     DebugLog.Write("RECV BYE");
                     await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
-                    _audioSession?.Dispose();
-                    _audioSession = null;
-                    _activeCall = null;
-                    _pendingIncomingCall = null;
-                    CallEnded?.Invoke(this, new CallEndedEventArgs("Call ended."));
-                    QueueRegistrationRefresh("remote BYE");
+                    var headers = ParseHeaders(message);
+                    var byeCallId = headers.GetValueOrDefault("call-id", "");
+                    if (_activeCall is not null &&
+                        string.Equals(byeCallId, _activeCall.CallId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _audioSession?.Dispose();
+                        _audioSession = null;
+                        _activeCall = null;
+                        _pendingIncomingCall = null;
+                        CallEnded?.Invoke(this, new CallEndedEventArgs("Call ended."));
+                        QueueRegistrationRefresh("remote BYE");
+                    }
+                    else
+                    {
+                        DebugLog.Write($"RECV BYE ignored callId={byeCallId} active={_activeCall?.CallId} pending={_pendingIncomingCall?.CallId}");
+                    }
                 }
                 else if (message.StartsWith("CANCEL ", StringComparison.OrdinalIgnoreCase))
                 {
