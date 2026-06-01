@@ -10,7 +10,7 @@ public sealed record ContactEntry
     public string Notes { get; init; } = "";
 
     [JsonIgnore]
-    public string Presence { get; init; } = "Unknown";
+    public string Presence { get; init; } = "Offline";
 
     [JsonIgnore]
     public string PresenceLabel => Presence switch
@@ -19,7 +19,7 @@ public sealed record ContactEntry
         "Ringing" => "Ringing",
         "Busy" => "Busy",
         "Offline" => "Offline",
-        _ => "Unknown"
+        _ => "Offline"
     };
 
     [JsonIgnore]
@@ -29,7 +29,7 @@ public sealed record ContactEntry
         "Ringing" => "#F59E0B",
         "Busy" => "#EF4444",
         "Offline" => "#94A3B8",
-        _ => "#CBD5E1"
+        _ => "#94A3B8"
     };
 
     [JsonIgnore]
@@ -39,7 +39,7 @@ public sealed record ContactEntry
         "Ringing" => "#FFF3D6",
         "Busy" => "#FFE2E2",
         "Offline" => "#EEF2F7",
-        _ => "#F1F5F9"
+        _ => "#EEF2F7"
     };
 
     [JsonIgnore]
@@ -49,6 +49,6 @@ public sealed record ContactEntry
         "Ringing" => "#8A4F08",
         "Busy" => "#9B1C1C",
         "Offline" => "#475569",
-        _ => "#64748B"
+        _ => "#475569"
     };
 }

@@ -351,7 +351,7 @@ public partial class MainWindow : Window
                 _incomingRinging = false;
                 _callInProgress = false;
                 _callConnected = false;
-                SetContactPresence(_activeRemoteNumber, "Available");
+                SetContactPresence(_activeRemoteNumber, "Offline");
                 _activeRemoteNumber = "";
                 UpdateCallControls();
             }
@@ -377,7 +377,7 @@ public partial class MainWindow : Window
             _callConnected = false;
             _muted = false;
             _held = false;
-            SetContactPresence(_activeRemoteNumber, "Available");
+            SetContactPresence(_activeRemoteNumber, "Offline");
             _activeRemoteNumber = "";
             StopCallTimer();
             ClearDialpadAfterCall();
@@ -745,7 +745,7 @@ public partial class MainWindow : Window
             NoticeText.Text = result.Message;
             _callInProgress = false;
             _callConnected = false;
-            SetContactPresence(destination, "Available");
+            SetContactPresence(destination, "Offline");
             _activeRemoteNumber = "";
             UpdateCallControls();
         }
@@ -765,7 +765,7 @@ public partial class MainWindow : Window
         _incomingRinging = false;
         _callInProgress = false;
         _callConnected = false;
-        SetContactPresence(_activeRemoteNumber, "Available");
+        SetContactPresence(_activeRemoteNumber, "Offline");
         _activeRemoteNumber = "";
         UpdateCallControls();
         NoticeText.Text = "Call ended.";
@@ -812,7 +812,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            SetContactPresence(_activeRemoteNumber, "Available");
+            SetContactPresence(_activeRemoteNumber, "Offline");
             _activeRemoteNumber = "";
         }
         UpdateCallControls();
@@ -828,7 +828,7 @@ public partial class MainWindow : Window
         _incomingRinging = false;
         _callInProgress = false;
         _callConnected = false;
-        SetContactPresence(_activeRemoteNumber, "Available");
+        SetContactPresence(_activeRemoteNumber, "Offline");
         _activeRemoteNumber = "";
         StopCallTimer();
         ClearDialpadAfterCall();

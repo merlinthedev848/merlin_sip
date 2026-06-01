@@ -397,7 +397,6 @@ public sealed class SipRegistrationService : IDisposable
 
         if (response.Code is >= 200 and < 300)
         {
-            ContactPresenceChanged?.Invoke(this, new ContactPresenceEventArgs(NormalizeExtension(extension), "Available"));
             DebugLog.Write($"BLF subscribed extension={extension} code={response.Code}");
         }
         else
@@ -1639,9 +1638,14 @@ public sealed class SipRegistrationService : IDisposable
             return "Ringing";
         }
 
-        if (Regex.IsMatch(body, @"<state>\s*confirmed\s*</state>|<basic>\s*closed\s*</basic>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        if (Regex.IsMatch(body, @"<state>\s*confirmed\s*</state>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
         {
             return "Busy";
+        }
+
+        if (Regex.IsMatch(body, @"<basic>\s*closed\s*</basic>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            return "Offline";
         }
 
         if (Regex.IsMatch(body, @"<state>\s*terminated\s*</state>|<basic>\s*open\s*</basic>", RegexOptions.IgnoreCase | RegexOptions.Singleline))

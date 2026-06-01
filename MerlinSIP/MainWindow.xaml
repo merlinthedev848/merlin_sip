@@ -64,7 +64,7 @@
             <Setter Property="Height" Value="58" />
             <Setter Property="Margin" Value="5" />
             <Setter Property="FontSize" Value="21" />
-            <Setter Property="FontWeight" Value="Black" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="#111827" />
             <Setter Property="Background" Value="{StaticResource DialFaceBrush}" />
             <Setter Property="BorderBrush" Value="#D7E3EF" />
@@ -125,11 +125,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Card" Property="Background" Value="#FFFFFF" />
-                                <Setter TargetName="Card" Property="BorderBrush" Value="#25BFA4" />
+                                <Setter TargetName="Card" Property="BorderBrush" Value="#AFC2D8" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Card" Property="Background" Value="#E8F8F4" />
-                                <Setter TargetName="Card" Property="BorderBrush" Value="#25BFA4" />
+                                <Setter TargetName="Card" Property="Background" Value="#EEF4FB" />
+                                <Setter TargetName="Card" Property="BorderBrush" Value="#8FB3D9" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
