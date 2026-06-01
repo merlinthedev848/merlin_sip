@@ -516,10 +516,22 @@
                                     <RowDefinition Height="*" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <StackPanel Margin="0,0,0,16">
-                                    <TextBlock x:Name="ChatThreadTitleText" Text="Choose a conversation" FontSize="28" FontWeight="SemiBold" Foreground="#111827" />
-                                    <TextBlock x:Name="ChatThreadSubtitleText" Text="" Foreground="#64748B" />
-                                </StackPanel>
+                                <DockPanel Margin="0,0,0,16">
+                                    <Button DockPanel.Dock="Right"
+                                            Content="Clear chat"
+                                            Style="{StaticResource SoftButton}"
+                                            Background="{StaticResource DangerBrush}"
+                                            Foreground="White"
+                                            Width="92"
+                                            Height="34"
+                                            FontSize="12"
+                                            Padding="8,0"
+                                            Click="ClearChatThreadButton_Click" />
+                                    <StackPanel>
+                                        <TextBlock x:Name="ChatThreadTitleText" Text="Choose a conversation" FontSize="28" FontWeight="SemiBold" Foreground="#111827" />
+                                        <TextBlock x:Name="ChatThreadSubtitleText" Text="" Foreground="#64748B" />
+                                    </StackPanel>
+                                </DockPanel>
                                 <ListBox x:Name="ChatMessagesListView" Grid.Row="1" BorderThickness="0" Background="Transparent">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
@@ -549,7 +561,6 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="110" />
-                                            <ColumnDefinition Width="120" />
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="MessageBodyTextBox"
                                                  AcceptsReturn="True"
@@ -568,13 +579,6 @@
                                                 Foreground="White"
                                                 Margin="10,0,0,0"
                                                 Click="SendMessageButton_Click" />
-                                        <Button Grid.Column="2"
-                                                Content="Clear chat"
-                                                Style="{StaticResource SoftButton}"
-                                                Background="{StaticResource DangerBrush}"
-                                                Foreground="White"
-                                                Margin="10,0,0,0"
-                                                Click="ClearChatThreadButton_Click" />
                                     </Grid>
                                 </Border>
                             </Grid>

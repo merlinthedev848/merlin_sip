@@ -1073,8 +1073,12 @@ public partial class MainWindow : Window
         _contacts.Add(savedContact);
 
         await _contactStore.SaveAsync(_contacts);
-        PhonebookContactsListView.SelectedItem = savedContact;
-        _editingContact = savedContact;
+        PhonebookContactsListView.SelectedItem = null;
+        _editingContact = null;
+        ContactNameTextBox.Text = "";
+        ContactNumberTextBox.Text = "";
+        ContactCompanyTextBox.Text = "";
+        ContactNotesTextBox.Text = "";
         FooterStatusText.Text = "Contact saved.";
         _ = RefreshPresenceSubscriptionsAsync();
     }
@@ -1569,6 +1573,16 @@ public partial class MainWindow : Window
 
     private async void SendMessageButton_Click(object sender, RoutedEventArgs e)
     {
+        await SendCurrentMessageAsync();
+    }
+
+    private async Task SendCurrentMessageAsync()
+    {
+        if (!SendMessageButton.IsEnabled)
+        {
+            return;
+        }
+
         var destination = NormalizeDialDestination(MessageToTextBox.Text);
         var message = MessageBodyTextBox.Text.Trim();
 
@@ -1604,6 +1618,7 @@ public partial class MainWindow : Window
             if (result.Signalled)
             {
                 MessageBodyTextBox.Text = string.Empty;
+                MessageBodyTextBox.Focus();
             }
         }
         finally
@@ -1614,10 +1629,10 @@ public partial class MainWindow : Window
 
     private void MessageBodyTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+        if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
         {
             e.Handled = true;
-            SendMessageButton_Click(sender, e);
+            _ = SendCurrentMessageAsync();
         }
     }
 
@@ -1657,7 +1672,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(_selectedChatNumber))
         {
             ChatThreadTitleText.Text = "Choose a conversation";
-            ChatThreadSubtitleText.Text = "Select a contact to view messages.";
+            ChatThreadSubtitleText.Text = "";
             return;
         }
 
