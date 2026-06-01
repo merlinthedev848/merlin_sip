@@ -102,7 +102,11 @@ public sealed class UpdateService
 
     private static UpdateCheckResult BuildResult(Version current, MsiRelease latest)
     {
-        if (latest.Version > current)
+        var updateAvailable = latest.AuthoritativeFeed
+            ? latest.Version != current
+            : latest.Version > current;
+
+        if (updateAvailable)
         {
             return new UpdateCheckResult(
                 true,
@@ -141,7 +145,7 @@ public sealed class UpdateService
                     continue;
                 }
 
-                return new MsiRelease(version, feed.DownloadUrl, feed.Notes);
+                return new MsiRelease(version, feed.DownloadUrl, feed.Notes, true);
             }
             catch
             {
@@ -168,7 +172,7 @@ public sealed class UpdateService
                 ? absolute.ToString()
                 : new Uri(new Uri(ReleasesUrl), href).ToString();
 
-            yield return new MsiRelease(version, url, null);
+            yield return new MsiRelease(version, url, null, false);
         }
     }
 
@@ -180,7 +184,7 @@ public sealed class UpdateService
             : null;
     }
 
-    private sealed record MsiRelease(Version Version, string Url, string? Notes);
+    private sealed record MsiRelease(Version Version, string Url, string? Notes, bool AuthoritativeFeed);
 
     private sealed record UpdateFeed(string Version, string DownloadUrl, string? Notes);
 }

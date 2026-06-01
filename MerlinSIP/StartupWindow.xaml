@@ -95,6 +95,11 @@
                             </StackPanel>
 
                             <StackPanel x:Name="ManualSipPanel" Visibility="Collapsed">
+                                <StackPanel x:Name="PrivatePbxPanel" Visibility="Collapsed">
+                                    <TextBlock Text="PBX server" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
+                                    <TextBox x:Name="PrivatePbxTextBox" Margin="0,6,0,12" />
+                                </StackPanel>
+
                                 <TextBlock Text="User / extension" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                                 <TextBox x:Name="ExtensionTextBox" Margin="0,6,0,12" />
 

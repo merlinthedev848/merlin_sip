@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private readonly AppCacheService _cacheService = new();
     private readonly DeviceDiscoveryService _deviceDiscoveryService = new();
     private readonly SipRegistrationService _sipRegistrationService = new();
+    private readonly LicenseService _licenseService = new();
     private readonly RingtonePlayer _ringtonePlayer = new();
     private readonly UpdateService _updateService = new();
     private readonly ProvisioningService _provisioningService = new();
@@ -38,7 +39,11 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ChatMessageEntry> _chatThreadMessages = [];
     private readonly DispatcherTimer _callTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _connectionWatchdog = new() { Interval = TimeSpan.FromSeconds(15) };
+    private readonly DispatcherTimer _licenseWatchdog = new() { Interval = TimeSpan.FromHours(6) };
+    private CancellationTokenSource? _earlyMediaRingbackCancellation;
     private bool _connectionCheckInProgress;
+    private bool _licenseCheckInProgress;
+    private bool _licenseLocked;
     private bool _startupUpdateCheckCompleted;
     private AppStartupConfig _config;
     private DateTimeOffset? _activeCallStartedAt;
@@ -51,6 +56,7 @@ public partial class MainWindow : Window
     private bool _callInProgress;
     private bool _callConnected;
     private bool _incomingRinging;
+    private bool _localRingbackActive;
     private bool _allowExit;
     private string _selectedChatNumber = "";
     private string _activeRemoteNumber = "";
@@ -77,6 +83,7 @@ public partial class MainWindow : Window
         _sipRegistrationService.ContactPresenceChanged += SipRegistrationService_ContactPresenceChanged;
         _callTimer.Tick += CallTimer_Tick;
         _connectionWatchdog.Tick += ConnectionWatchdog_Tick;
+        _licenseWatchdog.Tick += LicenseWatchdog_Tick;
         Closing += MainWindow_Closing;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
@@ -90,6 +97,9 @@ public partial class MainWindow : Window
         await LoadCallHistoryAsync();
         await LoadChatMessagesAsync();
         await Dispatcher.InvokeAsync(LoadDeviceSelectors, DispatcherPriority.Background);
+        WindowsStartupService.EnableLaunchOnWindowsStartup();
+        _licenseWatchdog.Start();
+        await VerifyLicenseAsync();
         _ = RegisterSipAsync();
         _connectionWatchdog.Start();
         _ = CheckForUpdatesOnStartupAsync();
@@ -98,7 +108,11 @@ public partial class MainWindow : Window
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
         HideIncomingCallSurfaces();
+        _earlyMediaRingbackCancellation?.Cancel();
+        _earlyMediaRingbackCancellation?.Dispose();
+        _earlyMediaRingbackCancellation = null;
         _connectionWatchdog.Stop();
+        _licenseWatchdog.Stop();
         _trayIcon?.Dispose();
         _trayIcon = null;
         _ringtonePlayer.Dispose();
@@ -156,9 +170,14 @@ public partial class MainWindow : Window
         await EnsureConnectionReadyAsync();
     }
 
+    private async void LicenseWatchdog_Tick(object? sender, EventArgs e)
+    {
+        await VerifyLicenseAsync();
+    }
+
     private async Task EnsureConnectionReadyAsync()
     {
-        if (_connectionCheckInProgress || _callInProgress || _incomingRinging)
+        if (_licenseLocked || _connectionCheckInProgress || _callInProgress || _incomingRinging)
         {
             return;
         }
@@ -239,6 +258,76 @@ public partial class MainWindow : Window
         CallTimerText.Text = $"Active {time}";
     }
 
+    private void StartLocalRingback()
+    {
+        if (_localRingbackActive || !_callInProgress || _callConnected || _incomingRinging)
+        {
+            return;
+        }
+
+        _localRingbackActive = true;
+        _ringtonePlayer.StartUkRingback(_config.AudioOutput, _config.HeadphoneVolume);
+        DebugLog.Write("LOCAL RINGBACK start cadence=uk");
+    }
+
+    private void StopLocalRingback()
+    {
+        _earlyMediaRingbackCancellation?.Cancel();
+        if (!_localRingbackActive)
+        {
+            return;
+        }
+
+        _localRingbackActive = false;
+        _ringtonePlayer.Stop();
+        DebugLog.Write("LOCAL RINGBACK stop");
+    }
+
+    private async void UseRingbackIfEarlyMediaIsSilent()
+    {
+        _earlyMediaRingbackCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _earlyMediaRingbackCancellation = cancellation;
+
+        try
+        {
+            await Task.Delay(1200, cancellation.Token);
+            if (_sipRegistrationService.HasInboundRtpAudio)
+            {
+                StopLocalRingback();
+                return;
+            }
+
+            if (_activeCallDirection == "Outbound" && _callInProgress && !_callConnected && !_incomingRinging && !_sipRegistrationService.HasInboundRtpAudio)
+            {
+                StartLocalRingback();
+            }
+
+            while (_activeCallDirection == "Outbound" && _callInProgress && !_callConnected && !cancellation.IsCancellationRequested)
+            {
+                if (_sipRegistrationService.HasInboundRtpAudio)
+                {
+                    StopLocalRingback();
+                    return;
+                }
+
+                await Task.Delay(500, cancellation.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_earlyMediaRingbackCancellation, cancellation))
+            {
+                _earlyMediaRingbackCancellation = null;
+            }
+
+            cancellation.Dispose();
+        }
+    }
+
     private void ShowIncomingCallWindow(string callerName, string callerNumber)
     {
         _incomingCallWindow?.Close();
@@ -315,6 +404,7 @@ public partial class MainWindow : Window
         {
             if (e.Connected)
             {
+                StopLocalRingback();
                 HideIncomingCallSurfaces();
                 SetContactPresence(_activeRemoteNumber, "Busy");
                 NoticeText.Text = "Call connected.";
@@ -329,6 +419,22 @@ public partial class MainWindow : Window
 
             if (e.Code is 180 or 183)
             {
+                if (_activeCallDirection == "Outbound")
+                {
+                    if (e.Code == 180)
+                    {
+                        StartLocalRingback();
+                    }
+                    else
+                    {
+                        UseRingbackIfEarlyMediaIsSilent();
+                    }
+                }
+                else
+                {
+                    StopLocalRingback();
+                }
+
                 SetContactPresence(_activeRemoteNumber, "Ringing");
                 NoticeText.Text = e.Message;
                 FooterStatusText.Text = e.Message;
@@ -344,6 +450,7 @@ public partial class MainWindow : Window
 
             if (e.Code >= 300)
             {
+                StopLocalRingback();
                 HideIncomingCallSurfaces();
                 NoticeText.Text = e.Message;
                 FooterStatusText.Text = e.Message;
@@ -367,6 +474,7 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             HideIncomingCallSurfaces();
+            StopLocalRingback();
             _ringtonePlayer.Stop();
             NoticeText.Text = "Call ended.";
             FooterStatusText.Text = e.Message;
@@ -409,9 +517,93 @@ public partial class MainWindow : Window
         ExtensionTextBox.Text = _config.Extension;
         UsernameTextBox.Text = _config.Username;
         PasswordBox.Password = _config.Password;
+        var customEndpoint = _config.AllowsCustomSipEndpoint;
+        PrivatePbxSettingsPanel.Visibility = customEndpoint ? Visibility.Visible : Visibility.Collapsed;
+        PrivatePbxSettingsTextBox.Text = customEndpoint ? _config.Server : string.Empty;
         SipAlgCompatibilityCheckBox.IsChecked = _config.SipAlgCompatibilityMode;
-        LicenseStatusText.Text = "Licensed";
+        LicenseStatusText.Text = ShortLicenseStatus(_config.LicenseStatus);
+        LicensedToText.Text = LicenseeFromStatus(_config.LicenseStatus);
         UpdateNetworkAssistanceText();
+    }
+
+    private async Task VerifyLicenseAsync()
+    {
+        if (_licenseCheckInProgress)
+        {
+            return;
+        }
+
+        _licenseCheckInProgress = true;
+        try
+        {
+            var result = await _licenseService.VerifyAsync(_config.LicenseKey, _config.LicenseLocalKey);
+            if (!result.Checked)
+            {
+                FooterStatusText.Text = result.Message;
+                return;
+            }
+
+            if (!result.Active)
+            {
+                LockForInactiveLicense(result.Message);
+                return;
+            }
+
+            _licenseLocked = false;
+            var status = string.IsNullOrWhiteSpace(result.Message) ? _config.LicenseStatus : result.Message;
+            _config = _config with
+            {
+                LicenseStatus = status,
+                LicenseLocalKey = _licenseService.LocalKey ?? _config.LicenseLocalKey
+            };
+            await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
+            LicenseStatusText.Text = ShortLicenseStatus(status);
+            LicensedToText.Text = string.IsNullOrWhiteSpace(result.Licensee)
+                ? LicenseeFromStatus(status)
+                : result.Licensee;
+            UpdateCallControls();
+        }
+        finally
+        {
+            _licenseCheckInProgress = false;
+        }
+    }
+
+    private void LockForInactiveLicense(string message)
+    {
+        _licenseLocked = true;
+        _registered = false;
+        _callInProgress = false;
+        _callConnected = false;
+        _incomingRinging = false;
+        StopLocalRingback();
+        _ringtonePlayer.Stop();
+        HideIncomingCallSurfaces();
+        _sipRegistrationService.Dispose();
+        SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
+        LicenseStatusText.Text = "Licence inactive";
+        LicensedToText.Text = "Inactive";
+        NoticeText.Text = "Licence inactive.";
+        FooterStatusText.Text = string.IsNullOrWhiteSpace(message)
+            ? "This licence is inactive. Contact CK Media Services."
+            : message;
+        UpdateCallControls();
+    }
+
+    private static string ShortLicenseStatus(string status)
+    {
+        return string.IsNullOrWhiteSpace(status) ? "Licensed" : "Licensed";
+    }
+
+    private static string LicenseeFromStatus(string status)
+    {
+        const string prefix = "Licensed to ";
+        if (status.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return status[prefix.Length..].Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(status) ? "CK Media Services" : status;
     }
 
     private void LoadDeviceSelectors()
@@ -485,6 +677,14 @@ public partial class MainWindow : Window
 
     private async Task RegisterSipAsync()
     {
+        if (_licenseLocked)
+        {
+            SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
+            ServerStatusText.Text = "Licence inactive.";
+            UpdateCallControls();
+            return;
+        }
+
         SetConnectionState("Connecting...", "#FFF1D6", "#8A4F08");
         ServerStatusText.Text = "Checking account connection.";
         await RefreshConnectionDiagnosticsAsync();
@@ -550,7 +750,9 @@ public partial class MainWindow : Window
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         AppVersionText.Text = version is null
             ? "Unknown"
-            : $"{version.Major}.{version.Minor}.{version.Build}";
+            : version.Revision > 0
+                ? $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}"
+                : $"{version.Major}.{version.Minor}.{version.Build}";
         UpdateStatusText.Text = $"Version {AppVersionText.Text}";
         ProductIdText.Text = LicenseService.ProductId;
     }
@@ -727,6 +929,7 @@ public partial class MainWindow : Window
 
         var contact = _contactStore.FindByNumber(_contacts, destination);
         var name = contact?.Name ?? destination;
+        StopLocalRingback();
         _ringtonePlayer.Stop();
         NoticeText.Text = $"Calling {name}.";
         _activeCallStartedAt = DateTimeOffset.Now;
@@ -741,6 +944,7 @@ public partial class MainWindow : Window
         await AddCallHistory("Outbound", name, destination, result.Signalled ? "Signalled" : "Failed", result.Message);
         if (!result.Signalled)
         {
+            StopLocalRingback();
             NoticeText.Text = result.Message;
             _callInProgress = false;
             _callConnected = false;
@@ -753,6 +957,7 @@ public partial class MainWindow : Window
     private async void HangupButton_Click(object sender, RoutedEventArgs e)
     {
         var result = await _sipRegistrationService.EndCallAsync();
+        StopLocalRingback();
         _ringtonePlayer.Stop();
         HideIncomingCallSurfaces();
         _muted = false;
@@ -792,6 +997,7 @@ public partial class MainWindow : Window
 
     private async void AnswerIncomingCall()
     {
+        StopLocalRingback();
         _ringtonePlayer.Stop();
         HideIncomingCallSurfaces();
         MainTabs.SelectedItem = PhoneTab;
@@ -820,6 +1026,7 @@ public partial class MainWindow : Window
     private async void DeclineIncomingCall()
     {
         var result = await _sipRegistrationService.EndCallAsync();
+        StopLocalRingback();
         _ringtonePlayer.Stop();
         HideIncomingCallSurfaces();
         FooterStatusText.Text = result.Message;
@@ -1103,11 +1310,20 @@ public partial class MainWindow : Window
     private async void ReconnectButton_Click(object sender, RoutedEventArgs e)
     {
         var mediaConfig = BuildConfigFromSettings();
+        var server = _config.AllowsCustomSipEndpoint
+            ? PrivatePbxSettingsTextBox.Text.Trim()
+            : AppStartupConfig.FixedSipServer;
+        if (_config.AllowsCustomSipEndpoint && string.IsNullOrWhiteSpace(server))
+        {
+            FooterStatusText.Text = "Enter the PBX server.";
+            return;
+        }
+
         _config = _config with
         {
-            Server = AppStartupConfig.FixedSipServer,
+            Server = server,
             Port = AppStartupConfig.FixedSipPort,
-            Domain = AppStartupConfig.FixedSipServer,
+            Domain = server,
             Extension = ExtensionTextBox.Text.Trim(),
             Username = UsernameTextBox.Text.Trim(),
             Password = PasswordBox.Password,
@@ -1136,6 +1352,12 @@ public partial class MainWindow : Window
         var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
         return _config with
         {
+            Server = _config.AllowsCustomSipEndpoint
+                ? PrivatePbxSettingsTextBox.Text.Trim()
+                : AppStartupConfig.FixedSipServer,
+            Domain = _config.AllowsCustomSipEndpoint
+                ? PrivatePbxSettingsTextBox.Text.Trim()
+                : AppStartupConfig.FixedSipServer,
             AudioInput = audioInput,
             AudioOutput = audioOutput,
             VideoSource = videoSource,
@@ -1376,8 +1598,9 @@ public partial class MainWindow : Window
         report.AppendLine($"RTP audio: {_sipRegistrationService.RtpStatus}");
         report.AppendLine($"Outbound route clue: {_sipRegistrationService.LastCallFailureReason}");
         report.AppendLine(_config.SipAlgCompatibilityMode
-            ? "Router keepalive assist: On. Standard SIP registration is unchanged; extra keepalive traffic is being added."
+            ? "Router keepalive assist: On. Standard SIP registration is unchanged; extra UDP keepalive traffic is being added."
             : "Router keepalive assist: Off. Merlin SIP is using standard SIP registration.");
+        report.AppendLine("SIP ALG note: If registration is OK but outbound calls fail only on a specific ISP router, that router may be rewriting SIP/SDP. UDP keepalive cannot fully bypass a hardcoded SIP ALG; use a PBX-side TCP/TLS compatibility profile for that customer.");
         report.AppendLine("Video: H.264 readiness is noted, but video calling remains disabled until real video RTP/SDP negotiation is implemented.");
 
         return report.ToString().Trim();
@@ -1439,10 +1662,7 @@ public partial class MainWindow : Window
                         var installerPath = await _updateService.DownloadInstallerAsync(result, progress);
                         UpdateStatusText.Text = "Starting installer...";
                         FooterStatusText.Text = "Starting update installer. Merlin SIP will close.";
-                        Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{installerPath}\"")
-                        {
-                            UseShellExecute = true
-                        });
+                        StartInstallerAndRestart(installerPath);
                         System.Windows.Application.Current.Shutdown();
                     }
                     catch (Exception error)
@@ -1499,10 +1719,7 @@ public partial class MainWindow : Window
             try
             {
                 var installerPath = await _updateService.DownloadInstallerAsync(result);
-                Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{installerPath}\"")
-                {
-                    UseShellExecute = true
-                });
+                StartInstallerAndRestart(installerPath);
                 System.Windows.Application.Current.Shutdown();
             }
             catch (Exception error)
@@ -1513,15 +1730,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private static void StartInstallerAndRestart(string installerPath)
+    {
+        WindowsStartupService.QueueLaunchAfterUpdate();
+        var executablePath = WindowsStartupService.GetExecutablePath();
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{installerPath}\"")
+            {
+                UseShellExecute = true
+            });
+            return;
+        }
+
+        var command = $"/c start /wait \"\" msiexec.exe /i \"{installerPath}\" && start \"\" \"{executablePath}\"";
+        Process.Start(new ProcessStartInfo("cmd.exe", command)
+        {
+            CreateNoWindow = true,
+            UseShellExecute = false
+        });
+    }
+
     private void UpdateCallControls()
     {
         var hasDestination = !string.IsNullOrWhiteSpace(DestinationTextBox.Text);
-        DialButton.IsEnabled = _registered && hasDestination && !_callInProgress && !_incomingRinging;
-        HangupButton.IsEnabled = _callInProgress || _incomingRinging;
-        MuteButton.IsEnabled = _callConnected && _sipRegistrationService.CanControlAudio;
-        HoldButton.IsEnabled = _callConnected && _sipRegistrationService.CanControlAudio;
-        TransferButton.IsEnabled = _callConnected;
-        DndButton.IsEnabled = true;
+        DialButton.IsEnabled = !_licenseLocked && _registered && hasDestination && !_callInProgress && !_incomingRinging;
+        HangupButton.IsEnabled = !_licenseLocked && (_callInProgress || _incomingRinging);
+        MuteButton.IsEnabled = !_licenseLocked && _callConnected && _sipRegistrationService.CanControlAudio;
+        HoldButton.IsEnabled = !_licenseLocked && _callConnected && _sipRegistrationService.CanControlAudio;
+        TransferButton.IsEnabled = !_licenseLocked && _callConnected;
+        DndButton.IsEnabled = !_licenseLocked;
     }
 
     private void SendErrorLogButton_Click(object sender, RoutedEventArgs e)

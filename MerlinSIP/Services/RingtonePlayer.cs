@@ -28,10 +28,20 @@ public sealed class RingtonePlayer : IDisposable
     private string _ringtone = AppStartupConfig.DefaultRingtone;
     private double _volume = 1.0;
 
+    public void StartUkRingback(MediaDeviceInfo outputDevice, double volume = 1.0)
+    {
+        Start(outputDevice, "uk-ringback", volume, allowHiddenTone: true);
+    }
+
     public void Start(MediaDeviceInfo outputDevice, string? ringtone = null, double volume = 1.0)
     {
+        Start(outputDevice, ringtone, volume, allowHiddenTone: false);
+    }
+
+    private void Start(MediaDeviceInfo outputDevice, string? ringtone, double volume, bool allowHiddenTone)
+    {
         Stop();
-        _ringtone = Choices.Any(choice => choice.Id == ringtone)
+        _ringtone = Choices.Any(choice => choice.Id == ringtone) || allowHiddenTone && ringtone == "uk-ringback"
             ? ringtone!
             : AppStartupConfig.DefaultRingtone;
         _volume = Math.Clamp(volume, 0.25, 2.0);
@@ -103,6 +113,15 @@ public sealed class RingtonePlayer : IDisposable
     {
         switch (_ringtone)
         {
+            case "uk-ringback":
+                Repeat(4, () =>
+                {
+                    QueueChord([400.00, 450.00], 0.40, 0.12);
+                    QueuePause(0.20);
+                    QueueChord([400.00, 450.00], 0.40, 0.12);
+                    QueuePause(2.00);
+                });
+                return 12000;
             case "office":
                 Repeat(4, () =>
                 {

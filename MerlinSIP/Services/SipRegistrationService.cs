@@ -44,6 +44,8 @@ public sealed class SipRegistrationService : IDisposable
 
     public bool HasPendingIncomingCall => _pendingIncomingCall is not null;
 
+    public bool HasInboundRtpAudio => _audioSession?.ReceivedPackets > 0;
+
     public string LastCallFailureReason => _lastCallFailureResponse is null
         ? "No outbound route failure has been recorded in this session."
         : $"{_lastCallFailureResponse.Code} {_lastCallFailureResponse.Reason}".Trim();

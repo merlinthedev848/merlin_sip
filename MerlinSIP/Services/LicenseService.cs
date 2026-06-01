@@ -65,13 +65,48 @@ public sealed class LicenseService
         }
     }
 
-    private static async Task<LicenseResponse> PostLicenseAsync(Uri url, string licenseKey, CancellationToken cancellationToken)
+    public async Task<LicenseVerificationResult> VerifyAsync(string token, string? localKey = null, CancellationToken cancellationToken = default)
+    {
+        var licenseKey = token?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(licenseKey))
+        {
+            return LicenseVerificationResult.Inactive("No licence key is saved.");
+        }
+
+        if (string.Equals(licenseKey, TestLicenseKey, StringComparison.OrdinalIgnoreCase))
+        {
+            Status = "Licensed to CK Media Services";
+            LocalKey = null;
+            return LicenseVerificationResult.Valid(Status, "CK Media Services");
+        }
+
+        try
+        {
+            var verify = await PostLicenseAsync(VerifyUrl, licenseKey, cancellationToken, localKey);
+            if (!IsAccepted(verify))
+            {
+                return LicenseVerificationResult.Inactive(ToCustomerMessage(verify));
+            }
+
+            Status = BuildStatus(verify);
+            LocalKey = verify.LocalKey ?? localKey;
+            return LicenseVerificationResult.Valid(Status, GetLicenseeDisplay(verify));
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"LICENSE verification failed error={error.Message}");
+            return LicenseVerificationResult.Unchecked("Unable to verify the licence right now.");
+        }
+    }
+
+    private static async Task<LicenseResponse> PostLicenseAsync(Uri url, string licenseKey, CancellationToken cancellationToken, string? localKey = null)
     {
         using var response = await HttpClient.PostAsJsonAsync(url, new LicenseRequest(
             licenseKey,
             ProductId,
             BuildMachineId(),
-            GetSoftwareVersion()), cancellationToken);
+            GetSoftwareVersion(),
+            localKey), cancellationToken);
 
         var payload = await response.Content.ReadFromJsonAsync<LicenseResponse>(cancellationToken: cancellationToken)
             ?? new LicenseResponse(false, false, response.StatusCode.ToString(), "", "The license server did not return a valid response.", "", false, null, null, null, null);
@@ -103,17 +138,30 @@ public sealed class LicenseService
 
     private static string BuildStatus(LicenseResponse response)
     {
+        var licensee = GetLicenseeDisplay(response);
+        return string.IsNullOrWhiteSpace(licensee)
+            ? "Licensed"
+            : $"Licensed to {licensee}";
+    }
+
+    private static string GetLicenseeDisplay(LicenseResponse response)
+    {
         if (!string.IsNullOrWhiteSpace(response.Licensee?.Company))
         {
-            return $"Licensed to {response.Licensee.Company}";
+            return response.Licensee.Company;
         }
 
         if (!string.IsNullOrWhiteSpace(response.Licensee?.Name))
         {
-            return $"Licensed to {response.Licensee.Name}";
+            return response.Licensee.Name;
         }
 
-        return "Licensed";
+        if (!string.IsNullOrWhiteSpace(response.Buyer))
+        {
+            return response.Buyer;
+        }
+
+        return string.Empty;
     }
 
     private static string ToCustomerMessage(LicenseResponse response)
@@ -136,14 +184,17 @@ public sealed class LicenseService
     private static string GetSoftwareVersion()
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
-        return version is null ? "unknown" : $"{version.Major}.{version.Minor}.{version.Build}";
+        return version is null ? "unknown" : version.Revision > 0
+            ? $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}"
+            : $"{version.Major}.{version.Minor}.{version.Build}";
     }
 
     private sealed record LicenseRequest(
         [property: JsonPropertyName("license_key")] string LicenseKey,
         [property: JsonPropertyName("product_id")] string ProductId,
         [property: JsonPropertyName("machine_id")] string MachineId,
-        [property: JsonPropertyName("software_version")] string SoftwareVersion);
+        [property: JsonPropertyName("software_version")] string SoftwareVersion,
+        [property: JsonPropertyName("local_key")] string? LocalKey = null);
 
     private sealed record LicenseResponse(
         [property: JsonPropertyName("success")] bool Success,
@@ -169,4 +220,13 @@ public sealed record LicenseActivationResult(bool Success, string Message, strin
     public static LicenseActivationResult Ok(string message, string? localKey = null) => new(true, message, localKey);
 
     public static LicenseActivationResult Fail(string message) => new(false, message);
+}
+
+public sealed record LicenseVerificationResult(bool Checked, bool Active, string Message, string Licensee)
+{
+    public static LicenseVerificationResult Valid(string message, string licensee) => new(true, true, message, licensee);
+
+    public static LicenseVerificationResult Inactive(string message) => new(true, false, message, "");
+
+    public static LicenseVerificationResult Unchecked(string message) => new(false, true, message, "");
 }

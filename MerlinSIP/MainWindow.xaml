@@ -677,6 +677,11 @@
                                                 Click="ProvisionAndReconnectButton_Click" />
                                     </Grid>
 
+                                    <StackPanel x:Name="PrivatePbxSettingsPanel" Visibility="Collapsed">
+                                        <TextBlock Text="PBX server" Foreground="#64748B" FontWeight="Medium" />
+                                        <TextBox x:Name="PrivatePbxSettingsTextBox" Margin="0,5,0,12" />
+                                    </StackPanel>
+
                                     <TextBlock Text="User / extension" Foreground="#64748B" FontWeight="Medium" />
                                     <TextBox x:Name="ExtensionTextBox" Margin="0,5,0,12" />
                                     <TextBlock Text="Auth username" Foreground="#64748B" FontWeight="Medium" />
@@ -761,13 +766,16 @@
                                                     <RowDefinition Height="Auto" />
                                                     <RowDefinition Height="Auto" />
                                                     <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
                                                 </Grid.RowDefinitions>
                                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Latency" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
                                                 <TextBlock Grid.Row="0" Grid.Column="1" x:Name="PingStatusText" Text="Not checked yet" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
                                                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Version" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
                                                 <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AppVersionText" Text="-" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Product" Foreground="#64748B" FontWeight="Medium" />
-                                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="ProductIdText" Text="merlin-sip" Foreground="#111827" FontWeight="Medium" />
+                                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Licensed to" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LicensedToText" Text="Checking" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Product" Foreground="#64748B" FontWeight="Medium" />
+                                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ProductIdText" Text="merlin-sip" Foreground="#111827" FontWeight="Medium" />
                                             </Grid>
                                         </StackPanel>
                                     </Border>
@@ -784,7 +792,7 @@
                                                       Margin="0,12,0,4"
                                                       Checked="SipAlgCompatibilityCheckBox_Changed"
                                                       Unchecked="SipAlgCompatibilityCheckBox_Changed" />
-                                            <TextBlock Text="Adds extra keepalive traffic for difficult routers. Normal SIP registration is unchanged."
+                                            <TextBlock Text="Adds extra UDP keepalive traffic for difficult routers. Normal SIP registration is unchanged. Some ISP SIP ALG faults require a PBX-side TCP/TLS profile."
                                                        Foreground="#64748B"
                                                        TextWrapping="Wrap" />
                                             <Grid Margin="0,12,0,0">

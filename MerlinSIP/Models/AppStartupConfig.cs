@@ -22,8 +22,20 @@ public sealed record AppStartupConfig(
     public const int FixedSipPort = 5060;
     public const string DefaultRingtone = "merlin";
 
+    public bool AllowsCustomSipEndpoint =>
+        LicenseKey.StartsWith("PR", StringComparison.OrdinalIgnoreCase);
+
     public AppStartupConfig WithFixedSipEndpoint()
     {
+        if (AllowsCustomSipEndpoint && !string.IsNullOrWhiteSpace(Server))
+        {
+            return this with
+            {
+                Domain = string.IsNullOrWhiteSpace(Domain) ? Server : Domain,
+                Port = Port > 0 ? Port : FixedSipPort
+            };
+        }
+
         return this with
         {
             Server = FixedSipServer,

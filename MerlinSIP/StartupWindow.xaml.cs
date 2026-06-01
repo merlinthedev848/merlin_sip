@@ -13,6 +13,7 @@ public partial class StartupWindow : Window
     private string _licenseKey = string.Empty;
     private string _licenseStatus = "Licensed";
     private bool _licenseAccepted;
+    private bool _allowCustomSipEndpoint;
 
     public AppStartupConfig? Config { get; private set; }
 
@@ -88,6 +89,9 @@ public partial class StartupWindow : Window
             _licenseAccepted = true;
             _licenseKey = licenseKey;
             _licenseStatus = _licenseService.Status;
+            _allowCustomSipEndpoint = LicenseAllowsCustomSipEndpoint(licenseKey);
+            PrivatePbxPanel.Visibility = _allowCustomSipEndpoint ? Visibility.Visible : Visibility.Collapsed;
+            PrivatePbxTextBox.Text = _allowCustomSipEndpoint ? AppStartupConfig.FixedSipServer : string.Empty;
             LicenseStepPanel.Visibility = Visibility.Collapsed;
             CredentialsStepPanel.Visibility = Visibility.Visible;
             SubtitleText.Text = "License accepted. Choose how to authenticate this device.";
@@ -134,6 +138,13 @@ public partial class StartupWindow : Window
         var extension = ExtensionTextBox.Text.Trim();
         var username = UsernameTextBox.Text.Trim();
         var password = PasswordBox.Password;
+        var server = _allowCustomSipEndpoint ? PrivatePbxTextBox.Text.Trim() : AppStartupConfig.FixedSipServer;
+
+        if (_allowCustomSipEndpoint && string.IsNullOrWhiteSpace(server))
+        {
+            ErrorText.Text = "Enter the PBX server.";
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(extension))
         {
@@ -148,9 +159,9 @@ public partial class StartupWindow : Window
         }
 
         Config = new AppStartupConfig(
-            AppStartupConfig.FixedSipServer,
+            server,
             AppStartupConfig.FixedSipPort,
-            AppStartupConfig.FixedSipServer,
+            server,
             extension,
             username,
             password,
@@ -182,5 +193,10 @@ public partial class StartupWindow : Window
         ManualSipPanel.Visibility = ManualSipRadioButton.IsChecked == true
             ? Visibility.Visible
             : Visibility.Collapsed;
+    }
+
+    private static bool LicenseAllowsCustomSipEndpoint(string licenseKey)
+    {
+        return licenseKey.StartsWith("PR", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -45,14 +45,20 @@ public sealed class AppCacheService
             return null;
         }
 
+        var licenseKey = Unprotect(settings.LicenseKey, settings.EncryptedLicenseKey);
+        var customServer = Unprotect(settings.Server, settings.EncryptedServer);
+        var server = licenseKey.StartsWith("PR", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(customServer)
+            ? customServer
+            : AppStartupConfig.FixedSipServer;
+
         return new AppStartupConfig(
-            AppStartupConfig.FixedSipServer,
-            AppStartupConfig.FixedSipPort,
-            AppStartupConfig.FixedSipServer,
+            server,
+            settings.Port is > 0 ? settings.Port.Value : AppStartupConfig.FixedSipPort,
+            server,
             Unprotect(settings.Extension, settings.EncryptedExtension),
             Unprotect(settings.Username, settings.EncryptedUsername),
             Unprotect(settings.Password, settings.EncryptedPassword),
-            Unprotect(settings.LicenseKey, settings.EncryptedLicenseKey),
+            licenseKey,
             settings.LicenseStatus,
             settings.AudioInput,
             settings.AudioOutput,
@@ -73,6 +79,9 @@ public sealed class AppCacheService
             Protect(config.Extension),
             Protect(config.Username),
             Protect(config.Password),
+            null,
+            Protect(config.Server),
+            config.Port,
             null,
             Protect(config.LicenseKey),
             config.LicenseStatus,
@@ -157,6 +166,9 @@ public sealed class AppCacheService
         string? EncryptedExtension,
         string? EncryptedUsername,
         string? EncryptedPassword,
+        string? Server,
+        string? EncryptedServer,
+        int? Port,
         string? LicenseKey,
         string? EncryptedLicenseKey,
         string LicenseStatus,
