@@ -130,7 +130,6 @@ public partial class MainWindow : Window
         Hide();
         ShowInTaskbar = false;
         FooterStatusText.Text = "Merlin SIP is running in the notification area.";
-        _trayIcon?.ShowBalloonTip(1800, "Merlin SIP", "Still running for calls and messages.", WinForms.ToolTipIcon.Info);
     }
 
     private void InitializeTrayIcon()
