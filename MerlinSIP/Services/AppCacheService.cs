@@ -52,7 +52,7 @@ public sealed class AppCacheService
             Unprotect(settings.Extension, settings.EncryptedExtension),
             Unprotect(settings.Username, settings.EncryptedUsername),
             Unprotect(settings.Password, settings.EncryptedPassword),
-            settings.LicenseKey,
+            Unprotect(settings.LicenseKey, settings.EncryptedLicenseKey),
             settings.LicenseStatus,
             settings.AudioInput,
             settings.AudioOutput,
@@ -60,7 +60,8 @@ public sealed class AppCacheService
             string.IsNullOrWhiteSpace(settings.Ringtone) ? AppStartupConfig.DefaultRingtone : settings.Ringtone,
             ClampVolume(settings.MicrophoneVolume),
             ClampVolume(settings.HeadphoneVolume),
-            settings.SipAlgCompatibilityMode ?? false).WithFixedSipEndpoint();
+            settings.SipAlgCompatibilityMode ?? false,
+            Unprotect(settings.LicenseLocalKey, settings.EncryptedLicenseLocalKey)).WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
@@ -72,7 +73,8 @@ public sealed class AppCacheService
             Protect(config.Extension),
             Protect(config.Username),
             Protect(config.Password),
-            config.LicenseKey,
+            null,
+            Protect(config.LicenseKey),
             config.LicenseStatus,
             config.AudioInput,
             config.AudioOutput,
@@ -80,7 +82,9 @@ public sealed class AppCacheService
             config.Ringtone,
             config.MicrophoneVolume,
             config.HeadphoneVolume,
-            config.SipAlgCompatibilityMode);
+            config.SipAlgCompatibilityMode,
+            null,
+            Protect(config.LicenseLocalKey));
 
         try
         {
@@ -153,7 +157,8 @@ public sealed class AppCacheService
         string? EncryptedExtension,
         string? EncryptedUsername,
         string? EncryptedPassword,
-        string LicenseKey,
+        string? LicenseKey,
+        string? EncryptedLicenseKey,
         string LicenseStatus,
         MediaDeviceInfo AudioInput,
         MediaDeviceInfo AudioOutput,
@@ -161,5 +166,7 @@ public sealed class AppCacheService
         string? Ringtone = null,
         double? MicrophoneVolume = null,
         double? HeadphoneVolume = null,
-        bool? SipAlgCompatibilityMode = null);
+        bool? SipAlgCompatibilityMode = null,
+        string? LicenseLocalKey = null,
+        string? EncryptedLicenseLocalKey = null);
 }

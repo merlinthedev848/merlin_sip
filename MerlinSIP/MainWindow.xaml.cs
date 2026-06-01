@@ -17,7 +17,6 @@ using WinForms = System.Windows.Forms;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfButton = System.Windows.Controls.Button;
 using WpfListBox = System.Windows.Controls.ListBox;
-using WpfMessageBox = System.Windows.MessageBox;
 
 namespace MerlinSip;
 
@@ -1195,6 +1194,7 @@ public partial class MainWindow : Window
                 SettingsProvisioningCodeTextBox.Text,
                 _config.LicenseKey,
                 _config.LicenseStatus,
+                _config.LicenseLocalKey,
                 audioInput,
                 audioOutput,
                 videoSource);
@@ -1390,6 +1390,17 @@ public partial class MainWindow : Window
 
     private async void ClearHistoryButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_callHistory.Count == 0)
+        {
+            FooterStatusText.Text = "Call history is already empty.";
+            return;
+        }
+
+        if (!ConfirmDialogWindow.Confirm(this, "Clear call history", "Clear all call history?", "Clear history"))
+        {
+            return;
+        }
+
         _callHistory.Clear();
         await _callHistoryStore.SaveAsync(_callHistory);
         FooterStatusText.Text = "Call history cleared.";
@@ -1400,47 +1411,59 @@ public partial class MainWindow : Window
         CheckUpdatesButton.IsEnabled = false;
         UpdateStatusText.Text = "Checking for updates...";
 
-        var result = await _updateService.CheckForUpdatesAsync();
-        UpdateStatusText.Text = result.Message;
-        UpdateNotesText.Text = result.Notes ?? string.Empty;
-        FooterStatusText.Text = result.Message;
-
-        if (result.UpdateAvailable && !string.IsNullOrWhiteSpace(result.DownloadUrl))
+        try
         {
-            var notes = string.IsNullOrWhiteSpace(result.Notes) ? "" : $"\n\n{result.Notes}";
-            var install = WpfMessageBox.Show(
-                $"{result.Message}{notes}\n\nDownload and install now?",
-                "Update available",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
+            var result = await _updateService.CheckForUpdatesAsync();
+            UpdateStatusText.Text = result.Message;
+            UpdateNotesText.Text = result.Notes ?? string.Empty;
+            FooterStatusText.Text = result.Message;
 
-            if (install == MessageBoxResult.Yes)
+            if (result.UpdateAvailable && !string.IsNullOrWhiteSpace(result.DownloadUrl))
             {
-                try
+                var notes = string.IsNullOrWhiteSpace(result.Notes) ? "" : $"\n\n{result.Notes}";
+                var install = ConfirmDialogWindow.Confirm(
+                    this,
+                    "Update available",
+                    $"{result.Message}{notes}\n\nDownload and install now?",
+                    "Install update",
+                    "Not now");
+
+                if (install)
                 {
-                    var progress = new Progress<int>(percent =>
+                    try
                     {
-                        UpdateStatusText.Text = $"Downloading update... {percent}%";
-                    });
-                    var installerPath = await _updateService.DownloadInstallerAsync(result, progress);
-                    UpdateStatusText.Text = "Starting installer...";
-                    FooterStatusText.Text = "Starting update installer. Merlin SIP will close.";
-                    Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{installerPath}\"")
+                        var progress = new Progress<int>(percent =>
+                        {
+                            UpdateStatusText.Text = $"Downloading update... {percent}%";
+                        });
+                        var installerPath = await _updateService.DownloadInstallerAsync(result, progress);
+                        UpdateStatusText.Text = "Starting installer...";
+                        FooterStatusText.Text = "Starting update installer. Merlin SIP will close.";
+                        Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{installerPath}\"")
+                        {
+                            UseShellExecute = true
+                        });
+                        System.Windows.Application.Current.Shutdown();
+                    }
+                    catch (Exception error)
                     {
-                        UseShellExecute = true
-                    });
-                    System.Windows.Application.Current.Shutdown();
-                }
-                catch (Exception error)
-                {
-                    DebugLog.Write($"UPDATE INSTALL failed error={error.Message}");
-                    UpdateStatusText.Text = "Unable to download the update right now.";
-                    FooterStatusText.Text = UpdateStatusText.Text;
+                        DebugLog.Write($"UPDATE INSTALL failed error={error.Message}");
+                        UpdateStatusText.Text = "Unable to download the update right now.";
+                        FooterStatusText.Text = UpdateStatusText.Text;
+                    }
                 }
             }
         }
-
-        CheckUpdatesButton.IsEnabled = true;
+        catch (Exception error)
+        {
+            DebugLog.Write($"UPDATE CHECK UI failed error={error.Message}");
+            UpdateStatusText.Text = "Unable to check for updates right now.";
+            FooterStatusText.Text = UpdateStatusText.Text;
+        }
+        finally
+        {
+            CheckUpdatesButton.IsEnabled = true;
+        }
     }
 
     private async Task CheckForUpdatesOnStartupAsync()
@@ -1464,13 +1487,14 @@ public partial class MainWindow : Window
         FooterStatusText.Text = "A Merlin SIP update is available.";
 
         var notes = string.IsNullOrWhiteSpace(result.Notes) ? "" : $"\n\n{result.Notes}";
-        var install = WpfMessageBox.Show(
-            $"{result.Message}{notes}\n\nInstall this update now?",
+        var install = ConfirmDialogWindow.Confirm(
+            this,
             "Merlin SIP update available",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Information);
+            $"{result.Message}{notes}\n\nInstall this update now?",
+            "Install update",
+            "Not now");
 
-        if (install == MessageBoxResult.Yes)
+        if (install)
         {
             try
             {
@@ -1531,13 +1555,11 @@ public partial class MainWindow : Window
 
     private async void ResetCacheButton_Click(object sender, RoutedEventArgs e)
     {
-        var confirm = WpfMessageBox.Show(
-            "Clear saved account settings, contacts, and call history? Merlin SIP will close so setup can run again next time.",
+        if (!ConfirmDialogWindow.Confirm(
+            this,
             "Reset app",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (confirm != MessageBoxResult.Yes)
+            "Clear saved account settings, contacts, and call history? Merlin SIP will close so setup can run again next time.",
+            "Reset app"))
         {
             return;
         }
@@ -1695,13 +1717,11 @@ public partial class MainWindow : Window
 
         var contact = _contactStore.FindByNumber(_contacts, destination);
         var displayName = contact?.Name ?? destination;
-        var confirm = WpfMessageBox.Show(
-            $"Clear message history with {displayName}?",
+        if (!ConfirmDialogWindow.Confirm(
+            this,
             "Clear conversation",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (confirm != MessageBoxResult.Yes)
+            $"Clear message history with {displayName}?",
+            "Clear chat"))
         {
             return;
         }

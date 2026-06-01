@@ -187,7 +187,7 @@
             </Grid.RowDefinitions>
 
             <DockPanel Grid.Row="0" Margin="0,0,0,20">
-                <Border DockPanel.Dock="Right" x:Name="MainConnectionPill" Background="#FFF1D6" CornerRadius="8" Padding="16,11">
+                <Border DockPanel.Dock="Right" x:Name="MainConnectionPill" Background="#FFF1D6" CornerRadius="7" Padding="11,7" VerticalAlignment="Top">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.20" Color="#07111E" />
                     </Border.Effect>
@@ -226,8 +226,8 @@
                                     <Border DockPanel.Dock="Right"
                                             x:Name="CallTimerPill"
                                             Background="#FFE2E2"
-                                            CornerRadius="8"
-                                            Padding="12,8"
+                                            CornerRadius="7"
+                                            Padding="9,5"
                                             VerticalAlignment="Top">
                                         <TextBlock x:Name="CallTimerText" Text="Inactive" FontWeight="SemiBold" Foreground="#9B1C1C" />
                                     </Border>
@@ -340,7 +340,7 @@
                                                         </StackPanel>
                                                         <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#475569" VerticalAlignment="Center" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Grid.Column="2" Text="{Binding Duration}" Foreground="#64748B" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                                        <Border Grid.Column="3" Background="#EEF4FB" CornerRadius="7" Padding="8,5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                        <Border Grid.Column="3" Background="#EEF4FB" CornerRadius="6" Padding="6,3" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
                                                             <TextBlock Text="{Binding Result}" Foreground="#2750A7" FontWeight="SemiBold" FontSize="12" />
                                                         </Border>
                                                     </Grid>
@@ -384,9 +384,9 @@
                                                         <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="SemiBold" Margin="12,10" TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Grid.Column="1" Text="{Binding Company}" Foreground="#64748B" Margin="8,10" TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Grid.Column="2" Text="{Binding Number}" Foreground="#0E987E" FontWeight="SemiBold" Margin="8,10" TextTrimming="CharacterEllipsis" />
-                                                        <Border Grid.Column="3" Background="{Binding PresenceBackground}" CornerRadius="9" Padding="8,5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <Border Grid.Column="3" Background="{Binding PresenceBackground}" CornerRadius="6" Padding="6,3" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                             <StackPanel Orientation="Horizontal">
-                                                                <Ellipse Width="8" Height="8" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                                <Ellipse Width="7" Height="7" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" Margin="0,0,5,0" />
                                                                 <TextBlock Text="{Binding PresenceLabel}" Foreground="{Binding PresenceForeground}" FontWeight="Medium" FontSize="12" />
                                                             </StackPanel>
                                                         </Border>
@@ -424,9 +424,9 @@
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <DockPanel>
-                                                <Border DockPanel.Dock="Right" Background="{Binding PresenceBackground}" CornerRadius="8" Padding="12,8">
+                                                <Border DockPanel.Dock="Right" Background="{Binding PresenceBackground}" CornerRadius="6" Padding="7,4" VerticalAlignment="Top">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <Ellipse Width="9" Height="9" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                        <Ellipse Width="7" Height="7" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                                         <TextBlock Text="{Binding Number}" Foreground="{Binding PresenceForeground}" FontWeight="Medium" />
                                                     </StackPanel>
                                                 </Border>
@@ -491,7 +491,7 @@
                                             <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#475569" VerticalAlignment="Center" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="{Binding StartedAt}" Foreground="#64748B" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="3" Text="{Binding Duration}" Foreground="#64748B" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                            <Border Grid.Column="4" Background="#EEF4FB" CornerRadius="7" Padding="9,5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <Border Grid.Column="4" Background="#EEF4FB" CornerRadius="6" Padding="6,3" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
                                                 <TextBlock Text="{Binding Result}" Foreground="#2750A7" FontWeight="SemiBold" FontSize="12" />
                                             </Border>
                                         </Grid>
@@ -603,9 +603,9 @@
                                                     <ColumnDefinition Width="135" />
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="SemiBold" Margin="10,8" TextTrimming="CharacterEllipsis" />
-                                                <Border Grid.Column="1" Background="{Binding PresenceBackground}" CornerRadius="8" Padding="8,5" Margin="8" HorizontalAlignment="Stretch">
+                                                <Border Grid.Column="1" Background="{Binding PresenceBackground}" CornerRadius="6" Padding="6,3" Margin="8" HorizontalAlignment="Left" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <Ellipse Width="8" Height="8" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                        <Ellipse Width="7" Height="7" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" Margin="0,0,5,0" />
                                                         <TextBlock Text="{Binding Number}" Foreground="{Binding PresenceForeground}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
                                                     </StackPanel>
                                                 </Border>
@@ -746,7 +746,7 @@
                                     <Border Background="#EEF4FB" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
                                         <StackPanel>
                                             <DockPanel>
-                                                <Border DockPanel.Dock="Right" x:Name="ConnectionPill" Background="#FFF1D6" CornerRadius="8" Padding="12,8">
+                                                <Border DockPanel.Dock="Right" x:Name="ConnectionPill" Background="#FFF1D6" CornerRadius="7" Padding="9,5" VerticalAlignment="Center">
                                                     <TextBlock x:Name="ConnectionStatusText" Text="Connecting..." Foreground="#8A4F08" FontWeight="SemiBold" />
                                                 </Border>
                                                 <TextBlock Text="Connection" Foreground="#111827" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />

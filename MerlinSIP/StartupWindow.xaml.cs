@@ -45,14 +45,19 @@ public partial class StartupWindow : Window
 
         if (!_licenseAccepted)
         {
-            AcceptLicenseStep();
+            await AcceptLicenseStepAsync();
             return;
         }
 
+        await RunWithDisabledContinueAsync(AcceptCredentialsStep);
+    }
+
+    private async Task RunWithDisabledContinueAsync(Func<Task> action)
+    {
         ContinueButton.IsEnabled = false;
         try
         {
-            await AcceptCredentialsStep();
+            await action();
         }
         finally
         {
@@ -60,23 +65,38 @@ public partial class StartupWindow : Window
         }
     }
 
-    private void AcceptLicenseStep()
+    private async Task AcceptLicenseStepAsync()
     {
         var licenseKey = LicenseKeyTextBox.Text.Trim();
-
-        if (!_licenseService.Activate(licenseKey))
+        if (string.IsNullOrWhiteSpace(licenseKey))
         {
             ErrorText.Text = "Enter a valid license key.";
             return;
         }
 
-        _licenseAccepted = true;
-        _licenseKey = licenseKey;
-        _licenseStatus = _licenseService.Status;
-        LicenseStepPanel.Visibility = Visibility.Collapsed;
-        CredentialsStepPanel.Visibility = Visibility.Visible;
-        SubtitleText.Text = "License accepted. Now choose how to authenticate this device.";
-        ContinueButton.Content = "Provision";
+        ContinueButton.IsEnabled = false;
+        ContinueButton.Content = "Checking...";
+        try
+        {
+            var activation = await _licenseService.ActivateAsync(licenseKey);
+            if (!activation.Success)
+            {
+                ErrorText.Text = activation.Message;
+                return;
+            }
+
+            _licenseAccepted = true;
+            _licenseKey = licenseKey;
+            _licenseStatus = _licenseService.Status;
+            LicenseStepPanel.Visibility = Visibility.Collapsed;
+            CredentialsStepPanel.Visibility = Visibility.Visible;
+            SubtitleText.Text = "License accepted. Choose how to authenticate this device.";
+        }
+        finally
+        {
+            ContinueButton.Content = "Provision";
+            ContinueButton.IsEnabled = true;
+        }
     }
 
     private async Task AcceptCredentialsStep()
@@ -95,6 +115,7 @@ public partial class StartupWindow : Window
                 ProvisioningCodeTextBox.Text,
                 _licenseKey,
                 _licenseStatus,
+                _licenseService.LocalKey ?? string.Empty,
                 audioInput,
                 audioOutput,
                 videoSource);
@@ -137,7 +158,8 @@ public partial class StartupWindow : Window
             _licenseStatus,
             audioInput,
             audioOutput,
-            videoSource).WithFixedSipEndpoint();
+            videoSource,
+            LicenseLocalKey: _licenseService.LocalKey ?? string.Empty).WithFixedSipEndpoint();
 
         DialogResult = true;
     }

@@ -22,6 +22,7 @@ public sealed class ProvisioningService
         string code,
         string licenseKey,
         string licenseStatus,
+        string licenseLocalKey,
         MediaDeviceInfo audioInput,
         MediaDeviceInfo audioOutput,
         MediaDeviceInfo videoSource,
@@ -74,7 +75,8 @@ public sealed class ProvisioningService
                     licenseStatus,
                     audioInput,
                     audioOutput,
-                    videoSource).WithFixedSipEndpoint();
+                    videoSource,
+                    LicenseLocalKey: licenseLocalKey).WithFixedSipEndpoint();
 
                 return ProvisioningResult.Ok(config);
             }
