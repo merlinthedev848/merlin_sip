@@ -508,8 +508,8 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <StackPanel Margin="0,0,0,16">
-                                    <TextBlock Text="Messages" FontSize="28" FontWeight="Black" Foreground="#111827" />
-                                    <TextBlock Text="Extension messages." Foreground="#64748B" />
+                                    <TextBlock x:Name="ChatThreadTitleText" Text="Choose a conversation" FontSize="28" FontWeight="Black" Foreground="#111827" />
+                                    <TextBlock x:Name="ChatThreadSubtitleText" Text="Select a contact to view messages." Foreground="#64748B" />
                                 </StackPanel>
                                 <ListBox x:Name="ChatMessagesListView" Grid.Row="1" BorderThickness="0" Background="Transparent">
                                     <ListBox.ItemTemplate>
@@ -570,7 +570,7 @@
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
                                     <TextBlock Text="Contacts" Foreground="#111827" FontSize="18" FontWeight="Black" Margin="0,0,0,10" />
-                                    <ListBox x:Name="ChatContactsListView" Grid.Row="1" BorderThickness="0" Background="Transparent" MouseDoubleClick="ChatContactsListView_MouseDoubleClick">
+                                    <ListBox x:Name="ChatContactsListView" Grid.Row="1" BorderThickness="0" Background="Transparent" SelectionChanged="ChatContactsListView_SelectionChanged" MouseDoubleClick="ChatContactsListView_MouseDoubleClick">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Background="#F8FBFE" Margin="0,0,0,1">
@@ -752,10 +752,11 @@
                                             </DockPanel>
                                             <CheckBox x:Name="SipAlgCompatibilityCheckBox"
                                                       Content="SIP ALG compatibility mode"
-                                                      IsChecked="True"
                                                       Foreground="#111827"
                                                       FontWeight="Black"
-                                                      Margin="0,12,0,4" />
+                                                      Margin="0,12,0,4"
+                                                      Checked="SipAlgCompatibilityCheckBox_Changed"
+                                                      Unchecked="SipAlgCompatibilityCheckBox_Changed" />
                                             <TextBlock Text="Keeps the connection warm and refreshes signalling more often for routers that interfere with SIP."
                                                        Foreground="#64748B"
                                                        TextWrapping="Wrap" />
@@ -770,11 +771,11 @@
                                                     <RowDefinition Height="Auto" />
                                                 </Grid.RowDefinitions>
                                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="NAT keepalive" Foreground="#64748B" FontWeight="Bold" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="0" Grid.Column="1" Text="On" Foreground="#106247" FontWeight="Black" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="NatKeepaliveStatusText" Text="Off" Foreground="#106247" FontWeight="Black" Margin="0,0,0,6" />
                                                 <TextBlock Grid.Row="1" Grid.Column="0" Text="rport signalling" Foreground="#64748B" FontWeight="Bold" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="1" Grid.Column="1" Text="On" Foreground="#106247" FontWeight="Black" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="RportStatusText" Text="On" Foreground="#106247" FontWeight="Black" Margin="0,0,0,6" />
                                                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Auto recovery" Foreground="#64748B" FontWeight="Bold" />
-                                                <TextBlock Grid.Row="2" Grid.Column="1" Text="On" Foreground="#106247" FontWeight="Black" />
+                                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="AutoRecoveryStatusText" Text="On" Foreground="#106247" FontWeight="Black" />
                                             </Grid>
                                         </StackPanel>
                                     </Border>

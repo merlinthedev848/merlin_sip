@@ -50,7 +50,7 @@ public sealed class AppCacheService
             string.IsNullOrWhiteSpace(settings.Ringtone) ? AppStartupConfig.DefaultRingtone : settings.Ringtone,
             ClampVolume(settings.MicrophoneVolume),
             ClampVolume(settings.HeadphoneVolume),
-            settings.SipAlgCompatibilityMode ?? true).WithFixedSipEndpoint();
+            settings.SipAlgCompatibilityMode ?? false).WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)

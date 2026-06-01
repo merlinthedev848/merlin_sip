@@ -1073,10 +1073,13 @@ public sealed class SipRegistrationService : IDisposable
         {
             try
             {
-                var interval = _config?.SipAlgCompatibilityMode == true
-                    ? TimeSpan.FromSeconds(15)
-                    : TimeSpan.FromSeconds(25);
-                await Task.Delay(interval, cancellationToken);
+                if (_config?.SipAlgCompatibilityMode != true)
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
+                    continue;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
                 if (_client is null || _config is null || _activeCall is not null || _pendingResponse is not null)
                 {
                     continue;
@@ -1189,12 +1192,22 @@ public sealed class SipRegistrationService : IDisposable
                 {
                     DebugLog.Write("RECV CANCEL");
                     await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
-                    _audioSession?.Dispose();
-                    _audioSession = null;
-                    _activeCall = null;
-                    _pendingIncomingCall = null;
-                    CallEnded?.Invoke(this, new CallEndedEventArgs("Incoming call was cancelled."));
-                    QueueRegistrationRefresh("remote CANCEL");
+                    var headers = ParseHeaders(message);
+                    var cancelCallId = headers.GetValueOrDefault("call-id", "");
+                    if (_pendingIncomingCall is not null &&
+                        string.Equals(cancelCallId, _pendingIncomingCall.CallId, StringComparison.OrdinalIgnoreCase) &&
+                        _activeCall is null)
+                    {
+                        _audioSession?.Dispose();
+                        _audioSession = null;
+                        _pendingIncomingCall = null;
+                        CallEnded?.Invoke(this, new CallEndedEventArgs("Incoming call was cancelled."));
+                        QueueRegistrationRefresh("remote CANCEL");
+                    }
+                    else
+                    {
+                        DebugLog.Write($"RECV CANCEL ignored callId={cancelCallId} active={_activeCall?.CallId} pending={_pendingIncomingCall?.CallId}");
+                    }
                 }
                 else if (message.StartsWith("NOTIFY ", StringComparison.OrdinalIgnoreCase))
                 {

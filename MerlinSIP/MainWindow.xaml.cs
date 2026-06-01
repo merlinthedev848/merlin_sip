@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
     private readonly ObservableCollection<ChatMessageEntry> _chatMessages = [];
+    private readonly ObservableCollection<ChatMessageEntry> _chatThreadMessages = [];
     private readonly DispatcherTimer _callTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _connectionWatchdog = new() { Interval = TimeSpan.FromSeconds(15) };
     private bool _connectionCheckInProgress;
@@ -52,6 +53,7 @@ public partial class MainWindow : Window
     private bool _callConnected;
     private bool _incomingRinging;
     private bool _allowExit;
+    private string _selectedChatNumber = "";
     private ContactEntry? _editingContact;
     private IncomingCallWindow? _incomingCallWindow;
 
@@ -67,7 +69,7 @@ public partial class MainWindow : Window
         ChatContactsListView.ItemsSource = _contacts;
         RecentCallsListView.ItemsSource = _callHistory;
         CallHistoryListView.ItemsSource = _callHistory;
-        ChatMessagesListView.ItemsSource = _chatMessages;
+        ChatMessagesListView.ItemsSource = _chatThreadMessages;
         _sipRegistrationService.IncomingCall += SipRegistrationService_IncomingCall;
         _sipRegistrationService.IncomingMessage += SipRegistrationService_IncomingMessage;
         _sipRegistrationService.CallProgress += SipRegistrationService_CallProgress;
@@ -368,6 +370,12 @@ public partial class MainWindow : Window
             var senderName = contact?.Name ?? e.SenderNumber;
             await AddChatMessage("Inbound", senderName, e.SenderNumber, e.Message, "Received");
             FooterStatusText.Text = $"Message received from {senderName}.";
+            if (!MessageBelongsToThread(new ChatMessageEntry { Number = e.SenderNumber }, _selectedChatNumber))
+            {
+                return;
+            }
+
+            RefreshChatThread();
         });
     }
 
@@ -379,6 +387,7 @@ public partial class MainWindow : Window
         PasswordBox.Password = _config.Password;
         SipAlgCompatibilityCheckBox.IsChecked = _config.SipAlgCompatibilityMode;
         LicenseStatusText.Text = "Licensed";
+        UpdateNetworkAssistanceText();
     }
 
     private void LoadDeviceSelectors()
@@ -624,6 +633,8 @@ public partial class MainWindow : Window
         {
             _chatMessages.Add(message);
         }
+
+        RefreshChatThread();
     }
 
     private static string NormalizeDialDestination(string value)
@@ -1170,6 +1181,10 @@ public partial class MainWindow : Window
     private void ShowMessagesButton_Click(object sender, RoutedEventArgs e)
     {
         MainTabs.SelectedItem = MessagesTab;
+        if (string.IsNullOrWhiteSpace(_selectedChatNumber) && _contacts.Count > 0)
+        {
+            SelectChatContact(_contacts[0]);
+        }
     }
 
     private async void OpenSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -1204,21 +1219,36 @@ public partial class MainWindow : Window
 
     private async void SaveNetworkModeButton_Click(object sender, RoutedEventArgs e)
     {
+        var previousMode = _config.SipAlgCompatibilityMode;
         _config = _config with
         {
             SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true
         };
 
         await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
+        UpdateNetworkAssistanceText();
         FooterStatusText.Text = _config.SipAlgCompatibilityMode
             ? "SIP ALG compatibility mode is on."
             : "Standard network mode is on.";
 
-        if (!_callInProgress && NetworkInterface.GetIsNetworkAvailable())
+        if (previousMode != _config.SipAlgCompatibilityMode && !_callInProgress && NetworkInterface.GetIsNetworkAvailable())
         {
-            _registered = false;
-            await RegisterSipAsync();
+            await EnsureConnectionReadyAsync();
         }
+    }
+
+    private void SipAlgCompatibilityCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        UpdateNetworkAssistanceText();
+    }
+
+    private void UpdateNetworkAssistanceText()
+    {
+        var compatibilityOn = SipAlgCompatibilityCheckBox.IsChecked == true;
+        NatKeepaliveStatusText.Text = compatibilityOn ? "On" : "Off";
+        NatKeepaliveStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(compatibilityOn ? "#106247" : "#64748B")!;
+        RportStatusText.Text = "On";
+        AutoRecoveryStatusText.Text = "On";
     }
 
     private async void RunPbxDiagnosticsButton_Click(object sender, RoutedEventArgs e)
@@ -1492,6 +1522,15 @@ public partial class MainWindow : Window
         {
             var contact = _contactStore.FindByNumber(_contacts, destination);
             var name = contact?.Name ?? destination;
+            if (!string.Equals(_selectedChatNumber, destination, StringComparison.OrdinalIgnoreCase))
+            {
+                _selectedChatNumber = destination;
+                ChatThreadTitleText.Text = name;
+                ChatThreadSubtitleText.Text = contact is null || string.IsNullOrWhiteSpace(contact.Company)
+                    ? destination
+                    : $"{destination}  {contact.Company}";
+            }
+
             var result = await _sipRegistrationService.SendMessageAsync(destination, message);
             await AddChatMessage("Outbound", name, destination, message, result.Signalled ? "Sent" : "Failed");
             FooterStatusText.Text = result.Message;
@@ -1522,8 +1561,45 @@ public partial class MainWindow : Window
             return;
         }
 
+        SelectChatContact(contact);
+    }
+
+    private void ChatContactsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ChatContactsListView.SelectedItem is ContactEntry contact)
+        {
+            SelectChatContact(contact);
+        }
+    }
+
+    private void SelectChatContact(ContactEntry contact)
+    {
+        _selectedChatNumber = NormalizeDialDestination(contact.Number);
         MessageToTextBox.Text = contact.Number;
+        ChatThreadTitleText.Text = contact.Name;
+        ChatThreadSubtitleText.Text = string.IsNullOrWhiteSpace(contact.Company)
+            ? contact.Number
+            : $"{contact.Number}  {contact.Company}";
+        RefreshChatThread();
         MessageBodyTextBox.Focus();
+    }
+
+    private void RefreshChatThread()
+    {
+        _chatThreadMessages.Clear();
+        if (string.IsNullOrWhiteSpace(_selectedChatNumber))
+        {
+            ChatThreadTitleText.Text = "Choose a conversation";
+            ChatThreadSubtitleText.Text = "Select a contact to view messages.";
+            return;
+        }
+
+        foreach (var message in _chatMessages
+            .Where(message => MessageBelongsToThread(message, _selectedChatNumber))
+            .OrderBy(message => ParseChatTimestamp(message.SentAt)))
+        {
+            _chatThreadMessages.Add(message);
+        }
     }
 
     private async void ClearChatThreadButton_Click(object sender, RoutedEventArgs e)
@@ -1558,6 +1634,7 @@ public partial class MainWindow : Window
         }
 
         await _chatMessageStore.SaveAsync(_chatMessages);
+        RefreshChatThread();
         FooterStatusText.Text = $"Conversation with {displayName} cleared.";
     }
 
@@ -1578,7 +1655,18 @@ public partial class MainWindow : Window
             Result = result
         };
 
-        _chatMessages.Insert(0, entry);
-        await _chatMessageStore.SaveAsync(_chatMessages);
+        _chatMessages.Add(entry);
+        await _chatMessageStore.SaveAsync(_chatMessages.OrderBy(message => ParseChatTimestamp(message.SentAt)));
+        if (MessageBelongsToThread(entry, _selectedChatNumber))
+        {
+            RefreshChatThread();
+        }
+    }
+
+    private static DateTimeOffset ParseChatTimestamp(string value)
+    {
+        return DateTimeOffset.TryParse(value, out var parsed)
+            ? parsed
+            : DateTimeOffset.MinValue;
     }
 }
