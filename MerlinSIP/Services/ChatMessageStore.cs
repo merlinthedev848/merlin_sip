@@ -27,9 +27,17 @@ public sealed class ChatMessageStore
     {
         if (File.Exists(_path))
         {
-            var protectedText = await File.ReadAllTextAsync(_path);
-            var plainText = Unprotect(protectedText);
-            return JsonSerializer.Deserialize<List<ChatMessageEntry>>(plainText) ?? [];
+            try
+            {
+                var protectedText = await File.ReadAllTextAsync(_path);
+                var plainText = Unprotect(protectedText);
+                return JsonSerializer.Deserialize<List<ChatMessageEntry>>(plainText) ?? [];
+            }
+            catch (Exception error)
+            {
+                DebugLog.Write($"MESSAGES load failed error={error.Message}");
+                return [];
+            }
         }
 
         if (!File.Exists(_legacyPath))
@@ -37,17 +45,32 @@ public sealed class ChatMessageStore
             return [];
         }
 
-        await using var stream = File.OpenRead(_legacyPath);
-        var messages = await JsonSerializer.DeserializeAsync<List<ChatMessageEntry>>(stream) ?? [];
-        await SaveAsync(messages);
-        return messages;
+        try
+        {
+            await using var stream = File.OpenRead(_legacyPath);
+            var messages = await JsonSerializer.DeserializeAsync<List<ChatMessageEntry>>(stream) ?? [];
+            await SaveAsync(messages);
+            return messages;
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"LEGACY MESSAGES load failed error={error.Message}");
+            return [];
+        }
     }
 
     public async Task SaveAsync(IEnumerable<ChatMessageEntry> messages)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        var plainText = JsonSerializer.Serialize(messages.Take(1000).ToList(), JsonOptions);
-        await File.WriteAllTextAsync(_path, Protect(plainText));
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            var plainText = JsonSerializer.Serialize(messages.Take(1000).ToList(), JsonOptions);
+            await File.WriteAllTextAsync(_path, Protect(plainText));
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"MESSAGES save failed error={error.Message}");
+        }
     }
 
     private static string Protect(string value)

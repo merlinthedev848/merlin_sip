@@ -104,58 +104,117 @@ public sealed class RingtonePlayer : IDisposable
         switch (_ringtone)
         {
             case "office":
-                QueueChord([659.25, 987.77], 0.20, 0.14);
-                QueueTone(783.99, 0.16, 0.18);
-                QueueChord([587.33, 880.00], 0.24, 0.13);
-                return 1150;
+                Repeat(4, () =>
+                {
+                    QueueChord([659.25, 987.77], 0.34, 0.12);
+                    QueuePause(0.08);
+                    QueueTone(783.99, 0.24, 0.14);
+                    QueuePause(0.10);
+                    QueueChord([587.33, 880.00], 0.40, 0.11);
+                    QueuePause(1.55);
+                });
+                return 10500;
             case "teams":
-                QueueChord([622.25, 830.61], 0.18, 0.13);
-                QueueTone(739.99, 0.18, 0.15);
-                QueueChord([554.37, 739.99], 0.20, 0.12);
-                return 1250;
+                Repeat(4, () =>
+                {
+                    QueueChord([622.25, 830.61], 0.28, 0.12);
+                    QueuePause(0.08);
+                    QueueTone(739.99, 0.24, 0.13);
+                    QueuePause(0.08);
+                    QueueChord([554.37, 739.99], 0.32, 0.11);
+                    QueuePause(1.70);
+                });
+                return 10500;
             case "skype":
-                QueueTone(783.99, 0.18, 0.14);
-                QueueTone(987.77, 0.12, 0.13);
-                QueueTone(739.99, 0.24, 0.13);
-                return 1400;
+                Repeat(5, () =>
+                {
+                    QueueTone(783.99, 0.22, 0.12);
+                    QueueTone(987.77, 0.18, 0.11);
+                    QueueTone(739.99, 0.28, 0.11);
+                    QueuePause(1.25);
+                });
+                return 10500;
             case "desk":
-                QueueTone(440.00, 0.45, 0.20);
-                QueueTone(480.00, 0.45, 0.18);
-                return 2100;
+                Repeat(3, () =>
+                {
+                    QueueTone(440.00, 0.75, 0.16);
+                    QueueTone(480.00, 0.75, 0.15);
+                    QueuePause(1.80);
+                });
+                return 10500;
             case "double":
-                QueueTone(425.00, 0.34, 0.22);
-                QueueTone(425.00, 0.34, 0.22);
-                return 1900;
+                Repeat(4, () =>
+                {
+                    QueueTone(425.00, 0.38, 0.17);
+                    QueuePause(0.18);
+                    QueueTone(425.00, 0.38, 0.17);
+                    QueuePause(1.55);
+                });
+                return 10500;
             case "reception":
-                QueueChord([1046.50, 1318.51], 0.18, 0.12);
-                QueueChord([880.00, 1174.66], 0.22, 0.13);
-                return 1500;
+                Repeat(5, () =>
+                {
+                    QueueChord([1046.50, 1318.51], 0.24, 0.10);
+                    QueuePause(0.08);
+                    QueueChord([880.00, 1174.66], 0.30, 0.11);
+                    QueuePause(1.35);
+                });
+                return 10500;
             case "marimba":
-                QueueTone(523.25, 0.14, 0.16);
-                QueueTone(659.25, 0.14, 0.15);
-                QueueTone(783.99, 0.20, 0.13);
-                QueueTone(659.25, 0.16, 0.12);
-                return 1350;
+                Repeat(5, () =>
+                {
+                    QueueTone(523.25, 0.18, 0.12);
+                    QueueTone(659.25, 0.18, 0.12);
+                    QueueTone(783.99, 0.24, 0.10);
+                    QueueTone(659.25, 0.22, 0.10);
+                    QueuePause(1.15);
+                });
+                return 10500;
             case "piano":
-                QueueChord([392.00, 493.88, 659.25], 0.30, 0.10);
-                QueueChord([440.00, 554.37, 739.99], 0.30, 0.10);
-                return 1750;
+                Repeat(4, () =>
+                {
+                    QueueChord([392.00, 493.88, 659.25], 0.45, 0.08);
+                    QueuePause(0.10);
+                    QueueChord([440.00, 554.37, 739.99], 0.45, 0.08);
+                    QueuePause(1.55);
+                });
+                return 10500;
             case "night":
-                QueueTone(349.23, 0.30, 0.10);
-                QueueChord([440.00, 523.25], 0.34, 0.09);
-                return 2300;
+                Repeat(3, () =>
+                {
+                    QueueTone(349.23, 0.55, 0.08);
+                    QueuePause(0.18);
+                    QueueChord([440.00, 523.25], 0.65, 0.07);
+                    QueuePause(1.95);
+                });
+                return 10500;
             case "urgent":
-                QueueTone(1046.50, 0.12, 0.20);
-                QueueTone(880.00, 0.12, 0.20);
-                QueueTone(1046.50, 0.12, 0.20);
-                QueueTone(880.00, 0.12, 0.20);
-                return 650;
+                Repeat(8, () =>
+                {
+                    QueueTone(1046.50, 0.14, 0.14);
+                    QueuePause(0.06);
+                    QueueTone(880.00, 0.14, 0.14);
+                    QueuePause(0.82);
+                });
+                return 10500;
             default:
-                QueueTone(659.25, 0.16, 0.26);
-                QueueTone(783.99, 0.16, 0.22);
-                QueueTone(987.77, 0.18, 0.18);
-                QueueTone(783.99, 0.14, 0.20);
-                return 1700;
+                Repeat(5, () =>
+                {
+                    QueueTone(659.25, 0.20, 0.13);
+                    QueueTone(783.99, 0.20, 0.12);
+                    QueueTone(987.77, 0.24, 0.10);
+                    QueueTone(783.99, 0.22, 0.11);
+                    QueuePause(1.10);
+                });
+                return 10500;
+        }
+    }
+
+    private static void Repeat(int count, Action phrase)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            phrase();
         }
     }
 
@@ -180,6 +239,11 @@ public sealed class RingtonePlayer : IDisposable
             var shimmer = Math.Sin(2 * Math.PI * (frequency * 2) * index / SampleRate) * 0.12;
             return Math.Sin(2 * Math.PI * frequency * index / SampleRate) + shimmer;
         });
+    }
+
+    private void QueuePause(double seconds)
+    {
+        QueueWave(seconds, 0, _ => 0);
     }
 
     private void QueueWave(double seconds, double gain, Func<int, double> sampleFactory)
@@ -210,7 +274,7 @@ public sealed class RingtonePlayer : IDisposable
     {
         lock (_sync)
         {
-            while (_buffers.Count > 12)
+            while (_buffers.Count > 72)
             {
                 var old = _buffers[0];
                 _buffers.RemoveAt(0);

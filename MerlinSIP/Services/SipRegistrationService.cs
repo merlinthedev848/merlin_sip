@@ -27,6 +27,7 @@ public sealed class SipRegistrationService : IDisposable
     private int _inviteCseq = 1;
     private int _registerCseq = 1;
     private int _messageCseq = 1;
+    private int _subscribeCseq = 1;
     private ActiveCall? _activeCall;
     private PendingIncomingCall? _pendingIncomingCall;
     private RtpAudioSession? _audioSession;
@@ -37,6 +38,7 @@ public sealed class SipRegistrationService : IDisposable
     public event EventHandler<IncomingMessageEventArgs>? IncomingMessage;
     public event EventHandler<CallProgressEventArgs>? CallProgress;
     public event EventHandler<CallEndedEventArgs>? CallEnded;
+    public event EventHandler<ContactPresenceEventArgs>? ContactPresenceChanged;
 
     public bool CanControlAudio => _audioSession is not null;
 
@@ -350,6 +352,58 @@ public sealed class SipRegistrationService : IDisposable
         return firstResponse.Code is >= 200 and < 300
             ? new SipCallResult(true, "Message sent.")
             : new SipCallResult(false, $"Message failed: {firstResponse.Code} {firstResponse.Reason}".Trim());
+    }
+
+    public async Task SubscribeToContactPresenceAsync(IEnumerable<string> extensions, CancellationToken cancellationToken = default)
+    {
+        if (_client is null || _config is null || !_registered)
+        {
+            return;
+        }
+
+        foreach (var extension in extensions.Select(NormalizeExtension).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await SubscribeToContactPresenceAsync(extension, cancellationToken);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                DebugLog.Write($"BLF subscribe failed extension={extension} error={error.Message}");
+            }
+        }
+    }
+
+    private async Task SubscribeToContactPresenceAsync(string extension, CancellationToken cancellationToken)
+    {
+        var target = extension.Contains('@') ? extension : $"{extension}@{_domain}";
+        var callId = $"{Guid.NewGuid():N}@merlin-sip";
+        var localTag = Guid.NewGuid().ToString("N")[..12];
+        var cseq = _subscribeCseq++;
+        var request = BuildSubscribe(target, callId, localTag, cseq, null);
+        DebugLog.Write($"SEND BLF SUBSCRIBE target={target} callId={callId}");
+        var response = await SendAndWaitFromListenerAsync(request, cancellationToken);
+
+        if (response.Code is 401 or 407)
+        {
+            var challengeHeader = response.Headers.TryGetValue("www-authenticate", out var wwwAuthenticate)
+                ? wwwAuthenticate
+                : response.Headers.GetValueOrDefault("proxy-authenticate", "");
+            var authCseq = _subscribeCseq++;
+            var authorization = BuildDigestAuthorization("SUBSCRIBE", $"sip:{target}", challengeHeader);
+            var authorized = BuildSubscribe(target, callId, localTag, authCseq, authorization);
+            response = await SendAndWaitFromListenerAsync(authorized, cancellationToken);
+        }
+
+        if (response.Code is >= 200 and < 300)
+        {
+            ContactPresenceChanged?.Invoke(this, new ContactPresenceEventArgs(NormalizeExtension(extension), "Available"));
+            DebugLog.Write($"BLF subscribed extension={extension} code={response.Code}");
+        }
+        else
+        {
+            DebugLog.Write($"BLF subscribe response extension={extension} code={response.Code} reason={response.Reason}");
+        }
     }
 
     public async Task<SipCallResult> AnswerIncomingCallAsync(CancellationToken cancellationToken = default)
@@ -844,6 +898,35 @@ public sealed class SipRegistrationService : IDisposable
         return string.Join("\r\n", lines);
     }
 
+    private string BuildSubscribe(string target, string callId, string localTag, int cseq, string? authorization)
+    {
+        var lines = new List<string>
+        {
+            $"SUBSCRIBE sip:{target} SIP/2.0",
+            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={CreateBranch()};rport",
+            "Max-Forwards: 70",
+            $"From: <sip:{_config!.Extension}@{_domain}>;tag={localTag}",
+            $"To: <sip:{target}>",
+            $"Call-ID: {callId}",
+            $"CSeq: {cseq} SUBSCRIBE",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            "User-Agent: CK Media Services Merlin SIP",
+            "Event: dialog",
+            "Accept: application/dialog-info+xml, application/pidf+xml",
+            "Expires: 3600",
+            "Content-Length: 0",
+            "",
+            ""
+        };
+
+        if (!string.IsNullOrWhiteSpace(authorization))
+        {
+            lines.Insert(8, $"Authorization: {authorization}");
+        }
+
+        return string.Join("\r\n", lines);
+    }
+
     private string BuildOptions(string target, string callId, int cseq)
     {
         return string.Join("\r\n", [
@@ -1276,6 +1359,7 @@ public sealed class SipRegistrationService : IDisposable
                 {
                     DebugLog.Write("RECV NOTIFY");
                     await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
+                    HandlePresenceNotify(message);
                 }
                 else if (message.StartsWith("MESSAGE ", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1336,6 +1420,38 @@ public sealed class SipRegistrationService : IDisposable
         }
 
         IncomingMessage?.Invoke(this, new IncomingMessageEventArgs(ExtractCaller(from), from, body));
+    }
+
+    private void HandlePresenceNotify(string message)
+    {
+        try
+        {
+            var headers = ParseHeaders(message);
+            var body = ExtractBody(message);
+            var extension = ExtractPresenceExtension(body);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                var source = headers.GetValueOrDefault("from", "");
+                extension = NormalizeExtension(ExtractCaller(source));
+            }
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = NormalizeExtension(headers.GetValueOrDefault("event", ""));
+            }
+
+            var presence = ParsePresenceState(body);
+            if (string.IsNullOrWhiteSpace(extension) || string.IsNullOrWhiteSpace(presence))
+            {
+                return;
+            }
+
+            DebugLog.Write($"BLF notify extension={extension} presence={presence}");
+            ContactPresenceChanged?.Invoke(this, new ContactPresenceEventArgs(extension, presence));
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"BLF notify parse failed error={error.Message}");
+        }
     }
 
     private async Task SendSimpleResponseAsync(
@@ -1464,6 +1580,91 @@ public sealed class SipRegistrationService : IDisposable
     {
         var match = Regex.Match(fromHeader, @"sip:([^@>;]+)", RegexOptions.IgnoreCase);
         return match.Success ? match.Groups[1].Value : fromHeader;
+    }
+
+    private static string NormalizeExtension(string value)
+    {
+        var source = value.Trim();
+        var sipMatch = Regex.Match(source, @"sip:([^@>;]+)", RegexOptions.IgnoreCase);
+        if (sipMatch.Success)
+        {
+            source = sipMatch.Groups[1].Value;
+        }
+
+        var builder = new StringBuilder(source.Length);
+        foreach (var character in source)
+        {
+            if (char.IsDigit(character) || character is '*' or '#')
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static string ExtractPresenceExtension(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return "";
+        }
+
+        foreach (var pattern in new[]
+        {
+            "entity\\s*=\\s*\"sip:([^@\";>]+)",
+            "<local>.*?<identity[^>]*>\\s*([^<@]+)",
+            "<remote>.*?<identity[^>]*>\\s*([^<@]+)"
+        })
+        {
+            var match = Regex.Match(body, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            if (match.Success)
+            {
+                return NormalizeExtension(match.Groups[1].Value);
+            }
+        }
+
+        return "";
+    }
+
+    private static string ParsePresenceState(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return "";
+        }
+
+        if (Regex.IsMatch(body, @"<state>\s*early\s*</state>|<dialog[^>]*>\s*<state>\s*early", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            return "Ringing";
+        }
+
+        if (Regex.IsMatch(body, @"<state>\s*confirmed\s*</state>|<basic>\s*closed\s*</basic>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            return "Busy";
+        }
+
+        if (Regex.IsMatch(body, @"<state>\s*terminated\s*</state>|<basic>\s*open\s*</basic>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            return "Available";
+        }
+
+        if (body.Contains("busy", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Busy";
+        }
+
+        if (body.Contains("ring", StringComparison.OrdinalIgnoreCase) || body.Contains("early", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Ringing";
+        }
+
+        if (body.Contains("open", StringComparison.OrdinalIgnoreCase) || body.Contains("available", StringComparison.OrdinalIgnoreCase) || body.Contains("terminated", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Available";
+        }
+
+        return "";
     }
 
     private static string ExtractBody(string raw)
@@ -1705,6 +1906,8 @@ public sealed record IncomingMessageEventArgs(string SenderNumber, string RawFro
 public sealed record CallProgressEventArgs(int Code, string Reason, bool Connected, string Message);
 
 public sealed record CallEndedEventArgs(string Message);
+
+public sealed record ContactPresenceEventArgs(string Number, string Presence);
 
 internal sealed record SipResponse(int Code, string Reason, IReadOnlyDictionary<string, string> Headers, string Raw);
 

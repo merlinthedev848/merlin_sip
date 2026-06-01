@@ -45,9 +45,9 @@
                     <TextBlock Text="Merlin SIP"
                                Foreground="{StaticResource InkBrush}"
                                FontSize="30"
-                               FontWeight="Black" />
+                               FontWeight="SemiBold" />
                     <TextBlock x:Name="SubtitleText"
-                               Text="Enter your license key to unlock setup."
+                               Text="Enter your license key to set up Merlin SIP."
                                Foreground="{StaticResource MutedBrush}"
                                FontSize="13"
                                TextWrapping="Wrap" />
@@ -59,11 +59,11 @@
                               CanContentScroll="False">
                     <StackPanel>
                         <StackPanel x:Name="LicenseStepPanel">
-                            <TextBlock Text="License key" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                            <TextBlock Text="License key" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                         <TextBox x:Name="LicenseKeyTextBox"
                                  Margin="0,6,0,8"
                                  CharacterCasing="Upper" />
-                            <TextBlock Text="Enter the license key provided with your account."
+                            <TextBlock Text="Use the license key provided with your account."
                                        Foreground="{StaticResource MutedBrush}"
                                        FontSize="12"
                                        TextWrapping="Wrap" />
@@ -88,36 +88,36 @@
                             </Grid>
 
                             <StackPanel x:Name="ProvisionCodePanel">
-                                <TextBlock Text="Provisioning code" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                                <TextBlock Text="Provisioning code" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                                 <TextBox x:Name="ProvisioningCodeTextBox"
                                          Margin="0,6,0,12"
                                          MaxLength="8" />
                             </StackPanel>
 
                             <StackPanel x:Name="ManualSipPanel" Visibility="Collapsed">
-                                <TextBlock Text="User / extension" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                                <TextBlock Text="User / extension" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                                 <TextBox x:Name="ExtensionTextBox" Margin="0,6,0,12" />
 
-                                <TextBlock Text="Auth username" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                                <TextBlock Text="Auth username" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                                 <TextBox x:Name="UsernameTextBox" Margin="0,6,0,12" />
 
-                                <TextBlock Text="Password" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                                <TextBlock Text="Password" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                                 <PasswordBox x:Name="PasswordBox" Margin="0,6,0,12" />
                             </StackPanel>
 
-                            <TextBlock Text="Audio input" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                            <TextBlock Text="Audio input" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                             <ComboBox x:Name="AudioInputComboBox" Margin="0,6,0,12" />
 
-                            <TextBlock Text="Audio output" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                            <TextBlock Text="Audio output" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                             <ComboBox x:Name="AudioOutputComboBox" Margin="0,6,0,12" />
 
-                            <TextBlock Text="Video source" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                            <TextBlock Text="Video source" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                             <ComboBox x:Name="VideoSourceComboBox" Margin="0,6,0,12" />
                         </StackPanel>
 
                         <TextBlock x:Name="ErrorText"
                                    Foreground="#B82F2F"
-                                   FontWeight="Bold"
+                                   FontWeight="Medium"
                                    Margin="0,14,0,0"
                                    TextWrapping="Wrap" />
                     </StackPanel>
@@ -134,7 +134,7 @@
                             Margin="0,0,8,0" />
                     <Button Grid.Column="1"
                             x:Name="ContinueButton"
-                            Content="Continue"
+                            Content="Provision"
                             Background="{StaticResource TealBrush}"
                             Foreground="White"
                             Click="ContinueButton_Click" />

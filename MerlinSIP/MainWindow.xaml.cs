@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private bool _incomingRinging;
     private bool _allowExit;
     private string _selectedChatNumber = "";
+    private string _activeRemoteNumber = "";
     private ContactEntry? _editingContact;
     private IncomingCallWindow? _incomingCallWindow;
 
@@ -74,6 +75,7 @@ public partial class MainWindow : Window
         _sipRegistrationService.IncomingMessage += SipRegistrationService_IncomingMessage;
         _sipRegistrationService.CallProgress += SipRegistrationService_CallProgress;
         _sipRegistrationService.CallEnded += SipRegistrationService_CallEnded;
+        _sipRegistrationService.ContactPresenceChanged += SipRegistrationService_ContactPresenceChanged;
         _callTimer.Tick += CallTimer_Tick;
         _connectionWatchdog.Tick += ConnectionWatchdog_Tick;
         Closing += MainWindow_Closing;
@@ -283,6 +285,8 @@ public partial class MainWindow : Window
             var contact = _contactStore.FindByNumber(_contacts, e.CallerNumber);
             var callerName = contact?.Name ?? e.CallerNumber;
             var useDesktopPopup = ShouldUseDesktopIncomingPopup();
+            _activeRemoteNumber = e.CallerNumber;
+            SetContactPresence(e.CallerNumber, "Ringing");
             DestinationTextBox.Text = e.CallerNumber;
             IncomingCallerNameText.Text = callerName;
             IncomingCallerNumberText.Text = e.CallerNumber;
@@ -313,6 +317,7 @@ public partial class MainWindow : Window
             if (e.Connected)
             {
                 HideIncomingCallSurfaces();
+                SetContactPresence(_activeRemoteNumber, "Busy");
                 NoticeText.Text = "Call connected.";
                 FooterStatusText.Text = "Call connected. Audio session is active.";
                 _incomingRinging = false;
@@ -325,6 +330,7 @@ public partial class MainWindow : Window
 
             if (e.Code is 180 or 183)
             {
+                SetContactPresence(_activeRemoteNumber, "Ringing");
                 NoticeText.Text = e.Message;
                 FooterStatusText.Text = e.Message;
                 return;
@@ -345,9 +351,16 @@ public partial class MainWindow : Window
                 _incomingRinging = false;
                 _callInProgress = false;
                 _callConnected = false;
+                SetContactPresence(_activeRemoteNumber, "Available");
+                _activeRemoteNumber = "";
                 UpdateCallControls();
             }
         });
+    }
+
+    private void SipRegistrationService_ContactPresenceChanged(object? sender, ContactPresenceEventArgs e)
+    {
+        Dispatcher.Invoke(() => SetContactPresence(e.Number, e.Presence));
     }
 
     private void SipRegistrationService_CallEnded(object? sender, CallEndedEventArgs e)
@@ -364,6 +377,8 @@ public partial class MainWindow : Window
             _callConnected = false;
             _muted = false;
             _held = false;
+            SetContactPresence(_activeRemoteNumber, "Available");
+            _activeRemoteNumber = "";
             StopCallTimer();
             ClearDialpadAfterCall();
             MuteButton.Content = "Mute";
@@ -501,6 +516,7 @@ public partial class MainWindow : Window
             SetConnectionState("Connected", "#DFF8EE", "#106247");
             ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
             FooterStatusText.Text = "Ready.";
+            await RefreshPresenceSubscriptionsAsync();
         }
         else
         {
@@ -604,6 +620,37 @@ public partial class MainWindow : Window
         {
             _contacts.Add(contact);
         }
+
+        _ = RefreshPresenceSubscriptionsAsync();
+    }
+
+    private async Task RefreshPresenceSubscriptionsAsync()
+    {
+        if (!_registered)
+        {
+            return;
+        }
+
+        await _sipRegistrationService.SubscribeToContactPresenceAsync(_contacts.Select(contact => contact.Number));
+    }
+
+    private void SetContactPresence(string number, string presence)
+    {
+        if (string.IsNullOrWhiteSpace(number))
+        {
+            return;
+        }
+
+        var normalized = NormalizeDialDestination(number);
+        for (var index = 0; index < _contacts.Count; index++)
+        {
+            if (!string.Equals(NormalizeDialDestination(_contacts[index].Number), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            _contacts[index] = _contacts[index] with { Presence = presence };
+        }
     }
 
     private async Task LoadCallHistoryAsync()
@@ -685,6 +732,8 @@ public partial class MainWindow : Window
         NoticeText.Text = $"Calling {name}.";
         _activeCallStartedAt = DateTimeOffset.Now;
         _activeCallDirection = "Outbound";
+        _activeRemoteNumber = destination;
+        SetContactPresence(destination, "Ringing");
         _callInProgress = true;
         _callConnected = false;
         UpdateCallControls();
@@ -696,6 +745,8 @@ public partial class MainWindow : Window
             NoticeText.Text = result.Message;
             _callInProgress = false;
             _callConnected = false;
+            SetContactPresence(destination, "Available");
+            _activeRemoteNumber = "";
             UpdateCallControls();
         }
     }
@@ -714,6 +765,8 @@ public partial class MainWindow : Window
         _incomingRinging = false;
         _callInProgress = false;
         _callConnected = false;
+        SetContactPresence(_activeRemoteNumber, "Available");
+        _activeRemoteNumber = "";
         UpdateCallControls();
         NoticeText.Text = "Call ended.";
         FooterStatusText.Text = result.Message;
@@ -754,7 +807,13 @@ public partial class MainWindow : Window
         _callConnected = result.Signalled;
         if (result.Signalled)
         {
+            SetContactPresence(_activeRemoteNumber, "Busy");
             StartCallTimer();
+        }
+        else
+        {
+            SetContactPresence(_activeRemoteNumber, "Available");
+            _activeRemoteNumber = "";
         }
         UpdateCallControls();
     }
@@ -769,6 +828,8 @@ public partial class MainWindow : Window
         _incomingRinging = false;
         _callInProgress = false;
         _callConnected = false;
+        SetContactPresence(_activeRemoteNumber, "Available");
+        _activeRemoteNumber = "";
         StopCallTimer();
         ClearDialpadAfterCall();
         UpdateCallControls();
@@ -1015,6 +1076,7 @@ public partial class MainWindow : Window
         PhonebookContactsListView.SelectedItem = savedContact;
         _editingContact = savedContact;
         FooterStatusText.Text = "Contact saved.";
+        _ = RefreshPresenceSubscriptionsAsync();
     }
 
     private async void DeleteContactButton_Click(object sender, RoutedEventArgs e)

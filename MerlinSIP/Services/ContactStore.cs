@@ -20,24 +20,33 @@ public sealed class ContactStore
     {
         if (!File.Exists(_path))
         {
-            var starter = new[]
-            {
-                new ContactEntry { Name = "Reception", Number = "1000", Company = "Internal", Notes = "Main desk" }
-            };
-
-            await SaveAsync(starter);
-            return starter;
+            return [];
         }
 
-        await using var stream = File.OpenRead(_path);
-        return await JsonSerializer.DeserializeAsync<List<ContactEntry>>(stream) ?? [];
+        try
+        {
+            await using var stream = File.OpenRead(_path);
+            return await JsonSerializer.DeserializeAsync<List<ContactEntry>>(stream) ?? [];
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"CONTACTS load failed error={error.Message}");
+            return [];
+        }
     }
 
     public async Task SaveAsync(IEnumerable<ContactEntry> contacts)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        await using var stream = File.Create(_path);
-        await JsonSerializer.SerializeAsync(stream, contacts.OrderBy(contact => contact.Name).ToList(), JsonOptions);
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            await using var stream = File.Create(_path);
+            await JsonSerializer.SerializeAsync(stream, contacts.OrderBy(contact => contact.Name).ToList(), JsonOptions);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"CONTACTS save failed error={error.Message}");
+        }
     }
 
     public ContactEntry? FindByNumber(IEnumerable<ContactEntry> contacts, string number)

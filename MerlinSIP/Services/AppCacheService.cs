@@ -28,8 +28,18 @@ public sealed class AppCacheService
             return null;
         }
 
-        await using var stream = File.OpenRead(SettingsPath);
-        var settings = await JsonSerializer.DeserializeAsync<SavedAppSettings>(stream);
+        SavedAppSettings? settings;
+        try
+        {
+            await using var stream = File.OpenRead(SettingsPath);
+            settings = await JsonSerializer.DeserializeAsync<SavedAppSettings>(stream);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"SETTINGS load failed error={error.Message}");
+            return null;
+        }
+
         if (settings is null)
         {
             return null;
@@ -72,9 +82,16 @@ public sealed class AppCacheService
             config.HeadphoneVolume,
             config.SipAlgCompatibilityMode);
 
-        Directory.CreateDirectory(_root);
-        await using var stream = File.Create(SettingsPath);
-        await JsonSerializer.SerializeAsync(stream, settings, JsonOptions);
+        try
+        {
+            Directory.CreateDirectory(_root);
+            await using var stream = File.Create(SettingsPath);
+            await JsonSerializer.SerializeAsync(stream, settings, JsonOptions);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"SETTINGS save failed error={error.Message}");
+        }
     }
 
     public void Reset()
