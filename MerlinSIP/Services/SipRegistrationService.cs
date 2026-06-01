@@ -377,11 +377,17 @@ public sealed class SipRegistrationService : IDisposable
     private async Task SubscribeToContactPresenceAsync(string extension, CancellationToken cancellationToken)
     {
         var target = extension.Contains('@') ? extension : $"{extension}@{_domain}";
+        await SubscribeToContactPresenceAsync(extension, target, "dialog", "application/dialog-info+xml", cancellationToken);
+        await SubscribeToContactPresenceAsync(extension, target, "presence", "application/pidf+xml", cancellationToken);
+    }
+
+    private async Task SubscribeToContactPresenceAsync(string extension, string target, string eventName, string accept, CancellationToken cancellationToken)
+    {
         var callId = $"{Guid.NewGuid():N}@merlin-sip";
         var localTag = Guid.NewGuid().ToString("N")[..12];
         var cseq = _subscribeCseq++;
-        var request = BuildSubscribe(target, callId, localTag, cseq, null);
-        DebugLog.Write($"SEND BLF SUBSCRIBE target={target} callId={callId}");
+        var request = BuildSubscribe(target, callId, localTag, cseq, eventName, accept, null);
+        DebugLog.Write($"SEND BLF SUBSCRIBE target={target} event={eventName} callId={callId}");
         var response = await SendAndWaitFromListenerAsync(request, cancellationToken);
 
         if (response.Code is 401 or 407)
@@ -391,17 +397,17 @@ public sealed class SipRegistrationService : IDisposable
                 : response.Headers.GetValueOrDefault("proxy-authenticate", "");
             var authCseq = _subscribeCseq++;
             var authorization = BuildDigestAuthorization("SUBSCRIBE", $"sip:{target}", challengeHeader);
-            var authorized = BuildSubscribe(target, callId, localTag, authCseq, authorization);
+            var authorized = BuildSubscribe(target, callId, localTag, authCseq, eventName, accept, authorization);
             response = await SendAndWaitFromListenerAsync(authorized, cancellationToken);
         }
 
         if (response.Code is >= 200 and < 300)
         {
-            DebugLog.Write($"BLF subscribed extension={extension} code={response.Code}");
+            DebugLog.Write($"BLF subscribed extension={extension} event={eventName} code={response.Code}");
         }
         else
         {
-            DebugLog.Write($"BLF subscribe response extension={extension} code={response.Code} reason={response.Reason}");
+            DebugLog.Write($"BLF subscribe response extension={extension} event={eventName} code={response.Code} reason={response.Reason}");
         }
     }
 
@@ -897,7 +903,7 @@ public sealed class SipRegistrationService : IDisposable
         return string.Join("\r\n", lines);
     }
 
-    private string BuildSubscribe(string target, string callId, string localTag, int cseq, string? authorization)
+    private string BuildSubscribe(string target, string callId, string localTag, int cseq, string eventName, string accept, string? authorization)
     {
         var lines = new List<string>
         {
@@ -910,8 +916,8 @@ public sealed class SipRegistrationService : IDisposable
             $"CSeq: {cseq} SUBSCRIBE",
             $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
             "User-Agent: CK Media Services Merlin SIP",
-            "Event: dialog",
-            "Accept: application/dialog-info+xml, application/pidf+xml",
+            $"Event: {eventName}",
+            $"Accept: {accept}",
             "Expires: 3600",
             "Content-Length: 0",
             "",
@@ -1648,9 +1654,14 @@ public sealed class SipRegistrationService : IDisposable
             return "Offline";
         }
 
-        if (Regex.IsMatch(body, @"<state>\s*terminated\s*</state>|<basic>\s*open\s*</basic>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        if (Regex.IsMatch(body, @"<basic>\s*open\s*</basic>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
         {
             return "Available";
+        }
+
+        if (Regex.IsMatch(body, @"<state>\s*terminated\s*</state>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            return "Offline";
         }
 
         if (body.Contains("busy", StringComparison.OrdinalIgnoreCase))
@@ -1663,7 +1674,7 @@ public sealed class SipRegistrationService : IDisposable
             return "Ringing";
         }
 
-        if (body.Contains("open", StringComparison.OrdinalIgnoreCase) || body.Contains("available", StringComparison.OrdinalIgnoreCase) || body.Contains("terminated", StringComparison.OrdinalIgnoreCase))
+        if (body.Contains("open", StringComparison.OrdinalIgnoreCase) || body.Contains("available", StringComparison.OrdinalIgnoreCase))
         {
             return "Available";
         }
