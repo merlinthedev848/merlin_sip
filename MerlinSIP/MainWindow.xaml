@@ -793,11 +793,9 @@
                                     </ComboBox>
                                     <TextBlock Text="When I decline a call" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="DeclineActionComboBox" Margin="0,5,0,12">
-                                        <ComboBoxItem Content="End call" />
                                         <ComboBoxItem Content="Send busy" />
-                                        <ComboBoxItem Content="Send to voicemail" />
                                     </ComboBox>
-                                    <CheckBox x:Name="CallWaitingCheckBox" Content="Allow call waiting while busy" Foreground="#111827" FontWeight="SemiBold" Margin="0,4,0,14" />
+                                    <CheckBox x:Name="CallWaitingCheckBox" Content="Allow call waiting while busy" Visibility="Collapsed" />
                                     <Button Content="Save preferences" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" />
                                 </StackPanel>
                             </TabItem>
@@ -807,9 +805,8 @@
                                     <TextBlock Text="Call Handling" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
                                     <TextBlock Text="Internal calls when busy" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="InternalBusyActionComboBox" Margin="0,5,0,12">
-                                        <ComboBoxItem Content="Divert to call group" />
-                                        <ComboBoxItem Content="Receive busy tone" />
-                                        <ComboBoxItem Content="Send to voicemail" />
+                                        <ComboBoxItem Content="Send busy" />
+                                        <ComboBoxItem Content="Keep ringing" />
                                     </ComboBox>
                                     <TextBlock Text="Internal no-answer timeout" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="InternalNoAnswerTimeoutComboBox" Margin="0,5,0,12">
@@ -819,9 +816,8 @@
                                     </ComboBox>
                                     <TextBlock Text="External calls when busy" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="ExternalBusyActionComboBox" Margin="0,5,0,12">
-                                        <ComboBoxItem Content="Divert to call group" />
-                                        <ComboBoxItem Content="Receive busy tone" />
-                                        <ComboBoxItem Content="Send to voicemail" />
+                                        <ComboBoxItem Content="Send busy" />
+                                        <ComboBoxItem Content="Keep ringing" />
                                     </ComboBox>
                                     <TextBlock Text="External no-answer timeout" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="ExternalNoAnswerTimeoutComboBox" Margin="0,5,0,12">
@@ -883,27 +879,32 @@
                             <TabItem x:Name="SettingsQueuesTab" Header="Queues">
                                 <StackPanel>
                                     <TextBlock Text="Queue Settings" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                    <CheckBox x:Name="QueuePickupCheckBox" Content="Enable queue pickup" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,14" />
-                                    <TextBlock Text="Queue pickup is stored as a Merlin preference. PBX-side queue membership remains managed on the telephone system." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,14" />
-                                    <Button Content="Save queues" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" />
+                                    <CheckBox x:Name="QueuePickupCheckBox" Content="Enable queue pickup shortcut" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,14" />
+                                    <TextBlock Text="Queue pickup dials *8 from this handset when enabled." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Content="Pick up queue call" Style="{StaticResource SoftButton}" Margin="0,0,8,0" Click="QueuePickupButton_Click" />
+                                        <Button Grid.Column="1" Content="Save queues" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" />
+                                    </Grid>
                                 </StackPanel>
                             </TabItem>
 
                             <TabItem x:Name="SettingsAdvancedTab" Header="Advanced">
                                 <StackPanel>
                                     <TextBlock Text="Advanced Settings" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                    <CheckBox x:Name="FlashCallStateCheckBox" Content="Flash call state changes" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
-                                    <TextBlock Text="Maximum simultaneous calls" Foreground="#64748B" FontWeight="Medium" />
-                                    <ComboBox x:Name="MaxCallsComboBox" Margin="0,5,0,12">
+                                    <CheckBox x:Name="FlashCallStateCheckBox" Content="Flash call state changes" Visibility="Collapsed" />
+                                    <ComboBox x:Name="MaxCallsComboBox" Visibility="Collapsed">
                                         <ComboBoxItem Content="1" />
                                         <ComboBoxItem Content="2" />
                                         <ComboBoxItem Content="3" />
                                     </ComboBox>
-                                    <CheckBox x:Name="ShowCallStatsCheckBox" Content="Show call statistics" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
-                                    <CheckBox x:Name="SingleClickTransferCheckBox" Content="Single-click blind transfer" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                    <CheckBox x:Name="ShowCallStatsCheckBox" Content="Show call statistics" Visibility="Collapsed" />
+                                    <CheckBox x:Name="SingleClickTransferCheckBox" Content="Single-click blind transfer" Visibility="Collapsed" />
                                     <CheckBox x:Name="CombineContactsCheckBox" Content="Combine contacts in search" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
-                                    <TextBlock Text="Incoming notification duration" Foreground="#64748B" FontWeight="Medium" />
-                                    <ComboBox x:Name="IncomingNotificationDurationComboBox" Margin="0,5,0,12">
+                                    <ComboBox x:Name="IncomingNotificationDurationComboBox" Visibility="Collapsed">
                                         <ComboBoxItem Content="15 seconds" />
                                         <ComboBoxItem Content="30 seconds" />
                                         <ComboBoxItem Content="60 seconds" />
@@ -914,7 +915,7 @@
                                         <ComboBoxItem Content="10 seconds" />
                                         <ComboBoxItem Content="15 seconds" />
                                     </ComboBox>
-                                    <CheckBox x:Name="FavouriteTransferCheckBox" Content="Show favourite extensions while transferring" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,14" />
+                                    <CheckBox x:Name="FavouriteTransferCheckBox" Content="Show favourite extensions while transferring" Visibility="Collapsed" />
                                     <Button Content="Save advanced" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" />
                                 </StackPanel>
                             </TabItem>

@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _connectionWatchdog = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly DispatcherTimer _licenseWatchdog = new() { Interval = TimeSpan.FromHours(6) };
     private CancellationTokenSource? _earlyMediaRingbackCancellation;
+    private CancellationTokenSource? _incomingNoAnswerCancellation;
     private bool _connectionCheckInProgress;
     private bool _licenseCheckInProgress;
     private bool _licenseLocked;
@@ -342,8 +343,85 @@ public partial class MainWindow : Window
         return !IsVisible || WindowState == WindowState.Minimized || !IsActive;
     }
 
+    private bool IsSilentRingingEnabled()
+    {
+        return string.Equals(_config.DndMode, "Silent ringing", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool ShouldSendBusyWhenBusy(string callerNumber)
+    {
+        var action = IsInternalNumber(callerNumber)
+            ? _config.InternalBusyAction
+            : _config.ExternalBusyAction;
+
+        return action.Contains("busy", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsInternalNumber(string number)
+    {
+        var digits = new string(number.Where(char.IsDigit).ToArray());
+        return digits.Length > 0 && digits.Length <= 4;
+    }
+
+    private void StartIncomingNoAnswerTimeout(string callerNumber)
+    {
+        CancelIncomingNoAnswerTimeout();
+        var seconds = IsInternalNumber(callerNumber)
+            ? _config.InternalNoAnswerSeconds
+            : _config.ExternalNoAnswerSeconds;
+
+        if (seconds <= 0)
+        {
+            return;
+        }
+
+        var cancellation = new CancellationTokenSource();
+        _incomingNoAnswerCancellation = cancellation;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(seconds), cancellation.Token);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (_incomingRinging && _sipRegistrationService.HasPendingIncomingCall)
+                    {
+                        FooterStatusText.Text = "Incoming call timed out.";
+                        DeclineIncomingCall();
+                    }
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        });
+    }
+
+    private void CancelIncomingNoAnswerTimeout()
+    {
+        _incomingNoAnswerCancellation?.Cancel();
+        _incomingNoAnswerCancellation?.Dispose();
+        _incomingNoAnswerCancellation = null;
+    }
+
+    private async Task ResetFailedCallDisplayAsync(string message)
+    {
+        var seconds = Math.Max(1, _config.FailedCallDisplaySeconds);
+        await Task.Delay(TimeSpan.FromSeconds(seconds));
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (string.Equals(FooterStatusText.Text, message, StringComparison.Ordinal) ||
+                string.Equals(NoticeText.Text, message, StringComparison.Ordinal))
+            {
+                NoticeText.Text = "Ready.";
+                FooterStatusText.Text = "Ready.";
+            }
+        });
+    }
+
     private void HideIncomingCallSurfaces()
     {
+        CancelIncomingNoAnswerTimeout();
         IncomingCallOverlay.Visibility = Visibility.Collapsed;
         if (_incomingCallWindow is null)
         {
@@ -371,7 +449,9 @@ public partial class MainWindow : Window
         {
             var contact = _contactStore.FindByNumber(_contacts, e.CallerNumber);
             var callerName = contact?.Name ?? e.CallerNumber;
-            var useDesktopPopup = ShouldUseDesktopIncomingPopup();
+            var alreadyOnCall = _callConnected || (_callInProgress && !_incomingRinging);
+            var silentRinging = IsSilentRingingEnabled();
+            var useDesktopPopup = !silentRinging && ShouldUseDesktopIncomingPopup();
             _activeRemoteNumber = e.CallerNumber;
             SetContactPresence(e.CallerNumber, "Ringing");
             DestinationTextBox.Text = e.CallerNumber;
@@ -387,12 +467,27 @@ public partial class MainWindow : Window
             _callInProgress = true;
             _callConnected = false;
             UpdateCallControls();
-            _ringtonePlayer.Start(_config.AudioOutput, _config.Ringtone, _config.HeadphoneVolume);
+
+            if (alreadyOnCall && ShouldSendBusyWhenBusy(e.CallerNumber))
+            {
+                NoticeText.Text = "Incoming call declined because the line is busy.";
+                FooterStatusText.Text = "Busy response sent.";
+                _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Busy", "Line was already in use.");
+                DeclineIncomingCall();
+                return;
+            }
+
+            if (!silentRinging)
+            {
+                _ringtonePlayer.Start(_config.AudioOutput, _config.Ringtone, _config.HeadphoneVolume);
+            }
+
             if (useDesktopPopup)
             {
                 ShowIncomingCallWindow(callerName, e.CallerNumber);
             }
 
+            StartIncomingNoAnswerTimeout(e.CallerNumber);
             _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming call received.");
         });
     }
@@ -453,6 +548,7 @@ public partial class MainWindow : Window
                 HideIncomingCallSurfaces();
                 NoticeText.Text = e.Message;
                 FooterStatusText.Text = e.Message;
+                _ = ResetFailedCallDisplayAsync(e.Message);
                 _incomingRinging = false;
                 _callInProgress = false;
                 _callConnected = false;
@@ -524,6 +620,7 @@ public partial class MainWindow : Window
         LicensedToText.Text = LicenseeFromStatus(_config.LicenseStatus);
         LoadApplicationSettingsControls();
         UpdateNetworkAssistanceText();
+        ApplyDndMode();
     }
 
     private void LoadApplicationSettingsControls()
@@ -939,6 +1036,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!_config.CombineContactsInSearch)
+        {
+            return;
+        }
+
         var contact = _contacts.FirstOrDefault(item =>
             item.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
             item.Company.Contains(query, StringComparison.OrdinalIgnoreCase));
@@ -961,12 +1063,15 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(DestinationTextBox.Text))
         {
             var query = GlobalSearchTextBox.Text.Trim();
-            var contact = _contacts.FirstOrDefault(item =>
-                item.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                item.Company.Contains(query, StringComparison.OrdinalIgnoreCase));
-            if (contact is not null)
+            if (_config.CombineContactsInSearch)
             {
-                DestinationTextBox.Text = contact.Number;
+                var contact = _contacts.FirstOrDefault(item =>
+                    item.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    item.Company.Contains(query, StringComparison.OrdinalIgnoreCase));
+                if (contact is not null)
+                {
+                    DestinationTextBox.Text = contact.Number;
+                }
             }
         }
 
@@ -1090,6 +1195,7 @@ public partial class MainWindow : Window
         {
             StopLocalRingback();
             NoticeText.Text = result.Message;
+            _ = ResetFailedCallDisplayAsync(result.Message);
             _callInProgress = false;
             _callConnected = false;
             SetContactPresence(destination, "Offline");
@@ -1289,9 +1395,27 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ApplyDndMode()
+    {
+        _dndEnabled = string.Equals(_config.DndMode, "Reject calls", StringComparison.OrdinalIgnoreCase);
+        _sipRegistrationService.SetRejectIncomingCalls(_dndEnabled);
+        DndButton.Content = _dndEnabled ? "DND on" : "DND";
+        if (_dndEnabled)
+        {
+            PresenceButton.Content = "DND";
+        }
+        else if (string.Equals(PresenceButton.Content?.ToString(), "DND", StringComparison.OrdinalIgnoreCase))
+        {
+            PresenceButton.Content = "Available";
+        }
+    }
+
     private async void DndButton_Click(object sender, RoutedEventArgs e)
     {
         _dndEnabled = !_dndEnabled;
+        _config = _config with { DndMode = _dndEnabled ? "Reject calls" : "Off" };
+        SelectComboBoxItem(DndModeComboBox, _config.DndMode);
+        await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
         _sipRegistrationService.SetRejectIncomingCalls(_dndEnabled);
         if (_dndEnabled)
         {
@@ -1317,6 +1441,7 @@ public partial class MainWindow : Window
         }
 
         DndButton.Content = _dndEnabled ? "DND on" : "DND";
+        PresenceButton.Content = _dndEnabled ? "DND" : "Available";
         UpdateCallControls();
         if (!_dndEnabled || !_sipRegistrationService.HasPendingIncomingCall)
         {
@@ -1786,14 +1911,14 @@ public partial class MainWindow : Window
         {
             MobileNumber = MobileNumberTextBox.Text.Trim(),
             DndMode = ComboBoxText(DndModeComboBox, "Off"),
-            DeclineIncomingAction = ComboBoxText(DeclineActionComboBox, "End call"),
+            DeclineIncomingAction = ComboBoxText(DeclineActionComboBox, "Send busy"),
             CallWaitingEnabled = CallWaitingCheckBox.IsChecked == true,
-            InternalBusyAction = ComboBoxText(InternalBusyActionComboBox, "Divert to call group"),
+            InternalBusyAction = ComboBoxText(InternalBusyActionComboBox, "Send busy"),
             InternalNoAnswerSeconds = ComboBoxSeconds(InternalNoAnswerTimeoutComboBox, 90),
-            InternalNoAnswerAction = "Receive busy tone",
-            ExternalBusyAction = ComboBoxText(ExternalBusyActionComboBox, "Divert to call group"),
+            InternalNoAnswerAction = "Send busy",
+            ExternalBusyAction = ComboBoxText(ExternalBusyActionComboBox, "Send busy"),
             ExternalNoAnswerSeconds = ComboBoxSeconds(ExternalNoAnswerTimeoutComboBox, 90),
-            ExternalNoAnswerAction = "Receive busy tone",
+            ExternalNoAnswerAction = "Send busy",
             QueuePickupEnabled = QueuePickupCheckBox.IsChecked == true,
             FlashCallState = FlashCallStateCheckBox.IsChecked == true,
             MaxConcurrentCalls = int.TryParse(ComboBoxText(MaxCallsComboBox, "2"), out var maxCalls) ? maxCalls : 2,
@@ -1806,7 +1931,21 @@ public partial class MainWindow : Window
         };
 
         await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
+        ApplyDndMode();
         FooterStatusText.Text = "Settings saved.";
+    }
+
+    private void QueuePickupButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (QueuePickupCheckBox.IsChecked != true)
+        {
+            FooterStatusText.Text = "Enable queue pickup first.";
+            return;
+        }
+
+        DestinationTextBox.Text = "*8";
+        MainTabs.SelectedItem = PhoneTab;
+        DialButton_Click(sender, e);
     }
 
     private async void ClearHistoryButton_Click(object sender, RoutedEventArgs e)
