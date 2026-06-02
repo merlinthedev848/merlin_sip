@@ -186,18 +186,54 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <DockPanel Grid.Row="0" Margin="0,0,0,20">
-                <Border DockPanel.Dock="Right" x:Name="MainConnectionPill" Background="#FFF1D6" CornerRadius="7" Padding="11,7" VerticalAlignment="Top">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.20" Color="#07111E" />
-                    </Border.Effect>
-                    <TextBlock x:Name="MainConnectionStatusText" Text="Checking" Foreground="#8A4F08" FontWeight="SemiBold" />
-                </Border>
-                <StackPanel>
+            <Grid Grid.Row="0" Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="420" />
+                    <ColumnDefinition Width="240" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
                     <TextBlock Text="Merlin SIP" Foreground="#111827" FontSize="34" FontWeight="SemiBold" />
                     <TextBlock x:Name="NoticeText" Text="Ready." Foreground="#5D6B7C" FontSize="14" />
                 </StackPanel>
-            </DockPanel>
+
+                <TextBox Grid.Column="1"
+                         x:Name="GlobalSearchTextBox"
+                         Height="40"
+                         Padding="14,9"
+                         VerticalAlignment="Center"
+                         BorderBrush="#D7E1EC"
+                         Background="#FFFFFF"
+                         TextChanged="GlobalSearchTextBox_TextChanged"
+                         KeyDown="GlobalSearchTextBox_KeyDown" />
+
+                <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button x:Name="PresenceButton"
+                            Content="Available"
+                            Style="{StaticResource SoftButton}"
+                            Width="108"
+                            Height="40"
+                            Margin="0,0,10,0"
+                            Click="PresenceButton_Click">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Available" Click="PresenceMenuItem_Click" />
+                                <MenuItem Header="Busy" Click="PresenceMenuItem_Click" />
+                                <MenuItem Header="DND" Click="PresenceMenuItem_Click" />
+                                <MenuItem Header="Appear Away" Click="PresenceMenuItem_Click" />
+                                <MenuItem Header="Appear Offline" Click="PresenceMenuItem_Click" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                    <Border x:Name="MainConnectionPill" Background="#FFF1D6" CornerRadius="7" Padding="11,7" VerticalAlignment="Top">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.20" Color="#07111E" />
+                        </Border.Effect>
+                        <TextBlock x:Name="MainConnectionStatusText" Text="Checking" Foreground="#8A4F08" FontWeight="SemiBold" />
+                    </Border>
+                </StackPanel>
+            </Grid>
 
             <TabControl x:Name="MainTabs" Grid.Row="1" Background="Transparent" BorderThickness="0">
                 <TabControl.Resources>

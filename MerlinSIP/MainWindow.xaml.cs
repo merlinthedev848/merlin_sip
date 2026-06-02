@@ -874,6 +874,83 @@ public partial class MainWindow : Window
             : $"{contact.Name}  {contact.Company}".Trim();
     }
 
+    private void GlobalSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var query = GlobalSearchTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(query) || _callConnected || _incomingRinging)
+        {
+            return;
+        }
+
+        if (query.Any(char.IsDigit))
+        {
+            DestinationTextBox.Text = NormalizeDialDestination(query);
+            DestinationTextBox.CaretIndex = DestinationTextBox.Text.Length;
+            return;
+        }
+
+        var contact = _contacts.FirstOrDefault(item =>
+            item.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            item.Company.Contains(query, StringComparison.OrdinalIgnoreCase));
+        if (contact is not null)
+        {
+            DestinationTextBox.Text = contact.Number;
+            DestinationTextBox.CaretIndex = DestinationTextBox.Text.Length;
+            CallerLookupText.Text = $"{contact.Name}  {contact.Company}".Trim();
+        }
+    }
+
+    private void GlobalSearchTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (string.IsNullOrWhiteSpace(DestinationTextBox.Text))
+        {
+            var query = GlobalSearchTextBox.Text.Trim();
+            var contact = _contacts.FirstOrDefault(item =>
+                item.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                item.Company.Contains(query, StringComparison.OrdinalIgnoreCase));
+            if (contact is not null)
+            {
+                DestinationTextBox.Text = contact.Number;
+            }
+        }
+
+        MainTabs.SelectedItem = PhoneTab;
+        DialButton_Click(sender, e);
+    }
+
+    private void PresenceButton_Click(object sender, RoutedEventArgs e)
+    {
+        PresenceButton.ContextMenu.IsOpen = true;
+    }
+
+    private void PresenceMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem item || item.Header is not string status)
+        {
+            return;
+        }
+
+        PresenceButton.Content = status;
+        if (status.Equals("DND", StringComparison.OrdinalIgnoreCase) && !_dndEnabled)
+        {
+            DndButton_Click(sender, e);
+            return;
+        }
+
+        if (!status.Equals("DND", StringComparison.OrdinalIgnoreCase) && _dndEnabled)
+        {
+            DndButton_Click(sender, e);
+        }
+
+        FooterStatusText.Text = $"Presence set to {status}.";
+    }
+
     private async void DialpadButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not WpfButton button)
