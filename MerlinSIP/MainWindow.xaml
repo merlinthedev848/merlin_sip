@@ -198,34 +198,74 @@
                     <TextBlock x:Name="NoticeText" Text="Ready." Foreground="#5D6B7C" FontSize="14" />
                 </StackPanel>
 
-                <TextBox Grid.Column="1"
-                         x:Name="GlobalSearchTextBox"
-                         Height="40"
-                         Padding="14,9"
-                         VerticalAlignment="Center"
-                         BorderBrush="#D7E1EC"
-                         Background="#FFFFFF"
-                         TextChanged="GlobalSearchTextBox_TextChanged"
-                         KeyDown="GlobalSearchTextBox_KeyDown" />
+                <Border Grid.Column="1"
+                        Background="#FFFFFF"
+                        BorderBrush="#D7E1EC"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="12,8"
+                        VerticalAlignment="Center">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.10" Color="#07111E" />
+                    </Border.Effect>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="96" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Search or dial"
+                                   Foreground="#64748B"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 x:Name="GlobalSearchTextBox"
+                                 Height="34"
+                                 Padding="10,6"
+                                 VerticalAlignment="Center"
+                                 BorderBrush="#E2E8F0"
+                                 Background="#F8FBFE"
+                                 ToolTip="Type a number or contact name, then press Enter"
+                                 TextChanged="GlobalSearchTextBox_TextChanged"
+                                 KeyDown="GlobalSearchTextBox_KeyDown" />
+                    </Grid>
+                </Border>
 
                 <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                    <Button x:Name="PresenceButton"
-                            Content="Available"
-                            Style="{StaticResource SoftButton}"
-                            Width="108"
-                            Height="40"
-                            Margin="0,0,10,0"
-                            Click="PresenceButton_Click">
-                        <Button.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Available" Click="PresenceMenuItem_Click" />
-                                <MenuItem Header="Busy" Click="PresenceMenuItem_Click" />
-                                <MenuItem Header="DND" Click="PresenceMenuItem_Click" />
-                                <MenuItem Header="Appear Away" Click="PresenceMenuItem_Click" />
-                                <MenuItem Header="Appear Offline" Click="PresenceMenuItem_Click" />
-                            </ContextMenu>
-                        </Button.ContextMenu>
-                    </Button>
+                    <Border Background="#FFFFFF"
+                            BorderBrush="#D7E1EC"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="10,8"
+                            Margin="0,0,10,0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.10" Color="#07111E" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="34" />
+                                <ColumnDefinition Width="112" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="30" Height="30" CornerRadius="7" Background="{StaticResource PrimaryBrush}">
+                                <TextBlock Text="MS" Foreground="#07111E" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Button Grid.Column="1"
+                                    x:Name="PresenceButton"
+                                    Content="Available"
+                                    Style="{StaticResource SoftButton}"
+                                    Height="32"
+                                    Click="PresenceButton_Click">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Available" Click="PresenceMenuItem_Click" />
+                                        <MenuItem Header="Busy" Click="PresenceMenuItem_Click" />
+                                        <MenuItem Header="DND" Click="PresenceMenuItem_Click" />
+                                        <MenuItem Header="Appear Away" Click="PresenceMenuItem_Click" />
+                                        <MenuItem Header="Appear Offline" Click="PresenceMenuItem_Click" />
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
+                        </Grid>
+                    </Border>
                     <Border x:Name="MainConnectionPill" Background="#FFF1D6" CornerRadius="7" Padding="11,7" VerticalAlignment="Top">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.20" Color="#07111E" />
@@ -678,12 +718,17 @@
                             </StackPanel>
                         </DockPanel>
 
-                        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,18">
-                            <Button Content="Account" Style="{StaticResource SoftButton}" Click="SettingsAccountButton_Click" />
-                            <Button Content="Devices" Style="{StaticResource SoftButton}" Click="SettingsDevicesButton_Click" />
-                            <Button Content="Status" Style="{StaticResource SoftButton}" Click="SettingsStatusButton_Click" />
-                            <Button Content="Updates" Style="{StaticResource SoftButton}" Click="SettingsUpdatesButton_Click" />
-                        </UniformGrid>
+                        <WrapPanel Grid.Row="1" Margin="0,0,0,18">
+                            <Button Content="Account" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsAccountButton_Click" />
+                            <Button Content="Preferences" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsPreferencesButton_Click" />
+                            <Button Content="Handling" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsHandlingButton_Click" />
+                            <Button Content="Devices" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsDevicesButton_Click" />
+                            <Button Content="Queues" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsQueuesButton_Click" />
+                            <Button Content="Advanced" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsAdvancedButton_Click" />
+                            <Button Content="Status" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsStatusButton_Click" />
+                            <Button Content="Updates" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsUpdatesButton_Click" />
+                            <Button Content="About" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsAboutButton_Click" />
+                        </WrapPanel>
 
                         <TabControl x:Name="SettingsTabs" Grid.Row="2" Background="Transparent" BorderThickness="0">
                             <TabControl.Resources>
@@ -735,6 +780,59 @@
                                 </StackPanel>
                             </TabItem>
 
+                            <TabItem x:Name="SettingsPreferencesTab" Header="Preferences">
+                                <StackPanel>
+                                    <TextBlock Text="Call Preferences" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <TextBlock Text="Mobile number" Foreground="#64748B" FontWeight="Medium" />
+                                    <TextBox x:Name="MobileNumberTextBox" Margin="0,5,0,12" />
+                                    <TextBlock Text="DND mode" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="DndModeComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="Off" />
+                                        <ComboBoxItem Content="Reject calls" />
+                                        <ComboBoxItem Content="Silent ringing" />
+                                    </ComboBox>
+                                    <TextBlock Text="When I decline a call" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="DeclineActionComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="End call" />
+                                        <ComboBoxItem Content="Send busy" />
+                                        <ComboBoxItem Content="Send to voicemail" />
+                                    </ComboBox>
+                                    <CheckBox x:Name="CallWaitingCheckBox" Content="Allow call waiting while busy" Foreground="#111827" FontWeight="SemiBold" Margin="0,4,0,14" />
+                                    <Button Content="Save preferences" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" />
+                                </StackPanel>
+                            </TabItem>
+
+                            <TabItem x:Name="SettingsHandlingTab" Header="Handling">
+                                <StackPanel>
+                                    <TextBlock Text="Call Handling" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <TextBlock Text="Internal calls when busy" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="InternalBusyActionComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="Divert to call group" />
+                                        <ComboBoxItem Content="Receive busy tone" />
+                                        <ComboBoxItem Content="Send to voicemail" />
+                                    </ComboBox>
+                                    <TextBlock Text="Internal no-answer timeout" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="InternalNoAnswerTimeoutComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="30 seconds" />
+                                        <ComboBoxItem Content="60 seconds" />
+                                        <ComboBoxItem Content="90 seconds" />
+                                    </ComboBox>
+                                    <TextBlock Text="External calls when busy" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="ExternalBusyActionComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="Divert to call group" />
+                                        <ComboBoxItem Content="Receive busy tone" />
+                                        <ComboBoxItem Content="Send to voicemail" />
+                                    </ComboBox>
+                                    <TextBlock Text="External no-answer timeout" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="ExternalNoAnswerTimeoutComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="30 seconds" />
+                                        <ComboBoxItem Content="60 seconds" />
+                                        <ComboBoxItem Content="90 seconds" />
+                                    </ComboBox>
+                                    <Button Content="Save handling" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" />
+                                </StackPanel>
+                            </TabItem>
+
                             <TabItem x:Name="SettingsDevicesTab" Header="Devices">
                                 <StackPanel>
                                     <TextBlock Text="Audio input" Foreground="#64748B" FontWeight="Medium" />
@@ -779,6 +877,45 @@
                                     <TextBlock Text="Video source" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="VideoSourceComboBox" Margin="0,5,0,18" />
                                     <Button Content="Save devices" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveDevicesButton_Click" />
+                                </StackPanel>
+                            </TabItem>
+
+                            <TabItem x:Name="SettingsQueuesTab" Header="Queues">
+                                <StackPanel>
+                                    <TextBlock Text="Queue Settings" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <CheckBox x:Name="QueuePickupCheckBox" Content="Enable queue pickup" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,14" />
+                                    <TextBlock Text="Queue pickup is stored as a Merlin preference. PBX-side queue membership remains managed on the telephone system." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                    <Button Content="Save queues" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" />
+                                </StackPanel>
+                            </TabItem>
+
+                            <TabItem x:Name="SettingsAdvancedTab" Header="Advanced">
+                                <StackPanel>
+                                    <TextBlock Text="Advanced Settings" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <CheckBox x:Name="FlashCallStateCheckBox" Content="Flash call state changes" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                    <TextBlock Text="Maximum simultaneous calls" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="MaxCallsComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="1" />
+                                        <ComboBoxItem Content="2" />
+                                        <ComboBoxItem Content="3" />
+                                    </ComboBox>
+                                    <CheckBox x:Name="ShowCallStatsCheckBox" Content="Show call statistics" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                    <CheckBox x:Name="SingleClickTransferCheckBox" Content="Single-click blind transfer" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                    <CheckBox x:Name="CombineContactsCheckBox" Content="Combine contacts in search" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                    <TextBlock Text="Incoming notification duration" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="IncomingNotificationDurationComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="15 seconds" />
+                                        <ComboBoxItem Content="30 seconds" />
+                                        <ComboBoxItem Content="60 seconds" />
+                                    </ComboBox>
+                                    <TextBlock Text="Failed call display timeout" Foreground="#64748B" FontWeight="Medium" />
+                                    <ComboBox x:Name="FailedCallTimeoutComboBox" Margin="0,5,0,12">
+                                        <ComboBoxItem Content="5 seconds" />
+                                        <ComboBoxItem Content="10 seconds" />
+                                        <ComboBoxItem Content="15 seconds" />
+                                    </ComboBox>
+                                    <CheckBox x:Name="FavouriteTransferCheckBox" Content="Show favourite extensions while transferring" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,14" />
+                                    <Button Content="Save advanced" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" />
                                 </StackPanel>
                             </TabItem>
 
@@ -887,6 +1024,30 @@
                                         <TextBlock x:Name="UpdateNotesText" Foreground="#64748B" Margin="0,8,0,0" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
+                            </TabItem>
+
+                            <TabItem x:Name="SettingsAboutTab" Header="About">
+                                <StackPanel>
+                                    <TextBlock Text="About Merlin SIP" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <TextBlock Text="CK Media Services softphone for managed SIP, messaging, contacts, and reception workflows." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Version" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ElementName=AppVersionText, Path=Text}" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Product" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="merlin-sip" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Support" Foreground="#64748B" FontWeight="Medium" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="CK Media Services" Foreground="#111827" FontWeight="Medium" />
+                                    </Grid>
+                                </StackPanel>
                             </TabItem>
                         </TabControl>
                 </Grid>

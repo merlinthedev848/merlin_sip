@@ -16,7 +16,26 @@ public sealed record AppStartupConfig(
     double MicrophoneVolume = 1.0,
     double HeadphoneVolume = 1.0,
     bool SipAlgCompatibilityMode = false,
-    string LicenseLocalKey = "")
+    string LicenseLocalKey = "",
+    string MobileNumber = "",
+    string DndMode = "Off",
+    string DeclineIncomingAction = "End call",
+    bool CallWaitingEnabled = false,
+    string InternalBusyAction = "Divert to call group",
+    int InternalNoAnswerSeconds = 90,
+    string InternalNoAnswerAction = "Receive busy tone",
+    string ExternalBusyAction = "Divert to call group",
+    int ExternalNoAnswerSeconds = 90,
+    string ExternalNoAnswerAction = "Receive busy tone",
+    bool QueuePickupEnabled = false,
+    bool FlashCallState = true,
+    int MaxConcurrentCalls = 2,
+    bool ShowCallStatistics = false,
+    bool SingleClickBlindTransfer = false,
+    bool CombineContactsInSearch = false,
+    int IncomingNotificationSeconds = 30,
+    int FailedCallDisplaySeconds = 5,
+    bool ShowFavouriteExtensionsOnTransfer = true)
 {
     public const string FixedSipServer = "pbx.chriskendall.media";
     public const int FixedSipPort = 5060;

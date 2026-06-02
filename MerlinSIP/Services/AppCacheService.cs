@@ -67,7 +67,26 @@ public sealed class AppCacheService
             ClampVolume(settings.MicrophoneVolume),
             ClampVolume(settings.HeadphoneVolume),
             settings.SipAlgCompatibilityMode ?? false,
-            Unprotect(settings.LicenseLocalKey, settings.EncryptedLicenseLocalKey)).WithFixedSipEndpoint();
+            Unprotect(settings.LicenseLocalKey, settings.EncryptedLicenseLocalKey),
+            settings.MobileNumber ?? "",
+            settings.DndMode ?? "Off",
+            settings.DeclineIncomingAction ?? "End call",
+            settings.CallWaitingEnabled ?? false,
+            settings.InternalBusyAction ?? "Divert to call group",
+            settings.InternalNoAnswerSeconds ?? 90,
+            settings.InternalNoAnswerAction ?? "Receive busy tone",
+            settings.ExternalBusyAction ?? "Divert to call group",
+            settings.ExternalNoAnswerSeconds ?? 90,
+            settings.ExternalNoAnswerAction ?? "Receive busy tone",
+            settings.QueuePickupEnabled ?? false,
+            settings.FlashCallState ?? true,
+            settings.MaxConcurrentCalls ?? 2,
+            settings.ShowCallStatistics ?? false,
+            settings.SingleClickBlindTransfer ?? false,
+            settings.CombineContactsInSearch ?? false,
+            settings.IncomingNotificationSeconds ?? 30,
+            settings.FailedCallDisplaySeconds ?? 5,
+            settings.ShowFavouriteExtensionsOnTransfer ?? true).WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
@@ -93,7 +112,26 @@ public sealed class AppCacheService
             config.HeadphoneVolume,
             config.SipAlgCompatibilityMode,
             null,
-            Protect(config.LicenseLocalKey));
+            Protect(config.LicenseLocalKey),
+            config.MobileNumber,
+            config.DndMode,
+            config.DeclineIncomingAction,
+            config.CallWaitingEnabled,
+            config.InternalBusyAction,
+            config.InternalNoAnswerSeconds,
+            config.InternalNoAnswerAction,
+            config.ExternalBusyAction,
+            config.ExternalNoAnswerSeconds,
+            config.ExternalNoAnswerAction,
+            config.QueuePickupEnabled,
+            config.FlashCallState,
+            config.MaxConcurrentCalls,
+            config.ShowCallStatistics,
+            config.SingleClickBlindTransfer,
+            config.CombineContactsInSearch,
+            config.IncomingNotificationSeconds,
+            config.FailedCallDisplaySeconds,
+            config.ShowFavouriteExtensionsOnTransfer);
 
         try
         {
@@ -180,5 +218,24 @@ public sealed class AppCacheService
         double? HeadphoneVolume = null,
         bool? SipAlgCompatibilityMode = null,
         string? LicenseLocalKey = null,
-        string? EncryptedLicenseLocalKey = null);
+        string? EncryptedLicenseLocalKey = null,
+        string? MobileNumber = null,
+        string? DndMode = null,
+        string? DeclineIncomingAction = null,
+        bool? CallWaitingEnabled = null,
+        string? InternalBusyAction = null,
+        int? InternalNoAnswerSeconds = null,
+        string? InternalNoAnswerAction = null,
+        string? ExternalBusyAction = null,
+        int? ExternalNoAnswerSeconds = null,
+        string? ExternalNoAnswerAction = null,
+        bool? QueuePickupEnabled = null,
+        bool? FlashCallState = null,
+        int? MaxConcurrentCalls = null,
+        bool? ShowCallStatistics = null,
+        bool? SingleClickBlindTransfer = null,
+        bool? CombineContactsInSearch = null,
+        int? IncomingNotificationSeconds = null,
+        int? FailedCallDisplaySeconds = null,
+        bool? ShowFavouriteExtensionsOnTransfer = null);
 }
