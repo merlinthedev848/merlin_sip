@@ -138,6 +138,25 @@ public sealed class SipRegistrationService : IDisposable
         _audioSession?.SetHeld(held);
     }
 
+    public async Task<SipCallResult> SendDtmfAsync(char digit, CancellationToken cancellationToken = default)
+    {
+        if (_audioSession is null)
+        {
+            return new SipCallResult(false, "No active audio session.");
+        }
+
+        try
+        {
+            await _audioSession.SendDtmfAsync(digit, cancellationToken);
+            return new SipCallResult(true, $"Sent DTMF {digit}.");
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"DTMF send failed digit={digit} error={error.Message}");
+            return new SipCallResult(false, "Unable to send DTMF tone.");
+        }
+    }
+
     public async Task<SipRegistrationResult> RegisterAsync(AppStartupConfig config, CancellationToken cancellationToken = default)
     {
         DisposeClient();
@@ -737,8 +756,10 @@ public sealed class SipRegistrationService : IDisposable
             "s=CK Media Services call",
             $"c=IN IP4 {_localAddress}",
             "t=0 0",
-            $"m=audio {_audioSession?.LocalPort ?? 40000} RTP/AVP {payloadType}",
+            $"m=audio {_audioSession?.LocalPort ?? 40000} RTP/AVP {payloadType} 101",
             codecLine,
+            "a=rtpmap:101 telephone-event/8000",
+            "a=fmtp:101 0-16",
             "a=sendrecv"
         ]) + "\r\n";
 

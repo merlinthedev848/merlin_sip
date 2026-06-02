@@ -17,6 +17,7 @@ public sealed class RtpAudioSession : IDisposable
     private readonly List<AudioBuffer> _inputBuffers = [];
     private readonly List<AudioBuffer> _outputBuffers = [];
     private readonly WinMm.WaveInProc _waveInCallback;
+    private readonly object _sendSync = new();
     private IntPtr _waveIn;
     private IntPtr _waveOut;
     private IPEndPoint? _remoteEndPoint;
@@ -128,6 +129,37 @@ public sealed class RtpAudioSession : IDisposable
         DebugLog.Write($"RTP held={held}");
     }
 
+    public async Task SendDtmfAsync(char digit, CancellationToken cancellationToken = default)
+    {
+        if (!_running || _remoteEndPoint is null)
+        {
+            throw new InvalidOperationException("RTP is not active.");
+        }
+
+        var eventCode = GetDtmfEventCode(digit);
+        uint eventTimestamp;
+        lock (_sendSync)
+        {
+            eventTimestamp = _timestamp;
+        }
+        ushort duration = 0;
+        DebugLog.Write($"RTP DTMF send digit={digit} event={eventCode} remote={_remoteEndPoint}");
+
+        for (var packetIndex = 0; packetIndex < 5; packetIndex++)
+        {
+            duration += 400;
+            SendDtmfPacket(eventCode, duration, eventTimestamp, end: false, marker: packetIndex == 0);
+            await Task.Delay(50, cancellationToken);
+        }
+
+        duration += 400;
+        for (var packetIndex = 0; packetIndex < 3; packetIndex++)
+        {
+            SendDtmfPacket(eventCode, duration, eventTimestamp, end: true, marker: false);
+            await Task.Delay(50, cancellationToken);
+        }
+    }
+
     public void Dispose()
     {
         Stop();
@@ -228,24 +260,50 @@ public sealed class RtpAudioSession : IDisposable
             payload[i] = _payloadType == 8 ? G711Codec.LinearToALaw(sample) : G711Codec.LinearToMuLaw(sample);
         }
 
-        var packet = BuildRtpPacket(payload);
-        _rtpClient.Send(packet, packet.Length, _remoteEndPoint);
-        var sent = Interlocked.Increment(ref _sentPackets);
+        int sent;
+        int packetLength;
+        lock (_sendSync)
+        {
+            var packet = BuildRtpPacket(payload, _payloadType, _timestamp, marker: false);
+            _rtpClient.Send(packet, packet.Length, _remoteEndPoint);
+            packetLength = packet.Length;
+            _timestamp += (uint)payload.Length;
+            sent = Interlocked.Increment(ref _sentPackets);
+        }
+
         if (sent is 1 or 50 or 250)
         {
-            DebugLog.Write($"RTP sent packets={sent} bytes={packet.Length} remote={_remoteEndPoint}");
+            DebugLog.Write($"RTP sent packets={sent} bytes={packetLength} remote={_remoteEndPoint}");
         }
-        _timestamp += (uint)payload.Length;
         WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
     }
 
-    private byte[] BuildRtpPacket(byte[] payload)
+    private void SendDtmfPacket(byte eventCode, ushort duration, uint timestamp, bool end, bool marker)
+    {
+        if (_remoteEndPoint is null)
+        {
+            return;
+        }
+
+        var payload = new byte[4];
+        payload[0] = eventCode;
+        payload[1] = (byte)((end ? 0x80 : 0x00) | 10);
+        WriteUInt16(payload, 2, duration);
+
+        lock (_sendSync)
+        {
+            var packet = BuildRtpPacket(payload, 101, timestamp, marker);
+            _rtpClient.Send(packet, packet.Length, _remoteEndPoint);
+        }
+    }
+
+    private byte[] BuildRtpPacket(byte[] payload, int payloadType, uint timestamp, bool marker)
     {
         var packet = new byte[12 + payload.Length];
         packet[0] = 0x80;
-        packet[1] = (byte)_payloadType;
+        packet[1] = (byte)((marker ? 0x80 : 0x00) | (payloadType & 0x7F));
         WriteUInt16(packet, 2, _sequence++);
-        WriteUInt32(packet, 4, _timestamp);
+        WriteUInt32(packet, 4, timestamp);
         WriteUInt32(packet, 8, _ssrc);
         Buffer.BlockCopy(payload, 0, packet, 12, payload.Length);
         return packet;
@@ -349,6 +407,21 @@ public sealed class RtpAudioSession : IDisposable
     private static short ApplyGain(short sample, double gain)
     {
         return (short)Math.Clamp(sample * gain, short.MinValue, short.MaxValue);
+    }
+
+    private static byte GetDtmfEventCode(char digit)
+    {
+        return digit switch
+        {
+            >= '0' and <= '9' => (byte)(digit - '0'),
+            '*' => 10,
+            '#' => 11,
+            'A' or 'a' => 12,
+            'B' or 'b' => 13,
+            'C' or 'c' => 14,
+            'D' or 'd' => 15,
+            _ => throw new ArgumentOutOfRangeException(nameof(digit), "Unsupported DTMF digit.")
+        };
     }
 
     private static void WriteUInt16(byte[] target, int offset, ushort value)

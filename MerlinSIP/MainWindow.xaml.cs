@@ -150,7 +150,7 @@ public partial class MainWindow : Window
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreFromTray);
     }
 
-    private void RestoreFromTray()
+    public void RestoreFromTray()
     {
         ShowInTaskbar = true;
         Show();
@@ -874,13 +874,31 @@ public partial class MainWindow : Window
             : $"{contact.Name}  {contact.Company}".Trim();
     }
 
-    private void DialpadButton_Click(object sender, RoutedEventArgs e)
+    private async void DialpadButton_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is WpfButton button)
+        if (sender is not WpfButton button)
         {
-            DestinationTextBox.Text += button.Content?.ToString();
-            DestinationTextBox.CaretIndex = DestinationTextBox.Text.Length;
+            return;
         }
+
+        var digitText = button.Content?.ToString();
+        if (string.IsNullOrWhiteSpace(digitText))
+        {
+            return;
+        }
+
+        var digit = digitText[0];
+        if (_callConnected)
+        {
+            var result = await _sipRegistrationService.SendDtmfAsync(digit);
+            FooterStatusText.Text = result.Signalled
+                ? $"Sent tone {digit}."
+                : result.Message;
+            return;
+        }
+
+        DestinationTextBox.Text += digitText;
+        DestinationTextBox.CaretIndex = DestinationTextBox.Text.Length;
     }
 
     private async Task LoadChatMessagesAsync()
