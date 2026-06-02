@@ -5,7 +5,11 @@ const state = {
   vendor: "yeastar-s100",
   dnd: false,
   queuePaused: false,
-  activeCall: false
+  activeCall: false,
+  activeCallId: "",
+  activeNumber: "",
+  muted: false,
+  held: false
 };
 
 const offlineData = {
@@ -22,6 +26,11 @@ const offlineData = {
     sipDomain: MERLIN_PBX_HOST,
     sipTransport: "udp",
     sipRegistered: false,
+    activeCall: false,
+    activeCallId: "",
+    activeNumber: "",
+    muted: false,
+    held: false,
     dnd: false,
     forwarding: "",
     queuePaused: false,
@@ -50,6 +59,49 @@ const offlineData = {
   ],
   callHistory: []
 };
+
+function callDuration(startedAt) {
+  if (!startedAt) return "00:00";
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000));
+  const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const remainder = String(seconds % 60).padStart(2, "0");
+  return `${minutes}:${remainder}`;
+}
+
+function currentCallRecord() {
+  return offlineData.callHistory.find(call => call.id === offlineData.state.activeCallId);
+}
+
+function startOfflineCall(destination) {
+  const id = `android-${Date.now()}`;
+  offlineData.state.activeCall = true;
+  offlineData.state.activeCallId = id;
+  offlineData.state.activeNumber = destination;
+  offlineData.state.muted = false;
+  offlineData.state.held = false;
+  offlineData.callHistory.unshift({
+    id,
+    direction: "outbound",
+    number: destination,
+    name: destination,
+    startedAt: new Date().toISOString(),
+    duration: "Active",
+    result: "Dialled"
+  });
+}
+
+function finishOfflineCall(result = "Completed") {
+  const record = currentCallRecord();
+  if (record) {
+    record.duration = callDuration(record.startedAt);
+    record.result = result;
+  }
+  offlineData.state.activeCall = false;
+  offlineData.state.activeCallId = "";
+  offlineData.state.activeNumber = "";
+  offlineData.state.muted = false;
+  offlineData.state.held = false;
+}
 
 function saveOfflineState() {
   localStorage.setItem("merlinSipAndroidState", JSON.stringify({
@@ -97,17 +149,9 @@ async function api(path, options = {}) {
       const destination = String(body.destination || "").trim();
       if (!destination) return { ok: false, message: "Enter a destination first." };
       Object.assign(offlineData.state, body);
-      offlineData.callHistory.unshift({
-        id: `android-${Date.now()}`,
-        direction: "outbound",
-        number: destination,
-        name: destination,
-        startedAt: new Date().toISOString(),
-        duration: "Active",
-        result: "Dialled"
-      });
+      startOfflineCall(destination);
       saveOfflineState();
-      return { ok: true, message: `Dialling ${destination} from Android shell.` };
+      return { ok: true, message: `Calling ${destination}.`, state: offlineData.state, callHistory: offlineData.callHistory };
     }
     if (path === "/api/register-sip") {
       Object.assign(offlineData.state, body, { sipRegistered: true });
@@ -127,8 +171,21 @@ async function api(path, options = {}) {
     if (path === "/api/action") {
       if (body.type === "dnd") offlineData.state.dnd = Boolean(body.enabled);
       if (body.type === "queuePause") offlineData.state.queuePaused = Boolean(body.paused);
+      if (body.type === "hangup") finishOfflineCall("Completed");
+      if (body.type === "mute") offlineData.state.muted = Boolean(body.enabled);
+      if (body.type === "hold") offlineData.state.held = Boolean(body.enabled);
+      if (body.type === "transfer") finishOfflineCall(`${body.mode === "blind" ? "Blind" : "Assisted"} transfer to ${body.target}`);
       saveOfflineState();
-      return { ok: true, message: `${body.type || "action"} accepted locally.`, state: offlineData.state };
+      const messages = {
+        dnd: offlineData.state.dnd ? "DND is active." : "DND is inactive.",
+        queuePause: offlineData.state.queuePaused ? "Queue pause is active." : "Queue pause is inactive.",
+        hangup: "Call ended.",
+        mute: offlineData.state.muted ? "Call muted." : "Call unmuted.",
+        hold: offlineData.state.held ? "Call on hold." : "Call resumed.",
+        transfer: `${body.mode === "blind" ? "Blind" : "Assisted"} transfer started for ${body.target}.`,
+        dtmf: `DTMF ${body.digit} sent.`
+      };
+      return { ok: true, message: messages[body.type] || `${body.type || "action"} accepted locally.`, state: offlineData.state, callHistory: offlineData.callHistory };
     }
     return { ok: false, message: "This Android build is running without the Node prototype server." };
   }
@@ -136,8 +193,18 @@ async function api(path, options = {}) {
 
 function setNotice(text, good = true) {
   $("#notice").textContent = text;
-  $("#connectionBadge").textContent = good ? "Ready" : "Inactive";
-  $("#connectionBadge").classList.toggle("status-warning", !good);
+  $("#connectionBadge").textContent = state.activeCall ? "In call" : (good ? "Ready" : "Inactive");
+  $("#connectionBadge").classList.toggle("status-warning", !good && !state.activeCall);
+}
+
+function renderCallControls() {
+  const hasCall = Boolean(state.activeCall);
+  $("#endButton").disabled = !hasCall;
+  $("#muteButton").disabled = !hasCall;
+  $("#holdButton").disabled = !hasCall;
+  $("#transferButton").disabled = !hasCall;
+  $("#muteButton").textContent = state.muted ? "Unmute" : "Mute";
+  $("#holdButton").textContent = state.held ? "Resume" : "Hold";
 }
 
 function currentConfig() {
@@ -174,10 +241,17 @@ function showDialerOnStartup() {
 
 function setActiveCall(active, destination = "") {
   state.activeCall = active;
+  state.activeNumber = active ? (destination || state.activeNumber || $("#destination").value) : "";
+  if (!active) {
+    state.activeCallId = "";
+    state.muted = false;
+    state.held = false;
+  }
   $("#inCallActions").classList.toggle("hidden", !active);
-  $("#activeCallLabel").textContent = destination || $("#destination").value;
+  $("#activeCallLabel").textContent = state.activeNumber;
   $("#connectionBadge").textContent = active ? "In call" : "Inactive";
   $("#connectionBadge").classList.toggle("status-warning", !active);
+  renderCallControls();
 }
 
 function renderDnd() {
@@ -210,6 +284,12 @@ function renderDialpad() {
     button.addEventListener("click", () => {
       $("#destination").value += digit;
       playDtmfTone(digit);
+      if (state.activeCall) {
+        api("/api/action", {
+          method: "POST",
+          body: JSON.stringify({ type: "dtmf", digit, callId: state.activeCallId })
+        }).catch(() => {});
+      }
     });
     $("#dialpad").append(button);
   });
@@ -238,6 +318,7 @@ function playDtmfTone(digit) {
 
   const context = playDtmfTone.context || new AudioContext();
   playDtmfTone.context = context;
+  if (context.state === "suspended") context.resume().catch(() => {});
 
   const gain = context.createGain();
   gain.gain.setValueAtTime(0.0001, context.currentTime);
@@ -296,7 +377,7 @@ function formatTime(value) {
   });
 }
 
-function renderCallHistory(callHistory) {
+function renderLegacyCallHistory(callHistory) {
   return;
 
   const rows = callHistory.map(call => `
@@ -350,8 +431,9 @@ async function load() {
   if ($("#extensions")) renderExtensions(data.extensions);
   if ($("#queues")) renderQueues(data.queues);
   renderCallHistory(data.callHistory || []);
-  setActiveCall(false);
+  setActiveCall(Boolean(data.state.activeCall), data.state.activeNumber || "");
   renderDnd();
+  renderCallControls();
 }
 
 $("#settingsToggle").addEventListener("click", () => {
@@ -413,40 +495,76 @@ if ($("#unregisterSip")) {
 
 $("#callButton").addEventListener("click", async () => {
   Object.assign(state, currentConfig());
-  const destination = $("#destination").value;
+  const destination = $("#destination").value.trim();
   const result = await api("/api/dial", {
     method: "POST",
     body: JSON.stringify({ ...state, destination })
   });
   setNotice(result.ok ? result.message : "Call setup needs your PBX settings.", result.ok);
   if (result.ok) {
+    Object.assign(state, result.state || { activeCall: true, activeNumber: destination });
     setActiveCall(true, destination);
+    if (result.callHistory) renderCallHistory(result.callHistory);
   }
-  load();
 });
 
 $("#endButton").addEventListener("click", async () => {
   const result = await api("/api/action", {
     method: "POST",
-    body: JSON.stringify({ type: "hangup" })
+    body: JSON.stringify({ type: "hangup", callId: state.activeCallId })
   });
+  Object.assign(state, result.state || { activeCall: false });
   setActiveCall(false);
-  setNotice(result.message);
+  if (result.callHistory) renderCallHistory(result.callHistory);
+  setNotice(result.message, result.ok !== false);
 });
 
-$("#muteButton").addEventListener("click", () => setNotice("Mute toggled locally. PBX/media wiring comes next."));
-$("#holdButton").addEventListener("click", () => setNotice("Hold requested. SIP/WebRTC wiring comes next."));
+$("#muteButton").addEventListener("click", async () => {
+  const result = await api("/api/action", {
+    method: "POST",
+    body: JSON.stringify({ type: "mute", enabled: !state.muted, callId: state.activeCallId })
+  });
+  Object.assign(state, result.state || { muted: !state.muted });
+  renderCallControls();
+  setNotice(result.message, result.ok !== false);
+});
+
+$("#holdButton").addEventListener("click", async () => {
+  const result = await api("/api/action", {
+    method: "POST",
+    body: JSON.stringify({ type: "hold", enabled: !state.held, callId: state.activeCallId })
+  });
+  Object.assign(state, result.state || { held: !state.held });
+  renderCallControls();
+  setNotice(result.message, result.ok !== false);
+});
+
 $("#transferButton").addEventListener("click", () => {
+  $("#transferTarget").value = "";
   $("#transferPopup").classList.remove("hidden");
+  $("#transferTarget").focus({ preventScroll: true });
 });
-$("#assistedTransferButton").addEventListener("click", () => {
+
+async function completeTransfer(mode) {
+  const target = $("#transferTarget").value.trim();
+  if (!target) {
+    setNotice("Enter a transfer target first.", false);
+    $("#transferTarget").focus({ preventScroll: true });
+    return;
+  }
+  const result = await api("/api/action", {
+    method: "POST",
+    body: JSON.stringify({ type: "transfer", mode, target, callId: state.activeCallId })
+  });
+  Object.assign(state, result.state || { activeCall: false });
   $("#transferPopup").classList.add("hidden");
-  setNotice("Assisted transfer selected. Enter the target number, then confirm transfer.");
-});
-$("#blindTransferButton").addEventListener("click", () => {
-  $("#transferPopup").classList.add("hidden");
-  setNotice("Blind transfer selected. Enter the target number, then confirm transfer.");
-});
+  setActiveCall(Boolean(state.activeCall), state.activeNumber || "");
+  if (result.callHistory) renderCallHistory(result.callHistory);
+  setNotice(result.message, result.ok !== false);
+}
+
+$("#assistedTransferButton").addEventListener("click", () => completeTransfer("assisted"));
+$("#blindTransferButton").addEventListener("click", () => completeTransfer("blind"));
 $("#closeTransferPopup").addEventListener("click", () => {
   $("#transferPopup").classList.add("hidden");
 });
@@ -459,6 +577,8 @@ $("#dndButton").addEventListener("click", async () => {
     method: "POST",
     body: JSON.stringify({ type: "dnd", enabled: state.dnd })
   });
+  Object.assign(state, result.state || {});
+  renderDnd();
   setNotice(state.dnd ? "DND is active." : "DND is inactive.", result.ok !== false);
 });
 

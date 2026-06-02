@@ -31,6 +31,12 @@ button:active {
   transform: translateY(1px) scale(0.99);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 14px;

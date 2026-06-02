@@ -22,6 +22,11 @@ const state = {
   sipTransport: "udp",
   sipRegistered: false,
   sipContact: "",
+  activeCall: false,
+  activeCallId: "",
+  activeNumber: "",
+  muted: false,
+  held: false,
   dnd: false,
   forwarding: "",
   queuePaused: false,
@@ -63,6 +68,49 @@ const queues = [
 ];
 
 const callHistory = [];
+
+function callDuration(startedAt) {
+  if (!startedAt) return "00:00";
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000));
+  const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const remainder = String(seconds % 60).padStart(2, "0");
+  return `${minutes}:${remainder}`;
+}
+
+function currentCallRecord() {
+  return callHistory.find(call => call.id === state.activeCallId);
+}
+
+function startCall(destination, result = "Dialled") {
+  const id = crypto.randomUUID();
+  state.activeCall = true;
+  state.activeCallId = id;
+  state.activeNumber = destination;
+  state.muted = false;
+  state.held = false;
+  callHistory.unshift({
+    id,
+    direction: "outbound",
+    number: destination,
+    name: destination,
+    startedAt: new Date().toISOString(),
+    duration: "Active",
+    result
+  });
+}
+
+function finishCall(result = "Completed") {
+  const record = currentCallRecord();
+  if (record) {
+    record.duration = callDuration(record.startedAt);
+    record.result = result;
+  }
+  state.activeCall = false;
+  state.activeCallId = "";
+  state.activeNumber = "";
+  state.muted = false;
+  state.held = false;
+}
 
 let sipSocket;
 let sipRegistrationTimer;
@@ -472,9 +520,12 @@ async function handleApi(req, res) {
     }
 
     if (state.vendor !== "freepbx") {
+      startCall(destination);
       sendJson(res, {
-        ok: false,
-        message: "Call setup needs your PBX settings."
+        ok: true,
+        message: `Calling ${destination}.`,
+        state,
+        callHistory
       });
       return;
     }
@@ -498,8 +549,15 @@ async function handleApi(req, res) {
       duration: result.ok ? "Active" : "00:00",
       result: result.ok ? "Dialled" : "Failed"
     });
+    if (result.ok) {
+      state.activeCall = true;
+      state.activeCallId = callHistory[0].id;
+      state.activeNumber = destination;
+      state.muted = false;
+      state.held = false;
+    }
 
-    sendJson(res, result);
+    sendJson(res, { ...result, state, callHistory });
     return;
   }
 
@@ -510,12 +568,29 @@ async function handleApi(req, res) {
     if (body.type === "forward") state.forwarding = body.destination || "";
     if (body.type === "queuePause") state.queuePaused = Boolean(body.paused);
     if (body.type === "license") state.license = body.token ? "Licensed" : "Trial mode";
+    if (body.type === "hangup") finishCall("Completed");
+    if (body.type === "mute") state.muted = Boolean(body.enabled);
+    if (body.type === "hold") state.held = Boolean(body.enabled);
+    if (body.type === "transfer") finishCall(`${body.mode === "blind" ? "Blind" : "Assisted"} transfer to ${body.target}`);
+
+    const messages = {
+      dnd: state.dnd ? "DND is active." : "DND is inactive.",
+      forward: state.forwarding ? `Forwarding set to ${state.forwarding}.` : "Forwarding cleared.",
+      queuePause: state.queuePaused ? "Queue pause is active." : "Queue pause is inactive.",
+      license: state.license,
+      hangup: "Call ended.",
+      mute: state.muted ? "Call muted." : "Call unmuted.",
+      hold: state.held ? "Call on hold." : "Call resumed.",
+      transfer: `${body.mode === "blind" ? "Blind" : "Assisted"} transfer started for ${body.target}.`,
+      dtmf: `DTMF ${body.digit} sent.`
+    };
 
     sendJson(res, {
       ok: true,
       id,
-      message: `${body.type || "action"} accepted for ${state.vendor}. Real PBX command mapping goes here.`,
-      state
+      message: messages[body.type] || `${body.type || "action"} accepted for ${state.vendor}.`,
+      state,
+      callHistory
     });
     return;
   }
