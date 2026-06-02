@@ -4,166 +4,106 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Merlin SIP</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="mark">MS</div>
-          <strong>Merlin SIP</strong>
-          <span>PBX console</span>
-        </div>
-        <button class="nav active" data-view="dialerView" title="Dialer" aria-label="Dialer">☎</button>
-        <button class="nav" data-view="historyView" title="Call history" aria-label="Call history">◷</button>
-        <button class="nav" data-view="presenceView" title="Presence" aria-label="Presence">◉</button>
-        <button class="nav" data-view="queuesView" title="Queues" aria-label="Queues">≡</button>
-        <button class="nav" data-view="recordingsView" title="Recordings" aria-label="Recordings">▣</button>
-        <button class="nav" data-view="settingsView" title="Settings" aria-label="Settings">⚙</button>
-        <div class="license" id="licenseState">Trial mode</div>
-      </aside>
-
-      <section class="workspace">
-        <header class="topbar">
+    <main class="app-shell">
+      <section class="phone-screen">
+        <header class="dialer-header">
           <div>
-            <h1>Merlin SIP</h1>
-            <p id="notice">Ready to dial.</p>
+            <span class="eyebrow">Merlin SIP</span>
+            <h1>Dial</h1>
           </div>
-          <span class="status" id="status">Ready</span>
         </header>
 
-        <section class="view active-view" id="dialerView">
-          <section class="dialer-only">
-            <section class="panel dialer">
-              <div class="panel-head">
-                <div>
-                  <span>Outbound</span>
-                  <h2 id="destinationLabel">1002</h2>
-                </div>
-                <div class="dialer-badges">
-                  <button class="dnd-toggle" id="dndButton" aria-pressed="false">DND off</button>
-                  <b id="connectionBadge">Not connected</b>
+        <section class="dialer-view view active-view" id="dialerView">
+          <section class="number-stage">
+            <div class="dial-card-head">
+              <div>
+                <span class="eyebrow">Dial</span>
+                <h2>Enter number</h2>
+                <p id="notice">No matching contact</p>
+              </div>
+              <div class="dial-card-actions">
+                <span class="status" id="connectionBadge">Inactive</span>
+                <div class="top-actions">
+                  <button class="icon-button" id="historyToggle" type="button" aria-label="Call history" title="Call history">History</button>
+                  <button class="icon-button" id="settingsToggle" type="button" aria-label="Settings" title="Settings">Settings</button>
                 </div>
               </div>
-
-              <input id="destination" value="1002" />
-              <div class="dialpad" id="dialpad"></div>
-
-              <div class="actions primary-call-actions">
-                <button class="primary" id="callButton">Dial</button>
-              </div>
-
-              <section class="in-call-actions hidden" id="inCallActions">
-                <div class="active-call-bar">
-                  <strong>Active call</strong>
-                  <span id="activeCallLabel">1002</span>
-                </div>
-                <div class="actions compact-actions">
-                  <button id="muteButton">Mute</button>
-                  <button id="holdButton">Hold</button>
-                  <button id="transferButton">Transfer</button>
-                  <button id="parkButton">Park</button>
-                </div>
-                <div class="actions compact-actions">
-                  <button id="pauseButton">Queue pause</button>
-                  <button class="danger" id="hangupButton">Hang up</button>
-                </div>
-              </section>
-            </section>
-            <section class="panel recent-panel">
-              <div class="panel-head">
-                <h2>Recent Calls</h2>
-                <span>Quick redial</span>
-              </div>
-              <div id="recentCalls"></div>
-            </section>
-          </section>
-        </section>
-
-        <section class="view" id="historyView">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>Call History</h2>
-              <span>Full log</span>
             </div>
-            <div id="fullCallHistory"></div>
-          </section>
-        </section>
-
-        <section class="view" id="presenceView">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>Presence / BLF</h2>
-              <span>Extension state</span>
+            <div class="number-row">
+              <input id="destination" value="" inputmode="tel" autocomplete="off" aria-label="Number to dial" />
+              <button class="secondary-action" id="clearButton" type="button">Clear</button>
             </div>
-            <div id="extensions"></div>
           </section>
-        </section>
 
-        <section class="view" id="queuesView">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>Queues</h2>
-              <span>Agent view</span>
+          <div class="dialpad" id="dialpad"></div>
+
+          <div class="primary-call-row">
+            <button class="call-button" id="callButton" type="button">Call</button>
+            <button class="end-button" id="endButton" type="button">End</button>
+          </div>
+
+          <div class="always-call-controls">
+            <button id="muteButton" type="button">Mute</button>
+            <button id="holdButton" type="button">Hold</button>
+            <button id="transferButton" type="button">Transfer</button>
+            <button id="dndButton" type="button" aria-pressed="false">DND</button>
+          </div>
+
+          <section class="in-call-actions hidden" id="inCallActions">
+            <div class="active-call-bar">
+              <strong>Active call</strong>
+              <span id="activeCallLabel"></span>
             </div>
-            <div id="queues"></div>
+            <button class="hidden" id="parkButton" type="button">Park</button>
+            <button class="hidden" id="pauseButton" type="button">Queue pause</button>
           </section>
         </section>
 
-        <section class="view" id="recordingsView">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>Recordings</h2>
-              <span>PBX media</span>
+        <section class="transfer-popup hidden" id="transferPopup" aria-label="Transfer type" role="dialog">
+          <div class="transfer-panel">
+            <h2>Transfer</h2>
+            <p>Choose transfer type</p>
+            <div class="transfer-options">
+              <button id="assistedTransferButton" type="button">Assisted</button>
+              <button id="blindTransferButton" type="button">Blind</button>
             </div>
-            <div class="empty-state">Recording search and playback will appear here once the PBX recording adapter is connected.</div>
-          </section>
+            <button class="secondary-action" id="closeTransferPopup" type="button">Cancel</button>
+          </div>
         </section>
 
-        <section class="view" id="settingsView">
-          <section class="settings-grid">
-            <section class="panel settings-panel">
-              <div class="panel-head">
-                <h2>PBX Connection</h2>
-                <span>Settings</span>
-              </div>
-              <label>PBX type
-                <select id="vendor">
-                  <option value="yeastar-s100">Yeastar S100</option>
-                  <option value="freepbx">FreePBX</option>
-                </select>
-              </label>
-              <label>PBX host or IP<input id="pbxHost" placeholder="192.168.1.10" /></label>
-              <label>SIP server host<input id="sipHost" placeholder="Leave blank to use PBX host" /></label>
-              <div class="split">
-                <label>Extension<input id="extension" value="1001" /></label>
-                <label>SIP port<input id="sipPort" value="5060" /></label>
-              </div>
-              <label>SIP domain / realm<input id="sipDomain" placeholder="Leave blank to use SIP host" /></label>
-              <label>PBX / AMI username<input id="username" /></label>
-              <label>PBX / AMI password<input id="password" type="password" /></label>
-              <label>AMI port<input id="amiPort" value="5038" /></label>
-              <div class="actions compact-actions">
-                <button id="saveConfig">Save</button>
-                <button id="connectPbx">Connect PBX</button>
-              </div>
-              <div class="actions compact-actions">
-                <button id="registerSip">Register SIP</button>
-                <button id="unregisterSip">Unregister</button>
-              </div>
-            </section>
+        <section class="history-sheet view" id="historyView">
+          <header class="sheet-head">
+            <div>
+              <span class="eyebrow">Calls</span>
+              <h2>History</h2>
+            </div>
+            <button class="icon-button" id="closeHistoryButton" type="button">Done</button>
+          </header>
+          <div class="history-list" id="fullCallHistory"></div>
+        </section>
 
-            <section class="panel">
-              <div class="panel-head">
-                <h2>PBX Features</h2>
-                <span>Adapter surface</span>
-              </div>
-              <div class="features" id="features"></div>
-            </section>
-          </section>
+        <section class="settings-sheet view" id="settingsView">
+          <header class="sheet-head">
+            <div>
+              <span class="eyebrow">Account</span>
+              <h2>Connection</h2>
+            </div>
+            <button class="icon-button" id="closeSettingsButton" type="button">Done</button>
+          </header>
+
+          <label>Username<input id="username" autocomplete="username" /></label>
+          <label>Auth ID<input id="authId" autocomplete="username" /></label>
+          <label>Password<input id="password" type="password" /></label>
+          <div class="settings-actions">
+            <button id="saveConfig" type="button">Save</button>
+            <button id="registerSip" type="button">Register</button>
+          </div>
         </section>
       </section>
     </main>
-    <script src="/app.js"></script>
+    <script src="./app.js"></script>
   </body>
 </html>

@@ -1,0 +1,13 @@
+{
+  "appId": "com.ckmedia.merlinsip",
+  "appName": "Merlin SIP",
+  "webDir": "node-app/public",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {
+      "releaseType": "APK"
+    }
+  }
+}

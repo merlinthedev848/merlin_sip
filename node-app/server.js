@@ -7,16 +7,18 @@ const os = require("os");
 const crypto = require("crypto");
 
 const root = path.join(__dirname, "public");
+const MERLIN_PBX_HOST = "pbx.chriskendall.media";
 const state = {
   vendor: "yeastar-s100",
-  extension: "1001",
-  pbxHost: "",
+  extension: "",
+  pbxHost: MERLIN_PBX_HOST,
   amiPort: 5038,
   username: "",
+  authId: "",
   password: "",
-  sipHost: "",
+  sipHost: MERLIN_PBX_HOST,
   sipPort: 5060,
-  sipDomain: "",
+  sipDomain: MERLIN_PBX_HOST,
   sipTransport: "udp",
   sipRegistered: false,
   sipContact: "",
@@ -60,11 +62,7 @@ const queues = [
   { name: "Accounts", waiting: 0, agents: 3, paused: 0 }
 ];
 
-const callHistory = [
-  { id: "seed-1", direction: "outbound", number: "1002", name: "Support Desk", startedAt: new Date(Date.now() - 18 * 60000).toISOString(), duration: "02:14", result: "Answered" },
-  { id: "seed-2", direction: "missed", number: "1004", name: "Warehouse", startedAt: new Date(Date.now() - 61 * 60000).toISOString(), duration: "00:00", result: "Missed" },
-  { id: "seed-3", direction: "inbound", number: "1003", name: "Accounts", startedAt: new Date(Date.now() - 4 * 3600000).toISOString(), duration: "05:46", result: "Answered" }
-];
+const callHistory = [];
 
 let sipSocket;
 let sipRegistrationTimer;
@@ -72,6 +70,18 @@ let sipRegistrationTimer;
 function sendJson(res, value) {
   res.writeHead(200, { "content-type": "application/json" });
   res.end(JSON.stringify(value));
+}
+
+function applyFixedPbxConfig(config) {
+  config.vendor = "yeastar-s100";
+  config.pbxHost = MERLIN_PBX_HOST;
+  config.sipHost = MERLIN_PBX_HOST;
+  config.sipDomain = MERLIN_PBX_HOST;
+  config.sipPort = 5060;
+  config.sipTransport = "udp";
+  config.amiPort = 5038;
+  config.extension = config.username || config.extension || "";
+  return config;
 }
 
 function readBody(req) {
@@ -341,11 +351,11 @@ async function registerSip(config, expires = 300) {
 
   const host = config.sipHost || config.pbxHost;
   const port = Number(config.sipPort || 5060);
-  const username = config.username || config.extension;
+  const username = config.authId || config.username || config.extension;
   const password = config.password;
 
   if (!host || !config.extension || !username || !password) {
-    return { ok: false, message: "SIP host, extension, username, and password are required." };
+    return { ok: false, message: "Username, auth ID, and password are required." };
   }
 
   if (sipSocket) sipSocket.close();
@@ -401,12 +411,13 @@ function scheduleSipRefresh(config) {
 
 async function handleApi(req, res) {
   if (req.url === "/api/state" && req.method === "GET") {
+    applyFixedPbxConfig(state);
     sendJson(res, { state, features, extensions, queues, callHistory });
     return;
   }
 
   if (req.url === "/api/config" && req.method === "POST") {
-    Object.assign(state, await readBody(req));
+    Object.assign(state, applyFixedPbxConfig(await readBody(req)));
     sendJson(res, { ok: true, state });
     return;
   }
@@ -419,7 +430,7 @@ async function handleApi(req, res) {
   }
 
   if (req.url === "/api/connect-pbx" && req.method === "POST") {
-    Object.assign(state, await readBody(req));
+    Object.assign(state, applyFixedPbxConfig(await readBody(req)));
 
     if (state.vendor === "freepbx") {
       const result = await amiAction({}, [["Action: Ping"]]);
@@ -435,14 +446,14 @@ async function handleApi(req, res) {
   }
 
   if (req.url === "/api/register-sip" && req.method === "POST") {
-    Object.assign(state, await readBody(req));
+    Object.assign(state, applyFixedPbxConfig(await readBody(req)));
     const result = await registerSip(state, 300);
     sendJson(res, { ...result, state });
     return;
   }
 
   if (req.url === "/api/unregister-sip" && req.method === "POST") {
-    Object.assign(state, await readBody(req));
+    Object.assign(state, applyFixedPbxConfig(await readBody(req)));
     const result = await registerSip(state, 0);
     clearTimeout(sipRegistrationTimer);
     state.sipRegistered = false;
@@ -452,7 +463,7 @@ async function handleApi(req, res) {
 
   if (req.url === "/api/dial" && req.method === "POST") {
     const body = await readBody(req);
-    Object.assign(state, body);
+    Object.assign(state, applyFixedPbxConfig(body));
     const destination = String(body.destination || "").trim();
 
     if (!destination) {
@@ -463,7 +474,7 @@ async function handleApi(req, res) {
     if (state.vendor !== "freepbx") {
       sendJson(res, {
         ok: false,
-        message: "Dial is wired for FreePBX AMI Originate first. Yeastar needs your S100 API/CTI endpoint details before it can place calls."
+        message: "Call setup needs your PBX settings."
       });
       return;
     }

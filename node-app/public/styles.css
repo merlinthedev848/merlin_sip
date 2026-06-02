@@ -1,7 +1,9 @@
 :root {
   color: #172033;
-  background: #f4f7fb;
-  font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  background: #f3f6fb;
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
 }
 
 * {
@@ -22,89 +24,133 @@ button {
   border: 0;
   cursor: pointer;
   border-radius: 8px;
-  transition: transform 130ms ease, box-shadow 130ms ease, background 130ms ease;
-}
-
-button:hover {
-  transform: translateY(-1px);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
 button:active {
-  transform: translateY(2px) scale(0.99);
-  box-shadow: inset 0 3px 8px rgba(17, 24, 39, 0.22), 0 1px 4px rgba(17, 24, 39, 0.12) !important;
+  transform: translateY(1px) scale(0.99);
 }
 
-.shell {
-  display: grid;
-  grid-template-columns: 84px 1fr;
+.app-shell {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8fbff, #edf4f8 52%, #f7f8fb);
+  padding: 14px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(45, 212, 191, 0.18), transparent 30%),
+    linear-gradient(135deg, #f7f9fd 0%, #eef3f9 52%, #f7f8fb 100%);
 }
 
-.sidebar {
+.phone-screen {
+  width: min(100%, 430px);
+  min-height: calc(100vh - 28px);
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+.dialer-header,
+.line-card,
+.sheet-head,
+.line-state,
+.top-actions,
+.dialer-tools,
+.settings-actions,
+.call-controls,
+.active-call-bar {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 18px 10px;
-  background: #121621;
-  color: #fff;
 }
 
-.brand {
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  margin-bottom: 12px;
-  text-align: center;
+.dialer-header {
+  padding: 2px 2px 0;
 }
 
-.brand strong {
+.eyebrow,
+.line-label,
+.number-stage span {
+  color: #667085;
   font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
-.brand span,
-.license {
-  color: #a8b3c7;
-  font-size: 10px;
+h1,
+h2,
+p {
+  margin: 0;
 }
 
-.mark {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
+h1 {
+  font-size: 28px;
+  line-height: 1.05;
+  font-weight: 400;
+}
+
+h2 {
+  font-size: 22px;
+  font-weight: 400;
+}
+
+strong {
+  font-weight: 400;
+}
+
+.icon-button,
+.secondary-action,
+.settings-actions button,
+.call-controls button,
+.dnd-toggle,
+.status {
+  min-height: 38px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #ffffff, #e9eff8);
+  color: #344054;
+  border: 1px solid #d8e1ee;
+  font-size: 12px;
+  font-weight: 400;
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.08),
+    0 10px 18px rgba(23, 32, 51, 0.09);
+}
+
+.line-card,
+.number-stage,
+.settings-sheet,
+.history-sheet {
+  border: 1px solid #dde4f0;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fbfd 62%, #f1f6fa 100%);
+  box-shadow: 0 18px 50px rgba(23, 32, 51, 0.08);
+}
+
+.line-card {
+  padding: 13px 14px;
   border-radius: 8px;
-  background: linear-gradient(145deg, #2dd4bf, #5eead4);
-  color: #101622;
-  font-weight: 900;
-  box-shadow: inset 0 -3px 0 rgba(11, 95, 83, 0.18), 0 10px 18px rgba(45, 212, 191, 0.22);
 }
 
-.nav {
-  width: 42px;
-  height: 42px;
-  background: #1a2030;
-  color: #d7dfef;
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.24), 0 8px 14px rgba(0, 0, 0, 0.15);
-  font-size: 19px;
-  font-weight: 900;
+.line-card strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 17px;
 }
 
-.nav.active,
-.nav:hover {
-  background: #30394e;
-  color: #fff;
+.line-state {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.license {
-  margin-top: auto;
-  text-align: center;
-  font-weight: 800;
+.status {
+  background: #e7f8f1;
+  color: #106247;
+  border-color: #c7eadf;
+  box-shadow: inset 0 -2px 0 rgba(16, 24, 40, 0.08);
 }
 
-.workspace {
-  padding: 20px;
+.dnd-active {
+  background: #fff1f3;
+  color: #b42318;
+  border-color: #fecdca;
 }
 
 .view {
@@ -115,141 +161,290 @@ button:active {
   display: block;
 }
 
-.topbar,
-.panel-head,
-.section-head,
-.actions,
-.data-grid {
+.dialer-view {
+  flex: 1;
+}
+
+.number-stage {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.dial-card-head,
+.number-row,
+.primary-call-row,
+.always-call-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-h1,
-h2,
-h3,
-p {
-  margin-top: 0;
-}
-
-.topbar h1 {
-  margin-bottom: 4px;
-  font-size: 25px;
-}
-
-.topbar p,
-.section-head p {
-  color: #667085;
-  margin-bottom: 0;
-  font-size: 13px;
-}
-
-.status {
-  padding: 8px 12px;
-  min-width: 104px;
-  text-align: center;
-  border-radius: 8px;
-  background: #dff8ee;
-  color: #106247;
-  font-size: 13px;
-  font-weight: 900;
-  box-shadow: inset 0 -2px 0 rgba(16, 24, 40, 0.08);
-}
-
-.panel,
-.feature {
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid #d8e1ee;
-  box-shadow: inset 0 -3px 0 rgba(16, 24, 40, 0.04), 0 12px 26px rgba(23, 32, 51, 0.07);
-}
-
-.dialer-only {
+.dial-card-actions {
   display: grid;
-  grid-template-columns: minmax(320px, 520px) minmax(280px, 360px);
-  justify-content: center;
-  align-items: start;
-  gap: 14px;
-}
-
-.settings-grid {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 14px;
-}
-
-.stack {
-  display: grid;
-  gap: 14px;
-}
-
-.panel {
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.dialer {
-  min-height: 420px;
-}
-
-.panel-head h2,
-.section-head h2 {
-  margin-bottom: 0;
-  font-size: 18px;
-}
-
-.panel-head span,
-label {
-  color: #667085;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.panel-head b {
-  padding: 6px 9px;
-  border-radius: 8px;
-  background: #eef3fa;
-  color: #344054;
-  font-size: 11px;
-}
-
-.dialer-badges {
-  display: flex;
-  align-items: center;
+  justify-items: end;
   gap: 8px;
 }
 
-.dnd-toggle {
-  min-height: 30px;
-  padding: 6px 10px;
-  background: #eef3fa;
-  color: #344054;
-  font-size: 11px;
-  font-weight: 900;
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08), 0 7px 12px rgba(23, 32, 51, 0.09);
+.dial-card-head h2 {
+  margin: 6px 0 2px;
+  font-size: 30px;
+  line-height: 1.05;
+  letter-spacing: 0;
 }
 
-.dnd-active {
-  background: linear-gradient(180deg, #e35a5a, #b82f2f);
-  color: #fff;
+.status-warning {
+  background: #fff1d6;
+  color: #8a4f08;
+  border-color: #f4d49a;
+}
+
+.number-row {
+  align-items: stretch;
+}
+
+.number-row .secondary-action {
+  flex: 0 0 84px;
+}
+
+#destination {
+  flex: 1;
+  min-width: 0;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid #cfd8e8;
+  border-radius: 8px;
+  background: #fbfcff;
+  color: #172033;
+  font-size: 24px;
+  line-height: 1;
+  text-align: left;
+  box-shadow: inset 0 2px 5px rgba(23, 32, 51, 0.06);
+}
+
+#destination::placeholder {
+  color: #98a2b3;
+  font-size: 22px;
+}
+
+#notice {
+  min-height: 18px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.dialpad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dialpad button {
+  height: clamp(58px, 10.5vh, 72px);
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  background: linear-gradient(180deg, #ffffff, #f5f9fd);
+  color: #111827;
+  box-shadow: inset 0 -4px 0 #e2e8f0, 0 10px 18px rgba(16, 24, 40, 0.07);
+}
+
+.dialpad strong {
+  display: block;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.dial-digit {
+  display: block;
+  color: #061020;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.dial-letters {
+  min-height: 13px;
+  color: #98a2b3;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+
+.dialer-tools {
+  margin: 12px 0;
+}
+
+.secondary-action {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.call-button {
+  flex: 1;
+  min-height: 60px;
+  background: linear-gradient(180deg, #27d5b7, #0e987e);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 400;
+  box-shadow:
+    inset 0 -4px 0 rgba(11, 95, 83, 0.18),
+    0 14px 26px rgba(45, 212, 191, 0.24);
+}
+
+.primary-call-row {
+  margin-top: 18px;
+}
+
+.end-button {
+  flex: 1;
+  min-height: 60px;
+  background: linear-gradient(180deg, #f16666, #c82f3a);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 400;
+  box-shadow:
+    inset 0 -4px 0 rgba(0, 0, 0, 0.18),
+    0 14px 26px rgba(200, 47, 58, 0.22);
+}
+
+.always-call-controls {
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+
+.always-call-controls button {
+  flex: 1 1 30%;
+  min-height: 42px;
+  background: linear-gradient(180deg, #ffffff, #e9eff8);
+  color: #344054;
+  border: 1px solid #d8e1ee;
+  font-size: 13px;
+  font-weight: 400;
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.08),
+    0 10px 18px rgba(23, 32, 51, 0.09);
+}
+
+.in-call-actions {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f2fffb;
+  border: 1px solid #c8eadc;
+}
+
+.active-call-bar {
+  margin-bottom: 10px;
+  color: #027a48;
+}
+
+.call-controls {
+  flex-wrap: wrap;
+}
+
+.call-controls button {
+  flex: 1 1 46%;
+}
+
+.danger {
+  background: linear-gradient(180deg, #f16666, #c82f3a) !important;
+  color: #ffffff !important;
+  border-color: #d92d20 !important;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.transfer-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.transfer-panel {
+  width: min(100%, 320px);
+  padding: 18px;
+  border: 1px solid #dde4f0;
+  border-radius: 8px;
+  background: #fbfcff;
+  box-shadow: 0 18px 40px rgba(23, 32, 51, 0.22);
+}
+
+.transfer-panel h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.transfer-panel p {
+  margin-bottom: 16px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.transfer-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.transfer-options button {
+  min-height: 42px;
+  border: 1px solid #d8e1ee;
+  background: linear-gradient(180deg, #ffffff, #e9eff8);
+  color: #061020;
+  font-size: 13px;
+  font-weight: 400;
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.08),
+    0 10px 18px rgba(23, 32, 51, 0.09);
+}
+
+.transfer-panel .secondary-action {
+  width: 100%;
+}
+
+.settings-sheet,
+.history-sheet {
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.sheet-head {
+  margin-bottom: 14px;
 }
 
 label {
   display: grid;
   gap: 6px;
   margin-top: 10px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 input,
 select {
   width: 100%;
+  min-height: 42px;
   padding: 9px 10px;
   border: 1px solid #cfd8e8;
   border-radius: 8px;
   background: #fbfcff;
-  color: #172033;
-  font-size: 13px;
-  box-shadow: inset 0 2px 5px rgba(23, 32, 51, 0.05);
+  color: #101828;
+  font-size: 14px;
 }
 
 .split {
@@ -258,214 +453,247 @@ select {
   gap: 10px;
 }
 
-#destination {
-  margin: 18px 0 14px;
-  padding: 13px;
-  font-size: 17px;
+.settings-actions {
+  margin-top: 12px;
 }
 
-.dialpad {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
-  max-width: 360px;
-}
-
-.dialpad button {
-  height: 54px;
-  background: linear-gradient(180deg, #fff, #e8eef7);
-  color: #172033;
-  font-size: 18px;
-  font-weight: 900;
-  box-shadow: inset 0 -4px 0 rgba(89, 105, 129, 0.15), 0 9px 14px rgba(23, 32, 51, 0.09);
-}
-
-.actions {
-  margin-top: 14px;
-}
-
-.primary-call-actions {
-  max-width: 360px;
-}
-
-.actions button,
-.wide-button {
+.settings-actions button {
   flex: 1;
-  min-height: 38px;
-  padding: 8px 10px;
-  background: linear-gradient(180deg, #fefefe, #e9eff8);
-  color: #172033;
-  font-size: 13px;
-  font-weight: 900;
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.08), 0 8px 16px rgba(23, 32, 51, 0.11);
 }
 
-.compact-actions {
-  gap: 9px;
-}
-
-.primary {
-  background: linear-gradient(180deg, #13a98f, #0b765f) !important;
-  color: #fff !important;
-}
-
-.danger {
-  background: linear-gradient(180deg, #e35a5a, #b82f2f) !important;
-  color: #fff !important;
-}
-
-.hidden {
-  display: none !important;
-}
-
-.in-call-actions {
-  max-width: 520px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid #edf1f6;
-}
-
-.active-call-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-  padding: 9px 10px;
-  border-radius: 8px;
-  background: #f2fffb;
-  color: #106247;
-  font-size: 13px;
-}
-
-.features {
+.history-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.feature {
-  min-height: 94px;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.feature h3 {
-  margin-bottom: 6px;
-  font-size: 13px;
-}
-
-.feature p {
-  color: #667085;
-  font-size: 11px;
-  line-height: 1.35;
-  margin-bottom: 8px;
-}
-
-.tag {
-  display: inline-flex;
-  padding: 3px 6px;
-  border-radius: 7px;
-  background: #e2ebff;
-  color: #2750a7;
-  font-size: 9px;
-  font-weight: 900;
-}
-
-.data-grid {
-  align-items: stretch;
-}
-
-.data-grid .panel {
-  flex: 1;
-}
-
-.recent-panel {
-  min-height: 420px;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: 62px 1fr auto;
-  gap: 9px;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #edf1f6;
-  font-size: 13px;
-}
-
-.recent-call,
 .history-row {
   width: 100%;
-  border: 1px solid #edf1f6;
-  background: #fbfcff;
+  display: grid;
+  grid-template-columns: 82px 1fr auto;
+  gap: 8px 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #d8e1ee;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fbfd 62%, #f1f6fa 100%);
   color: #172033;
   text-align: left;
-  box-shadow: inset 0 -2px 0 rgba(16, 24, 40, 0.04), 0 6px 12px rgba(23, 32, 51, 0.05);
+  box-shadow: 0 8px 18px rgba(16, 24, 40, 0.06);
 }
 
-.recent-call {
-  display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 4px 10px;
-  align-items: center;
-  margin-top: 8px;
-  padding: 10px;
-}
-
-.recent-call small {
+.history-row small {
   grid-column: 2;
   color: #667085;
 }
 
-.history-row {
-  display: grid;
-  grid-template-columns: 82px 1.2fr 1fr 1fr 70px 90px;
-  gap: 10px;
-  align-items: center;
-  margin-top: 8px;
-  padding: 10px;
-  font-size: 13px;
-}
-
-.call-direction {
-  padding: 4px 7px;
-  border-radius: 8px;
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
-  background: #e2ebff;
-  color: #2750a7;
-}
-
-.call-direction.outbound {
-  background: #dff8ee;
-  color: #106247;
-}
-
-.call-direction.missed {
-  background: #ffe2e2;
-  color: #9b1c1c;
-}
-
+.call-direction,
 .pill {
   padding: 4px 7px;
   border-radius: 8px;
-  background: #edf4ff;
-  color: #2750a7;
-  font-size: 11px;
-  font-weight: 900;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
 }
 
-@media (max-width: 1120px) {
-  .dialer-only,
-  .settings-grid,
-  .data-grid {
-    display: grid;
-    grid-template-columns: 1fr;
+.call-direction {
+  background: #e7f8f1;
+  color: #027a48;
+}
+
+.call-direction.inbound {
+  background: #e8f1ff;
+  color: #175cd3;
+}
+
+.call-direction.missed {
+  background: #fff1f3;
+  color: #b42318;
+}
+
+.pill {
+  background: #f2f4f7;
+  color: #475467;
+}
+
+.empty-state {
+  padding: 18px;
+  border: 1px dashed #cfd8e8;
+  border-radius: 8px;
+  color: #667085;
+  text-align: center;
+}
+
+@media (max-width: 390px) {
+  .app-shell {
+    padding: 10px;
   }
 
-  .features {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .phone-screen {
+    min-height: calc(100vh - 20px);
   }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .icon-button,
+  .secondary-action,
+  .settings-actions button,
+  .call-controls button,
+  .dnd-toggle,
+  .status {
+    padding: 8px 9px;
+  }
+
+  #destination {
+    min-height: 62px;
+    font-size: 32px;
+  }
+
+  .dialpad {
+    gap: 8px;
+  }
+
+  .dialpad button {
+    height: clamp(62px, 12vh, 78px);
+  }
+}
+
+/* Merlin SIP desktop dial panel match */
+.app-shell {
+  padding: 4px;
+  background: #e8eef5;
+}
+
+.phone-screen {
+  width: min(100%, 420px);
+  min-height: calc(100vh - 8px);
+  gap: 0;
+}
+
+.dialer-header {
+  display: none;
+}
+
+.dialer-view {
+  min-height: calc(100vh - 8px);
+  margin: 0;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #dde4f0;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fbfd 62%, #f1f6fa 100%);
+  box-shadow: 0 18px 50px rgba(23, 32, 51, 0.08);
+}
+
+.number-stage {
+  min-height: auto;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dial-card-head {
+  align-items: flex-start;
+}
+
+.dial-card-actions .top-actions {
+  gap: 6px;
+}
+
+.dial-card-actions .icon-button {
+  min-height: 28px;
+  padding: 5px 8px;
+  border-color: #d8e1ee;
+  background: linear-gradient(180deg, #ffffff, #f2f6fb);
+  color: #344054;
+  font-size: 11px;
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.06),
+    0 6px 12px rgba(23, 32, 51, 0.08);
+}
+
+.dial-card-head h2 {
+  margin: 6px 0 2px;
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 400;
+}
+
+#connectionBadge {
+  min-width: 60px;
+  min-height: 26px;
+  padding: 6px 10px;
+  border-color: #ffd7dc;
+  background: #ffe4e8;
+  color: #b42318;
+  box-shadow: none;
+}
+
+.number-row {
+  margin-top: 2px;
+}
+
+#destination {
+  min-height: 54px;
+  font-size: 24px;
+  text-align: left;
+  background: #fbfcff;
+  border: 1px solid #cfd8e8;
+  box-shadow: inset 0 2px 5px rgba(23, 32, 51, 0.06);
+}
+
+.number-row .secondary-action {
+  flex: 0 0 84px;
+  min-height: 42px;
+  align-self: center;
+}
+
+.dialpad {
+  gap: 10px;
+  padding: 0 5px;
+}
+
+.dialpad button {
+  height: 58px;
+  background: linear-gradient(180deg, #ffffff, #f5f9fd);
+  box-shadow:
+    inset 0 -4px 0 rgba(89, 105, 129, 0.16),
+    0 8px 14px rgba(23, 32, 51, 0.1);
+}
+
+.dialpad strong,
+.dial-digit {
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.dial-letters {
+  display: none;
+}
+
+.primary-call-row {
+  margin-top: 40px;
+  padding: 0 1px;
+}
+
+.call-button,
+.end-button {
+  min-height: 42px;
+  font-size: 13px;
+}
+
+.always-call-controls {
+  margin-top: 24px;
+  padding: 0 5px;
+  gap: 10px;
+}
+
+.always-call-controls button {
+  flex: 1 1 20%;
+  min-height: 42px;
+}
+
+.in-call-actions {
+  margin-top: 10px;
 }
