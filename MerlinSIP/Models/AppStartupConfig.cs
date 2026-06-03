@@ -16,6 +16,7 @@ public sealed record AppStartupConfig(
     double MicrophoneVolume = 1.0,
     double HeadphoneVolume = 1.0,
     bool SipAlgCompatibilityMode = false,
+    string SipSignallingTransport = AppStartupConfig.TransportUdp,
     string LicenseLocalKey = "",
     string MobileNumber = "",
     string DndMode = "Off",
@@ -40,6 +41,11 @@ public sealed record AppStartupConfig(
     public const string FixedSipServer = "pbx.chriskendall.media";
     public const int FixedSipPort = 5060;
     public const string DefaultRingtone = "merlin";
+    public const string TransportUdp = "UDP";
+    public const string TransportTcp = "TCP";
+
+    public bool UsesTcpSignalling =>
+        string.Equals(SipSignallingTransport, TransportTcp, StringComparison.OrdinalIgnoreCase);
 
     public bool AllowsCustomSipEndpoint =>
         LicenseKey.StartsWith("PR", StringComparison.OrdinalIgnoreCase);

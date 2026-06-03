@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -13,6 +14,8 @@ public sealed class SipRegistrationService : IDisposable
     private const int StandardRegisterExpiresSeconds = 3600;
     private static readonly TimeSpan RegisterRefreshInterval = TimeSpan.FromMinutes(10);
     private UdpClient? _client;
+    private TcpClient? _tcpClient;
+    private NetworkStream? _tcpStream;
     private AppStartupConfig? _config;
     private string _domain = "";
     private string _localAddress = "127.0.0.1";
@@ -20,6 +23,8 @@ public sealed class SipRegistrationService : IDisposable
     private CancellationTokenSource? _listenCancellation;
     private CancellationTokenSource? _registrationRefreshCancellation;
     private CancellationTokenSource? _natKeepAliveCancellation;
+    private readonly SemaphoreSlim _tcpWriteLock = new(1, 1);
+    private readonly StringBuilder _tcpReceiveBuffer = new();
     private PendingSipTransaction? _pendingResponse;
     private readonly SemaphoreSlim _registrationLock = new(1, 1);
     private bool _listenerStarted;
@@ -45,6 +50,16 @@ public sealed class SipRegistrationService : IDisposable
     public bool HasPendingIncomingCall => _pendingIncomingCall is not null;
 
     public bool HasInboundRtpAudio => _audioSession?.ReceivedPackets > 0;
+
+    private bool UseTcpSignalling => _config?.UsesTcpSignalling == true;
+
+    private bool IsTransportReady => UseTcpSignalling
+        ? _tcpClient?.Connected == true && _tcpStream is not null
+        : _client is not null;
+
+    private string SipTransportName => UseTcpSignalling ? "TCP" : "UDP";
+
+    private string ContactTransport => UseTcpSignalling ? "tcp" : "udp";
 
     public string LastCallFailureReason => _lastCallFailureResponse is null
         ? "No outbound route failure has been recorded in this session."
@@ -89,7 +104,7 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task<SipCallResult> SetHeldAsync(bool held, CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null || _activeCall is null || !_activeCall.Established)
+        if (!IsTransportReady || _config is null || _activeCall is null || !_activeCall.Established)
         {
             return new SipCallResult(false, "Connect a call before using hold.");
         }
@@ -164,8 +179,22 @@ public sealed class SipRegistrationService : IDisposable
         _config = config;
         _domain = string.IsNullOrWhiteSpace(config.Domain) ? config.Server : config.Domain;
         _localAddress = GetLocalAddress();
-        _client = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
-        _localPort = ((IPEndPoint)_client.Client.LocalEndPoint!).Port;
+        if (config.UsesTcpSignalling)
+        {
+            _tcpClient = new TcpClient();
+            await _tcpClient.ConnectAsync(config.Server, config.Port, cancellationToken);
+            _tcpClient.NoDelay = true;
+            _tcpStream = _tcpClient.GetStream();
+            var localEndPoint = (IPEndPoint)_tcpClient.Client.LocalEndPoint!;
+            _localAddress = localEndPoint.Address.ToString();
+            _localPort = localEndPoint.Port;
+            DebugLog.Write($"SIP TCP connected local={_localAddress}:{_localPort} remote={config.Server}:{config.Port}");
+        }
+        else
+        {
+            _client = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+            _localPort = ((IPEndPoint)_client.Client.LocalEndPoint!).Port;
+        }
 
         SipRegistrationResult result;
         try
@@ -190,7 +219,7 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task<SipCallResult> InviteAsync(string destination, CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return new SipCallResult(false, "Register the SIP account first.");
         }
@@ -301,7 +330,7 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task<SipCallResult> SendOptionsAsync(string? destination = null, CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return new SipCallResult(false, "Register the SIP account first.");
         }
@@ -321,7 +350,7 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task<SipCallResult> SendMessageAsync(string destination, string message, CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return new SipCallResult(false, "Register the SIP account first.");
         }
@@ -377,7 +406,7 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task SubscribeToContactPresenceAsync(IEnumerable<string> extensions, CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null || !_registered)
+        if (!IsTransportReady || _config is null || !_registered)
         {
             return;
         }
@@ -434,7 +463,7 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task<SipCallResult> AnswerIncomingCallAsync(CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return new SipCallResult(false, "Register the SIP account first.");
         }
@@ -472,7 +501,7 @@ public sealed class SipRegistrationService : IDisposable
 
         var answer = BuildIncomingAnswer(pendingCall, payloadType);
         var payload = Encoding.UTF8.GetBytes(answer);
-        await _client.SendAsync(payload, pendingCall.RemoteEndPoint, cancellationToken);
+        await SendToRemoteAsync(payload, pendingCall.RemoteEndPoint, cancellationToken);
         DebugLog.Write($"SEND INCOMING ANSWER callId={pendingCall.CallId} bytes={payload.Length}");
 
         _activeCall = new ActiveCall(
@@ -500,7 +529,7 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task<SipCallResult> EndCallAsync(CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return new SipCallResult(false, "No active SIP call to end.");
         }
@@ -538,7 +567,7 @@ public sealed class SipRegistrationService : IDisposable
         DebugLog.Write($"SEND {method} callId={_activeCall.CallId} bytes={payload.Length}");
         try
         {
-            await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+            await SendToServerAsync(payload, cancellationToken);
         }
         catch (Exception error)
         {
@@ -552,7 +581,7 @@ public sealed class SipRegistrationService : IDisposable
 
     public async Task<SipCallResult> TransferAsync(string destination, CancellationToken cancellationToken = default)
     {
-        if (_client is null || _config is null || _activeCall is null || !_activeCall.Established)
+        if (!IsTransportReady || _config is null || _activeCall is null || !_activeCall.Established)
         {
             return new SipCallResult(false, "Connect a call before transferring.");
         }
@@ -563,7 +592,7 @@ public sealed class SipRegistrationService : IDisposable
         DebugLog.Write($"SEND REFER callId={_activeCall.CallId} target={transferTarget} bytes={payload.Length}");
         try
         {
-            await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+            await SendToServerAsync(payload, cancellationToken);
             await SendByeAfterTransferAsync(_activeCall, cancellationToken);
         }
         catch (Exception error)
@@ -581,7 +610,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task SendByeAfterTransferAsync(ActiveCall call, CancellationToken cancellationToken)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return;
         }
@@ -589,7 +618,7 @@ public sealed class SipRegistrationService : IDisposable
         var bye = BuildBye(call);
         var payload = Encoding.UTF8.GetBytes(bye);
         DebugLog.Write($"SEND BYE after transfer callId={call.CallId} bytes={payload.Length}");
-        await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        await _client!.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
     }
 
     public void Dispose()
@@ -604,7 +633,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task<SipRegistrationResult> RegisterCurrentSocketAsync(CancellationToken cancellationToken)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return new SipRegistrationResult(false, "SIP client is not initialized.");
         }
@@ -670,12 +699,12 @@ public sealed class SipRegistrationService : IDisposable
     {
         var branch = $"z9hG4bK-{Guid.NewGuid():N}";
         var tag = Guid.NewGuid().ToString("N")[..12];
-        var contact = $"sip:{_config!.Extension}@{_localAddress}:{_localPort};transport=udp";
+        var contact = $"sip:{_config!.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}";
         var expires = StandardRegisterExpiresSeconds;
         var lines = new List<string>
         {
             $"REGISTER sip:{_domain} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={branch};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={branch};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config.Extension}@{_domain}>;tag={tag}",
             $"To: <sip:{_config.Extension}@{_domain}>",
@@ -715,13 +744,13 @@ public sealed class SipRegistrationService : IDisposable
         var lines = new List<string>
         {
             $"INVITE sip:{target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={branch};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={branch};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={localTag}",
             $"To: <sip:{target}>",
             $"Call-ID: {callId}",
             $"CSeq: {cseq} INVITE",
-            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}>",
             "User-Agent: CK Media Services Merlin SIP",
             "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY, MESSAGE",
             "Supported: replaces, timer",
@@ -770,7 +799,7 @@ public sealed class SipRegistrationService : IDisposable
             $"To: {to}",
             $"Call-ID: {call.CallId}",
             $"CSeq: {cseq}",
-            $"Contact: <sip:{_config!.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Contact: <sip:{_config!.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}>",
             "User-Agent: CK Media Services Merlin SIP",
             "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY, MESSAGE",
             "Content-Type: application/sdp",
@@ -806,13 +835,13 @@ public sealed class SipRegistrationService : IDisposable
         var lines = new List<string>
         {
             $"INVITE sip:{call.Target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={branch};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={branch};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={call.LocalTag}",
             $"To: {to}",
             $"Call-ID: {call.CallId}",
             $"CSeq: {cseq} INVITE",
-            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}>",
             "User-Agent: CK Media Services Merlin SIP",
             "Allow: INVITE, ACK, CANCEL, BYE, OPTIONS, REGISTER, REFER, NOTIFY, MESSAGE",
             "Supported: replaces, timer",
@@ -834,7 +863,7 @@ public sealed class SipRegistrationService : IDisposable
     {
         return string.Join("\r\n", [
             $"CANCEL sip:{call.Target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={call.InviteBranch};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={call.InviteBranch};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={call.LocalTag}",
             $"To: <sip:{call.Target}>",
@@ -858,7 +887,7 @@ public sealed class SipRegistrationService : IDisposable
 
         return string.Join("\r\n", [
             $"BYE sip:{call.Target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={branch};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={branch};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={call.LocalTag}",
             $"To: {to}",
@@ -882,13 +911,13 @@ public sealed class SipRegistrationService : IDisposable
 
         return string.Join("\r\n", [
             $"REFER sip:{call.Target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={branch};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={branch};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={call.LocalTag}",
             $"To: {to}",
             $"Call-ID: {call.CallId}",
             $"CSeq: {_inviteCseq++} REFER",
-            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}>",
             $"Refer-To: <sip:{transferTarget}>",
             $"Referred-By: <sip:{_config.Extension}@{_domain}>",
             "User-Agent: CK Media Services Merlin SIP",
@@ -904,13 +933,13 @@ public sealed class SipRegistrationService : IDisposable
         var lines = new List<string>
         {
             $"MESSAGE sip:{target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={CreateBranch()};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={CreateBranch()};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={localTag}",
             $"To: <sip:{target}>",
             $"Call-ID: {callId}",
             $"CSeq: {cseq} MESSAGE",
-            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}>",
             "User-Agent: CK Media Services Merlin SIP",
             "Content-Type: text/plain; charset=utf-8",
             $"Content-Length: {Encoding.UTF8.GetByteCount(body)}",
@@ -931,13 +960,13 @@ public sealed class SipRegistrationService : IDisposable
         var lines = new List<string>
         {
             $"SUBSCRIBE sip:{target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={CreateBranch()};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={CreateBranch()};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={localTag}",
             $"To: <sip:{target}>",
             $"Call-ID: {callId}",
             $"CSeq: {cseq} SUBSCRIBE",
-            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}>",
             "User-Agent: CK Media Services Merlin SIP",
             $"Event: {eventName}",
             $"Accept: {accept}",
@@ -959,13 +988,13 @@ public sealed class SipRegistrationService : IDisposable
     {
         return string.Join("\r\n", [
             $"OPTIONS sip:{target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={CreateBranch()};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={CreateBranch()};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={Guid.NewGuid():N}",
             $"To: <sip:{target}>",
             $"Call-ID: {callId}",
             $"CSeq: {cseq} OPTIONS",
-            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}>",
             "User-Agent: CK Media Services Merlin SIP",
             "Accept: application/sdp",
             "Content-Length: 0",
@@ -976,7 +1005,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task<SipResponse> SendAndReceiveDirectAsync(string message, CancellationToken cancellationToken)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return new SipResponse(0, "SIP client is not initialized.", new Dictionary<string, string>(), "");
         }
@@ -984,7 +1013,7 @@ public sealed class SipRegistrationService : IDisposable
         var payload = Encoding.UTF8.GetBytes(message);
         try
         {
-            await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+            await SendToServerAsync(payload, cancellationToken);
         }
         catch (Exception error)
         {
@@ -1000,8 +1029,9 @@ public sealed class SipRegistrationService : IDisposable
         {
             while (!linked.Token.IsCancellationRequested)
             {
-                var result = await _client.ReceiveAsync(linked.Token);
-                var text = Encoding.UTF8.GetString(result.Buffer);
+                var text = UseTcpSignalling
+                    ? await ReceiveTcpMessageAsync(linked.Token)
+                    : Encoding.UTF8.GetString((await _client!.ReceiveAsync(linked.Token)).Buffer);
                 if (text.StartsWith("SIP/2.0", StringComparison.OrdinalIgnoreCase))
                 {
                     var response = ParseResponse(text);
@@ -1009,7 +1039,7 @@ public sealed class SipRegistrationService : IDisposable
                     return response;
                 }
 
-                DebugLog.Write($"RECV DIRECT non-response bytes={result.Buffer.Length}");
+                DebugLog.Write($"RECV DIRECT non-response bytes={Encoding.UTF8.GetByteCount(text)}");
             }
         }
         catch (OperationCanceledException)
@@ -1026,9 +1056,145 @@ public sealed class SipRegistrationService : IDisposable
         return new SipResponse(0, "Timed out waiting for SIP response.", new Dictionary<string, string>(), "");
     }
 
+    private async Task SendToServerAsync(byte[] payload, CancellationToken cancellationToken)
+    {
+        if (UseTcpSignalling)
+        {
+            if (_tcpStream is null)
+            {
+                throw new InvalidOperationException("TCP SIP stream is not connected.");
+            }
+
+            await _tcpWriteLock.WaitAsync(cancellationToken);
+            try
+            {
+                await _tcpStream.WriteAsync(payload, cancellationToken);
+                await _tcpStream.FlushAsync(cancellationToken);
+            }
+            finally
+            {
+                _tcpWriteLock.Release();
+            }
+
+            return;
+        }
+
+        if (!IsTransportReady || _config is null)
+        {
+            throw new InvalidOperationException("UDP SIP socket is not connected.");
+        }
+
+        await SendToServerAsync(payload, cancellationToken);
+    }
+
+    private async Task SendToRemoteAsync(byte[] payload, IPEndPoint remoteEndPoint, CancellationToken cancellationToken)
+    {
+        if (UseTcpSignalling)
+        {
+            await SendToServerAsync(payload, cancellationToken);
+            return;
+        }
+
+        if (!IsTransportReady)
+        {
+            throw new InvalidOperationException("UDP SIP socket is not connected.");
+        }
+
+        await _client!.SendAsync(payload, remoteEndPoint, cancellationToken);
+    }
+
+    private IPEndPoint GetRemoteSipEndPoint()
+    {
+        if (_tcpClient?.Client.RemoteEndPoint is IPEndPoint tcpRemote)
+        {
+            return tcpRemote;
+        }
+
+        if (_config is not null)
+        {
+            try
+            {
+                var address = Dns.GetHostAddresses(_config.Server)
+                    .FirstOrDefault(candidate => candidate.AddressFamily == AddressFamily.InterNetwork);
+                if (address is not null)
+                {
+                    return new IPEndPoint(address, _config.Port);
+                }
+            }
+            catch (Exception error)
+            {
+                DebugLog.Write($"SIP remote endpoint resolve failed error={error.Message}");
+            }
+        }
+
+        return new IPEndPoint(IPAddress.None, _config?.Port ?? AppStartupConfig.FixedSipPort);
+    }
+
+    private async Task<string> ReceiveTcpMessageAsync(CancellationToken cancellationToken)
+    {
+        if (_tcpStream is null)
+        {
+            throw new InvalidOperationException("TCP SIP stream is not connected.");
+        }
+
+        var buffer = new byte[8192];
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var existing = TryTakeTcpMessage();
+            if (existing is not null)
+            {
+                return existing;
+            }
+
+            var read = await _tcpStream.ReadAsync(buffer, cancellationToken);
+            if (read <= 0)
+            {
+                throw new IOException("TCP SIP stream closed.");
+            }
+
+            _tcpReceiveBuffer.Append(Encoding.UTF8.GetString(buffer, 0, read));
+        }
+
+        throw new OperationCanceledException(cancellationToken);
+    }
+
+    private string? TryTakeTcpMessage()
+    {
+        var text = _tcpReceiveBuffer.ToString();
+        var headerEnd = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+        if (headerEnd < 0)
+        {
+            return null;
+        }
+
+        var headerText = text[..headerEnd];
+        var contentLength = 0;
+        foreach (var line in headerText.Split("\r\n"))
+        {
+            var separator = line.IndexOf(':');
+            if (separator > 0 &&
+                string.Equals(line[..separator], "Content-Length", StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(line[(separator + 1)..].Trim(), out var parsedLength))
+            {
+                contentLength = Math.Max(0, parsedLength);
+                break;
+            }
+        }
+
+        var totalLength = headerEnd + 4 + contentLength;
+        if (text.Length < totalLength)
+        {
+            return null;
+        }
+
+        var message = text[..totalLength];
+        _tcpReceiveBuffer.Remove(0, totalLength);
+        return message;
+    }
+
     private async Task<SipResponse> SendAndWaitFromListenerAsync(string message, CancellationToken cancellationToken)
     {
-        if (_client is null || _config is null)
+        if (!IsTransportReady || _config is null)
         {
             return new SipResponse(0, "SIP client is not initialized.", new Dictionary<string, string>(), "");
         }
@@ -1041,7 +1207,7 @@ public sealed class SipRegistrationService : IDisposable
         var payload = Encoding.UTF8.GetBytes(message);
         try
         {
-            await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+            await SendToServerAsync(payload, cancellationToken);
         }
         catch (Exception error)
         {
@@ -1103,14 +1269,14 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task AcknowledgeAndStartAudioAsync(SipResponse response, CancellationToken cancellationToken)
     {
-        if (_activeCall is null || _client is null || _config is null || _audioSession is null)
+        if (_activeCall is null || !IsTransportReady || _config is null || _audioSession is null)
         {
             return;
         }
 
         var ack = BuildAck(_activeCall, false);
         var ackPayload = Encoding.UTF8.GetBytes(ack);
-        await _client.SendAsync(ackPayload, _config.Server, _config.Port, cancellationToken);
+        await SendToServerAsync(ackPayload, cancellationToken);
         DebugLog.Write($"SEND ACK callId={_activeCall.CallId} bytes={ackPayload.Length}");
         RaiseCallProgress(response);
 
@@ -1133,7 +1299,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task SendAckForFinalInviteResponseAsync(SipResponse response, CancellationToken cancellationToken)
     {
-        if (_activeCall is null || _client is null || _config is null || response.Code < 300)
+        if (_activeCall is null || !IsTransportReady || _config is null || response.Code < 300)
         {
             return;
         }
@@ -1143,14 +1309,14 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task SendAckForInviteResponseAsync(SipResponse response, CancellationToken cancellationToken, bool reuseInviteBranch)
     {
-        if (_activeCall is null || _client is null || _config is null)
+        if (_activeCall is null || !IsTransportReady || _config is null)
         {
             return;
         }
 
         var ack = BuildAck(_activeCall, reuseInviteBranch);
         var payload = Encoding.UTF8.GetBytes(ack);
-        await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        await SendToServerAsync(payload, cancellationToken);
         DebugLog.Write($"SEND ACK callId={_activeCall.CallId} code={response.Code} bytes={payload.Length}");
     }
 
@@ -1165,13 +1331,13 @@ public sealed class SipRegistrationService : IDisposable
 
         return string.Join("\r\n", [
             $"ACK sip:{call.Target} SIP/2.0",
-            $"Via: SIP/2.0/UDP {_localAddress}:{_localPort};branch={branch};rport",
+            $"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch={branch};rport",
             "Max-Forwards: 70",
             $"From: <sip:{_config!.Extension}@{_domain}>;tag={call.LocalTag}",
             $"To: {to}",
             $"Call-ID: {call.CallId}",
             $"CSeq: {call.CSeq} ACK",
-            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport=udp>",
+            $"Contact: <sip:{_config.Extension}@{_localAddress}:{_localPort};transport={ContactTransport}>",
             "User-Agent: CK Media Services Merlin SIP",
             "Content-Length: 0",
             "",
@@ -1221,12 +1387,12 @@ public sealed class SipRegistrationService : IDisposable
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
-                if (_client is null || _config is null || _activeCall is not null || _pendingResponse is not null)
+                if (!IsTransportReady || _config is null || _activeCall is not null || _pendingResponse is not null)
                 {
                     continue;
                 }
 
-                await _client.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+                await SendToServerAsync(payload, cancellationToken);
                 DebugLog.Write("SEND NAT keepalive");
             }
             catch (OperationCanceledException)
@@ -1292,12 +1458,14 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task ListenLoopAsync(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested && _client is not null)
+        while (!cancellationToken.IsCancellationRequested && IsTransportReady)
         {
             try
             {
-                var result = await _client.ReceiveAsync(cancellationToken);
-                var message = Encoding.UTF8.GetString(result.Buffer);
+                var remoteEndPoint = GetRemoteSipEndPoint();
+                var message = UseTcpSignalling
+                    ? await ReceiveTcpMessageAsync(cancellationToken)
+                    : Encoding.UTF8.GetString((await _client!.ReceiveAsync(cancellationToken)).Buffer);
 
                 if (message.StartsWith("SIP/2.0", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1334,17 +1502,17 @@ public sealed class SipRegistrationService : IDisposable
                 if (message.StartsWith("INVITE ", StringComparison.OrdinalIgnoreCase))
                 {
                     DebugLog.Write("RECV INVITE");
-                    await HandleIncomingInviteAsync(message, result.RemoteEndPoint, cancellationToken);
+                    await HandleIncomingInviteAsync(message, remoteEndPoint, cancellationToken);
                 }
                 else if (message.StartsWith("OPTIONS ", StringComparison.OrdinalIgnoreCase))
                 {
                     DebugLog.Write("RECV OPTIONS");
-                    await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
+                    await SendSimpleResponseAsync(message, remoteEndPoint, 200, "OK", cancellationToken);
                 }
                 else if (message.StartsWith("BYE ", StringComparison.OrdinalIgnoreCase))
                 {
                     DebugLog.Write("RECV BYE");
-                    await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
+                    await SendSimpleResponseAsync(message, remoteEndPoint, 200, "OK", cancellationToken);
                     var headers = ParseHeaders(message);
                     var byeCallId = headers.GetValueOrDefault("call-id", "");
                     if (_activeCall is not null &&
@@ -1365,7 +1533,7 @@ public sealed class SipRegistrationService : IDisposable
                 else if (message.StartsWith("CANCEL ", StringComparison.OrdinalIgnoreCase))
                 {
                     DebugLog.Write("RECV CANCEL");
-                    await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
+                    await SendSimpleResponseAsync(message, remoteEndPoint, 200, "OK", cancellationToken);
                     var headers = ParseHeaders(message);
                     var cancelCallId = headers.GetValueOrDefault("call-id", "");
                     if (_pendingIncomingCall is not null &&
@@ -1386,13 +1554,13 @@ public sealed class SipRegistrationService : IDisposable
                 else if (message.StartsWith("NOTIFY ", StringComparison.OrdinalIgnoreCase))
                 {
                     DebugLog.Write("RECV NOTIFY");
-                    await SendSimpleResponseAsync(message, result.RemoteEndPoint, 200, "OK", cancellationToken);
+                    await SendSimpleResponseAsync(message, remoteEndPoint, 200, "OK", cancellationToken);
                     HandlePresenceNotify(message);
                 }
                 else if (message.StartsWith("MESSAGE ", StringComparison.OrdinalIgnoreCase))
                 {
                     DebugLog.Write("RECV MESSAGE");
-                    await HandleIncomingMessageAsync(message, result.RemoteEndPoint, cancellationToken);
+                    await HandleIncomingMessageAsync(message, remoteEndPoint, cancellationToken);
                 }
             }
             catch (OperationCanceledException)
@@ -1490,7 +1658,7 @@ public sealed class SipRegistrationService : IDisposable
         CancellationToken cancellationToken,
         string? localTag = null)
     {
-        if (_client is null)
+        if (!IsTransportReady)
         {
             return;
         }
@@ -1521,7 +1689,7 @@ public sealed class SipRegistrationService : IDisposable
         ]);
 
         var payload = Encoding.UTF8.GetBytes(response);
-        await _client.SendAsync(payload, remoteEndPoint, cancellationToken);
+        await SendToRemoteAsync(payload, remoteEndPoint, cancellationToken);
         DebugLog.Write($"SEND RESPONSE code={code} reason={reason} callId={callId} bytes={payload.Length}");
     }
 
@@ -1857,7 +2025,7 @@ public sealed class SipRegistrationService : IDisposable
         {
             try
             {
-                if (_client is null || _config is null)
+                if (!IsTransportReady || _config is null)
                 {
                     DebugLog.Write($"REGISTER post-call refresh abandoned reason={reason} attempt={attempt}");
                     return;

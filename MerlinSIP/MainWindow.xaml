@@ -239,8 +239,8 @@
             <Grid Grid.Row="0" Margin="0,0,0,20">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="430" />
-                    <ColumnDefinition Width="114" />
+                    <ColumnDefinition Width="560" />
+                    <ColumnDefinition Width="120" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
@@ -253,8 +253,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <Border Grid.Column="0"
-                        Grid.ColumnSpan="3"
+                <Border Grid.Column="1"
                         Width="430"
                         HorizontalAlignment="Center"
                         Background="#FFFFFF"
@@ -1007,6 +1006,17 @@
                                             <TextBlock Text="Adds extra UDP keepalive traffic for difficult routers. Normal SIP registration is unchanged. Some ISP SIP ALG faults require a PBX-side TCP/TLS profile."
                                                        Foreground="#64748B"
                                                        TextWrapping="Wrap" />
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="150" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Signalling mode" Foreground="#64748B" FontWeight="Medium" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Column="1" x:Name="SipTransportModeComboBox" Height="34" VerticalContentAlignment="Center" SelectionChanged="SipTransportModeComboBox_SelectionChanged">
+                                                    <ComboBoxItem Content="Standard UDP" Tag="UDP" />
+                                                    <ComboBoxItem Content="TCP signalling" Tag="TCP" />
+                                                </ComboBox>
+                                            </Grid>
                                             <Grid Margin="0,12,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="150" />

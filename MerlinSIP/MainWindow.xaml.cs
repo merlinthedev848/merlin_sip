@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MerlinSip.Models;
 using MerlinSip.Services;
+using MerlinSip.ViewModels;
 using DrawingIcon = System.Drawing.Icon;
 using DrawingSystemIcons = System.Drawing.SystemIcons;
 using WinForms = System.Windows.Forms;
@@ -32,6 +33,8 @@ public partial class MainWindow : Window
     private readonly RingtonePlayer _ringtonePlayer = new();
     private readonly UpdateService _updateService = new();
     private readonly ProvisioningService _provisioningService = new();
+    private readonly SipsorceryCompatibilityService _sipsorceryCompatibilityService = new();
+    private readonly MainWindowViewModel _viewModel = new();
     private WinForms.NotifyIcon? _trayIcon;
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
@@ -72,6 +75,7 @@ public partial class MainWindow : Window
     {
         _config = config;
         InitializeComponent();
+        DataContext = _viewModel;
         ApplyStartupConfig();
         ApplyAppVersion();
         LoadDefaultDeviceSelectors();
@@ -620,6 +624,7 @@ public partial class MainWindow : Window
         PrivatePbxSettingsPanel.Visibility = customEndpoint ? Visibility.Visible : Visibility.Collapsed;
         PrivatePbxSettingsTextBox.Text = customEndpoint ? _config.Server : string.Empty;
         SipAlgCompatibilityCheckBox.IsChecked = _config.SipAlgCompatibilityMode;
+        SelectSipTransportMode(_config.SipSignallingTransport);
         LicenseStatusText.Text = ShortLicenseStatus(_config.LicenseStatus);
         LicensedToText.Text = LicenseeFromStatus(_config.LicenseStatus);
         LoadApplicationSettingsControls();
@@ -667,6 +672,31 @@ public partial class MainWindow : Window
         return comboBox.SelectedItem is ComboBoxItem item && item.Content is not null
             ? item.Content.ToString() ?? fallback
             : fallback;
+    }
+
+    private static string ComboBoxTag(System.Windows.Controls.ComboBox comboBox, string fallback)
+    {
+        return comboBox.SelectedItem is ComboBoxItem item && item.Tag is not null
+            ? item.Tag.ToString() ?? fallback
+            : fallback;
+    }
+
+    private void SelectSipTransportMode(string transport)
+    {
+        var normalized = string.Equals(transport, AppStartupConfig.TransportTcp, StringComparison.OrdinalIgnoreCase)
+            ? AppStartupConfig.TransportTcp
+            : AppStartupConfig.TransportUdp;
+
+        foreach (var item in SipTransportModeComboBox.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag?.ToString(), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                SipTransportModeComboBox.SelectedItem = item;
+                return;
+            }
+        }
+
+        SipTransportModeComboBox.SelectedIndex = 0;
     }
 
     private static int ComboBoxSeconds(System.Windows.Controls.ComboBox comboBox, int fallback)
@@ -881,6 +911,7 @@ public partial class MainWindow : Window
 
     private void SetConnectionState(string text, string background, string foreground)
     {
+        _viewModel.ConnectionState = text;
         ConnectionStatusText.Text = text;
         ConnectionPill.Background = (WpfBrush)new BrushConverter().ConvertFromString(background)!;
         ConnectionStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(foreground)!;
@@ -1082,6 +1113,36 @@ public partial class MainWindow : Window
     private void GlobalSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         ApplyGlobalSearchFilter();
+        ApplyGlobalSearchNavigation();
+    }
+
+    private void ApplyGlobalSearchNavigation()
+    {
+        var query = GlobalSearchTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        MainTabs.SelectedItem = PhoneTab;
+        if (_filteredDirectoryContacts.Count > 0)
+        {
+            DirectoryTabs.SelectedItem = DirectoryContactsTab;
+        }
+        else
+        {
+            DirectoryTabs.SelectedItem = DirectoryHistoryTab;
+        }
+
+        if (IsDialableSearch(query))
+        {
+            DestinationTextBox.Text = NormalizeDialDestination(query);
+        }
+    }
+
+    private static bool IsDialableSearch(string query)
+    {
+        return query.All(character => char.IsDigit(character) || character is '+' or '*' or '#' or ' ' or '-' or '(' or ')');
     }
 
     private void GlobalSearchTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -1694,7 +1755,8 @@ public partial class MainWindow : Window
             Ringtone = ringtone?.Id ?? _config.Ringtone,
             MicrophoneVolume = Math.Clamp(MicrophoneVolumeSlider.Value / 100, 0.25, 2.0),
             HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0),
-            SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true
+            SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true,
+            SipSignallingTransport = ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp)
         };
     }
 
@@ -1763,7 +1825,8 @@ public partial class MainWindow : Window
                 Ringtone = ringtone?.Id ?? _config.Ringtone,
                 MicrophoneVolume = Math.Clamp(MicrophoneVolumeSlider.Value / 100, 0.25, 2.0),
                 HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0),
-                SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true
+                SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true,
+                SipSignallingTransport = ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp)
             };
             ApplyStartupConfig();
             await _cacheService.SaveSettingsAsync(_config);
@@ -1867,17 +1930,34 @@ public partial class MainWindow : Window
 
     private async void SaveNetworkModeButton_Click(object sender, RoutedEventArgs e)
     {
+        var previousTransport = _config.SipSignallingTransport;
         _config = _config with
         {
-            SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true
+            SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true,
+            SipSignallingTransport = ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp)
         };
 
         await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
         _sipRegistrationService.UpdateNetworkAssistance(_config.SipAlgCompatibilityMode);
         UpdateNetworkAssistanceText();
-        FooterStatusText.Text = _config.SipAlgCompatibilityMode
-            ? "Router keepalive assist is on."
-            : "Standard network mode is on.";
+        if (_config.UsesTcpSignalling)
+        {
+            var probe = await _sipsorceryCompatibilityService.TestTcpRegistrationAsync(_config);
+            FooterStatusText.Text = probe.Message;
+        }
+        else
+        {
+            FooterStatusText.Text = _config.SipAlgCompatibilityMode
+                ? "Router keepalive assist is on."
+                : "Standard network mode is on.";
+        }
+
+        if (!string.Equals(previousTransport, _config.SipSignallingTransport, StringComparison.OrdinalIgnoreCase))
+        {
+            _registered = false;
+            UpdateCallControls();
+            await RegisterSipAsync();
+        }
     }
 
     private void SipAlgCompatibilityCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -1885,12 +1965,18 @@ public partial class MainWindow : Window
         UpdateNetworkAssistanceText();
     }
 
+    private void SipTransportModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateNetworkAssistanceText();
+    }
+
     private void UpdateNetworkAssistanceText()
     {
         var compatibilityOn = SipAlgCompatibilityCheckBox.IsChecked == true;
+        var tcpMode = string.Equals(ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp), AppStartupConfig.TransportTcp, StringComparison.OrdinalIgnoreCase);
         NatKeepaliveStatusText.Text = compatibilityOn ? "On" : "Off";
         NatKeepaliveStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(compatibilityOn ? "#106247" : "#64748B")!;
-        RportStatusText.Text = "On";
+        RportStatusText.Text = tcpMode ? "TCP" : "On";
         AutoRecoveryStatusText.Text = "On";
     }
 
@@ -1947,6 +2033,16 @@ public partial class MainWindow : Window
 
         report.AppendLine($"RTP audio: {_sipRegistrationService.RtpStatus}");
         report.AppendLine($"Outbound route clue: {_sipRegistrationService.LastCallFailureReason}");
+        if (_config.UsesTcpSignalling)
+        {
+            var tcpProbe = await _sipsorceryCompatibilityService.TestTcpRegistrationAsync(_config);
+            report.AppendLine($"TCP/SIPSorcery signalling: {(tcpProbe.Supported ? "OK" : "Failed")}. {tcpProbe.Message}");
+        }
+        else
+        {
+            report.AppendLine("TCP/SIPSorcery signalling: Not selected. Standard UDP signalling remains active.");
+        }
+
         report.AppendLine(_config.SipAlgCompatibilityMode
             ? "Router keepalive assist: On. Standard SIP registration is unchanged; extra UDP keepalive traffic is being added."
             : "Router keepalive assist: Off. Merlin SIP is using standard SIP registration.");

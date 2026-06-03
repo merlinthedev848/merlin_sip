@@ -11,9 +11,9 @@
     <Authors>CK Media Services</Authors>
     <Company>CK Media Services</Company>
     <Product>Merlin SIP</Product>
-    <Version>1.1.17</Version>
-    <AssemblyVersion>1.1.17.0</AssemblyVersion>
-    <FileVersion>1.1.17.0</FileVersion>
+    <Version>1.1.22</Version>
+    <AssemblyVersion>1.1.22.0</AssemblyVersion>
+    <FileVersion>1.1.22.0</FileVersion>
     <Copyright>Copyright (c) CK Media Services</Copyright>
     <PackageProjectUrl>https://ckmediaservices.co.uk</PackageProjectUrl>
     <ApplicationIcon>Assets\CKMedia-Icon.ico</ApplicationIcon>
@@ -21,5 +21,8 @@
   <ItemGroup>
     <Content Include="Assets\CKMedia-Icon.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\CKMedia-Icon.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SIPSorcery" Version="10.0.8" />
   </ItemGroup>
 </Project>

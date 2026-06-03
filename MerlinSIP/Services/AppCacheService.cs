@@ -67,6 +67,7 @@ public sealed class AppCacheService
             ClampVolume(settings.MicrophoneVolume),
             ClampVolume(settings.HeadphoneVolume),
             settings.SipAlgCompatibilityMode ?? false,
+            NormalizeTransport(settings.SipSignallingTransport),
             Unprotect(settings.LicenseLocalKey, settings.EncryptedLicenseLocalKey),
             settings.MobileNumber ?? "",
             settings.DndMode ?? "Off",
@@ -111,6 +112,7 @@ public sealed class AppCacheService
             config.MicrophoneVolume,
             config.HeadphoneVolume,
             config.SipAlgCompatibilityMode,
+            NormalizeTransport(config.SipSignallingTransport),
             null,
             Protect(config.LicenseLocalKey),
             config.MobileNumber,
@@ -197,6 +199,13 @@ public sealed class AppCacheService
         return Math.Clamp(value ?? 1.0, 0.25, 2.0);
     }
 
+    private static string NormalizeTransport(string? transport)
+    {
+        return string.Equals(transport, AppStartupConfig.TransportTcp, StringComparison.OrdinalIgnoreCase)
+            ? AppStartupConfig.TransportTcp
+            : AppStartupConfig.TransportUdp;
+    }
+
     private sealed record SavedAppSettings(
         string? Extension,
         string? Username,
@@ -217,6 +226,7 @@ public sealed class AppCacheService
         double? MicrophoneVolume = null,
         double? HeadphoneVolume = null,
         bool? SipAlgCompatibilityMode = null,
+        string? SipSignallingTransport = null,
         string? LicenseLocalKey = null,
         string? EncryptedLicenseLocalKey = null,
         string? MobileNumber = null,
