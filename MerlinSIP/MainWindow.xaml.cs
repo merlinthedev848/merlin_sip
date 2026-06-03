@@ -38,6 +38,10 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
     private readonly ObservableCollection<ChatMessageEntry> _chatMessages = [];
     private readonly ObservableCollection<ChatMessageEntry> _chatThreadMessages = [];
+    private readonly ObservableCollection<ContactEntry> _filteredDirectoryContacts = [];
+    private readonly ObservableCollection<ContactEntry> _filteredPhonebookContacts = [];
+    private readonly ObservableCollection<CallHistoryEntry> _filteredRecentCalls = [];
+    private readonly ObservableCollection<CallHistoryEntry> _filteredCallHistory = [];
     private readonly DispatcherTimer _callTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _connectionWatchdog = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly DispatcherTimer _licenseWatchdog = new() { Interval = TimeSpan.FromHours(6) };
@@ -86,11 +90,11 @@ public partial class MainWindow : Window
         ApplyStartupConfig();
         ApplyAppVersion();
         LoadDefaultDeviceSelectors();
-        DialContactsListView.ItemsSource = _contacts;
-        PhonebookContactsListView.ItemsSource = _contacts;
+        DialContactsListView.ItemsSource = _filteredDirectoryContacts;
+        PhonebookContactsListView.ItemsSource = _filteredPhonebookContacts;
         ChatContactsListView.ItemsSource = _contacts;
-        RecentCallsListView.ItemsSource = _callHistory;
-        CallHistoryListView.ItemsSource = _callHistory;
+        RecentCallsListView.ItemsSource = _filteredRecentCalls;
+        CallHistoryListView.ItemsSource = _filteredCallHistory;
         ChatMessagesListView.ItemsSource = _chatThreadMessages;
         _sipRegistrationService.IncomingCall += SipRegistrationService_IncomingCall;
         _sipRegistrationService.IncomingMessage += SipRegistrationService_IncomingMessage;
@@ -983,6 +987,7 @@ public partial class MainWindow : Window
             _contacts.Add(contact);
         }
 
+        ApplyGlobalSearchFilter();
         _ = RefreshPresenceSubscriptionsAsync();
     }
 
@@ -1013,6 +1018,8 @@ public partial class MainWindow : Window
 
             _contacts[index] = _contacts[index] with { Presence = presence };
         }
+
+        ApplyGlobalSearchFilter();
     }
 
     private async Task LoadCallHistoryAsync()
@@ -1021,6 +1028,57 @@ public partial class MainWindow : Window
         foreach (var call in await _callHistoryStore.LoadAsync())
         {
             _callHistory.Add(call);
+        }
+
+        ApplyGlobalSearchFilter();
+    }
+
+    private void ApplyGlobalSearchFilter()
+    {
+        var query = GlobalSearchTextBox.Text.Trim();
+        ReplaceCollection(_filteredDirectoryContacts, FilterContacts(query));
+        ReplaceCollection(_filteredPhonebookContacts, FilterContacts(query));
+        ReplaceCollection(_filteredRecentCalls, FilterCalls(query));
+        ReplaceCollection(_filteredCallHistory, FilterCalls(query));
+    }
+
+    private IEnumerable<ContactEntry> FilterContacts(string query)
+    {
+        return string.IsNullOrWhiteSpace(query)
+            ? _contacts
+            : _contacts.Where(contact =>
+                ContainsSearchText(contact.Name, query) ||
+                ContainsSearchText(contact.Number, query) ||
+                ContainsSearchText(contact.Company, query) ||
+                ContainsSearchText(contact.Notes, query) ||
+                ContainsSearchText(contact.PresenceLabel, query));
+    }
+
+    private IEnumerable<CallHistoryEntry> FilterCalls(string query)
+    {
+        return string.IsNullOrWhiteSpace(query)
+            ? _callHistory
+            : _callHistory.Where(call =>
+                ContainsSearchText(call.Name, query) ||
+                ContainsSearchText(call.Number, query) ||
+                ContainsSearchText(call.Direction, query) ||
+                ContainsSearchText(call.Result, query) ||
+                ContainsSearchText(call.Detail, query) ||
+                ContainsSearchText(call.StartedAt, query));
+    }
+
+    private static bool ContainsSearchText(string value, string query)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+            value.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void ReplaceCollection<T>(ObservableCollection<T> target, IEnumerable<T> source)
+    {
+        target.Clear();
+        foreach (var item in source)
+        {
+            target.Add(item);
         }
     }
 
@@ -1038,33 +1096,7 @@ public partial class MainWindow : Window
 
     private void GlobalSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        var query = GlobalSearchTextBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(query) || _callConnected || _incomingRinging)
-        {
-            return;
-        }
-
-        if (query.Any(char.IsDigit))
-        {
-            DestinationTextBox.Text = NormalizeDialDestination(query);
-            DestinationTextBox.CaretIndex = DestinationTextBox.Text.Length;
-            return;
-        }
-
-        if (!_config.CombineContactsInSearch)
-        {
-            return;
-        }
-
-        var contact = _contacts.FirstOrDefault(item =>
-            item.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-            item.Company.Contains(query, StringComparison.OrdinalIgnoreCase));
-        if (contact is not null)
-        {
-            DestinationTextBox.Text = contact.Number;
-            DestinationTextBox.CaretIndex = DestinationTextBox.Text.Length;
-            CallerLookupText.Text = $"{contact.Name}  {contact.Company}".Trim();
-        }
+        ApplyGlobalSearchFilter();
     }
 
     private void GlobalSearchTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -1075,19 +1107,31 @@ public partial class MainWindow : Window
         }
 
         e.Handled = true;
-        if (string.IsNullOrWhiteSpace(DestinationTextBox.Text))
+        var query = GlobalSearchTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(query))
         {
-            var query = GlobalSearchTextBox.Text.Trim();
-            if (_config.CombineContactsInSearch)
-            {
-                var contact = _contacts.FirstOrDefault(item =>
-                    item.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    item.Company.Contains(query, StringComparison.OrdinalIgnoreCase));
-                if (contact is not null)
-                {
-                    DestinationTextBox.Text = contact.Number;
-                }
-            }
+            DestinationTextBox.Focus();
+            return;
+        }
+
+        var normalized = NormalizeDialDestination(query);
+        var firstContact = _filteredDirectoryContacts.FirstOrDefault()
+            ?? _filteredPhonebookContacts.FirstOrDefault();
+        var firstCall = _filteredRecentCalls.FirstOrDefault()
+            ?? _filteredCallHistory.FirstOrDefault();
+
+        if (query.Any(char.IsLetter) && firstContact is not null)
+        {
+            UseSelectedContact(firstContact);
+        }
+        else if (query.Any(char.IsLetter) && firstCall is not null)
+        {
+            DestinationTextBox.Text = firstCall.Number;
+            MainTabs.SelectedItem = PhoneTab;
+        }
+        else
+        {
+            DestinationTextBox.Text = string.IsNullOrWhiteSpace(normalized) ? query : normalized;
         }
 
         MainTabs.SelectedItem = PhoneTab;
@@ -1584,6 +1628,7 @@ public partial class MainWindow : Window
         ContactNumberTextBox.Text = "";
         ContactCompanyTextBox.Text = "";
         ContactNotesTextBox.Text = "";
+        ApplyGlobalSearchFilter();
         FooterStatusText.Text = "Contact saved.";
         _ = RefreshPresenceSubscriptionsAsync();
     }
@@ -1603,6 +1648,7 @@ public partial class MainWindow : Window
         ContactNumberTextBox.Text = "";
         ContactCompanyTextBox.Text = "";
         ContactNotesTextBox.Text = "";
+        ApplyGlobalSearchFilter();
         FooterStatusText.Text = "Contact deleted.";
     }
 
@@ -1993,6 +2039,7 @@ public partial class MainWindow : Window
 
         _callHistory.Clear();
         await _callHistoryStore.SaveAsync(_callHistory);
+        ApplyGlobalSearchFilter();
         FooterStatusText.Text = "Call history cleared.";
     }
 
@@ -2196,6 +2243,7 @@ public partial class MainWindow : Window
 
         _callHistory.Insert(0, entry);
         await _callHistoryStore.SaveAsync(_callHistory);
+        ApplyGlobalSearchFilter();
     }
 
     private async void SendMessageButton_Click(object sender, RoutedEventArgs e)
