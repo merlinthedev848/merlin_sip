@@ -11,7 +11,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MerlinSip.Models;
 using MerlinSip.Services;
-using Microsoft.Extensions.DependencyInjection;
 using DrawingIcon = System.Drawing.Icon;
 using DrawingSystemIcons = System.Drawing.SystemIcons;
 using WinForms = System.Windows.Forms;
@@ -23,16 +22,16 @@ namespace MerlinSip;
 
 public partial class MainWindow : Window
 {
-    private readonly ContactStore _contactStore;
-    private readonly CallHistoryStore _callHistoryStore;
-    private readonly ChatMessageStore _chatMessageStore;
-    private readonly AppCacheService _cacheService;
-    private readonly DeviceDiscoveryService _deviceDiscoveryService;
-    private readonly SipRegistrationService _sipRegistrationService;
-    private readonly LicenseService _licenseService;
-    private readonly RingtonePlayer _ringtonePlayer;
-    private readonly UpdateService _updateService;
-    private readonly ProvisioningService _provisioningService;
+    private readonly ContactStore _contactStore = new();
+    private readonly CallHistoryStore _callHistoryStore = new();
+    private readonly ChatMessageStore _chatMessageStore = new();
+    private readonly AppCacheService _cacheService = new();
+    private readonly DeviceDiscoveryService _deviceDiscoveryService = new();
+    private readonly SipRegistrationService _sipRegistrationService = new();
+    private readonly LicenseService _licenseService = new();
+    private readonly RingtonePlayer _ringtonePlayer = new();
+    private readonly UpdateService _updateService = new();
+    private readonly ProvisioningService _provisioningService = new();
     private WinForms.NotifyIcon? _trayIcon;
     private readonly ObservableCollection<ContactEntry> _contacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _callHistory = [];
@@ -69,23 +68,9 @@ public partial class MainWindow : Window
     private ContactEntry? _editingContact;
     private IncomingCallWindow? _incomingCallWindow;
 
-    public ViewModels.MainViewModel ViewModel => (ViewModels.MainViewModel)DataContext;
-
-    public MainWindow(AppStartupConfig config, ViewModels.MainViewModel viewModel)
+    public MainWindow(AppStartupConfig config)
     {
-        _contactStore = App.Current.Services.GetRequiredService<ContactStore>();
-        _callHistoryStore = App.Current.Services.GetRequiredService<CallHistoryStore>();
-        _chatMessageStore = App.Current.Services.GetRequiredService<ChatMessageStore>();
-        _cacheService = App.Current.Services.GetRequiredService<AppCacheService>();
-        _deviceDiscoveryService = App.Current.Services.GetRequiredService<DeviceDiscoveryService>();
-        _sipRegistrationService = App.Current.Services.GetRequiredService<SipRegistrationService>();
-        _licenseService = App.Current.Services.GetRequiredService<LicenseService>();
-        _ringtonePlayer = App.Current.Services.GetRequiredService<RingtonePlayer>();
-        _updateService = App.Current.Services.GetRequiredService<UpdateService>();
-        _provisioningService = App.Current.Services.GetRequiredService<ProvisioningService>();
-
         _config = config;
-        DataContext = viewModel;
         InitializeComponent();
         ApplyStartupConfig();
         ApplyAppVersion();
@@ -635,7 +620,7 @@ public partial class MainWindow : Window
         PrivatePbxSettingsPanel.Visibility = customEndpoint ? Visibility.Visible : Visibility.Collapsed;
         PrivatePbxSettingsTextBox.Text = customEndpoint ? _config.Server : string.Empty;
         SipAlgCompatibilityCheckBox.IsChecked = _config.SipAlgCompatibilityMode;
-        ViewModel.LicenseStatus = ShortLicenseStatus(_config.LicenseStatus);
+        LicenseStatusText.Text = ShortLicenseStatus(_config.LicenseStatus);
         LicensedToText.Text = LicenseeFromStatus(_config.LicenseStatus);
         LoadApplicationSettingsControls();
         UpdateNetworkAssistanceText();
@@ -722,7 +707,7 @@ public partial class MainWindow : Window
                 LicenseLocalKey = _licenseService.LocalKey ?? _config.LicenseLocalKey
             };
             await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
-            ViewModel.LicenseStatus = ShortLicenseStatus(status);
+            LicenseStatusText.Text = ShortLicenseStatus(status);
             LicensedToText.Text = string.IsNullOrWhiteSpace(result.Licensee)
                 ? LicenseeFromStatus(status)
                 : result.Licensee;
@@ -746,7 +731,7 @@ public partial class MainWindow : Window
         HideIncomingCallSurfaces();
         _sipRegistrationService.Dispose();
         SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
-        ViewModel.LicenseStatus = "Licence inactive";
+        LicenseStatusText.Text = "Licence inactive";
         LicensedToText.Text = "Inactive";
         NoticeText.Text = "Licence inactive.";
         FooterStatusText.Text = string.IsNullOrWhiteSpace(message)
@@ -905,7 +890,7 @@ public partial class MainWindow : Window
             : text.Equals("Connecting...", StringComparison.OrdinalIgnoreCase)
                 ? "Checking"
                 : "Not connected";
-        ViewModel.ConnectionStatus = mainText;
+        MainConnectionStatusText.Text = mainText;
         MainConnectionPill.Background = (WpfBrush)new BrushConverter().ConvertFromString(background)!;
         MainConnectionStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(foreground)!;
     }
