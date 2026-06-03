@@ -11,9 +11,9 @@
     <Authors>CK Media Services</Authors>
     <Company>Chris Kendall Media</Company>
     <Product>Merlin SIP</Product>
-    <Version>1.1.19</Version>
-    <AssemblyVersion>1.1.19.0</AssemblyVersion>
-    <FileVersion>1.1.19.0</FileVersion>
+    <Version>1.1.20</Version>
+    <AssemblyVersion>1.1.20.0</AssemblyVersion>
+    <FileVersion>1.1.20.0</FileVersion>
     <Copyright>Copyright (c) CK Media Services</Copyright>
     <PackageProjectUrl>https://ckmediaservices.co.uk</PackageProjectUrl>
     <ApplicationIcon>Assets\CKMedia-Icon.ico</ApplicationIcon>
