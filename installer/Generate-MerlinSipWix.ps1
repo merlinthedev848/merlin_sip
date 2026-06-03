@@ -182,17 +182,13 @@ function Add-DirectoryContent {
     }
 }
 
-[void] $builder.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">')
+[void] $builder.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">')
 [void] $builder.AppendLine('  <Package')
 [void] $builder.AppendLine('    Name="Merlin SIP"')
 [void] $builder.AppendLine('    Manufacturer="CK Media Services"')
 [void] $builder.AppendLine("    Version=`"$productVersion`"")
 [void] $builder.AppendLine('    UpgradeCode="{8E5C2C6E-3A1E-4F83-9897-4E62EB06E0EC}"')
 [void] $builder.AppendLine('    Scope="perMachine">')
-[void] $builder.AppendLine('')
-[void] $builder.AppendLine('    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />')
-[void] $builder.AppendLine("    <WixVariable Id=`"WixUIDialogBmp`" Value=`"$(Escape-Xml (Join-Path $projectRoot 'installer\WixUIDialogBmp.bmp'))`" />")
-[void] $builder.AppendLine("    <WixVariable Id=`"WixUIBannerBmp`" Value=`"$(Escape-Xml (Join-Path $projectRoot 'installer\WixUIBannerBmp.bmp'))`" />")
 [void] $builder.AppendLine('')
 [void] $builder.AppendLine('    <MajorUpgrade DowngradeErrorMessage="A newer version of Merlin SIP is already installed." />')
 [void] $builder.AppendLine('    <MediaTemplate EmbedCab="yes" />')
