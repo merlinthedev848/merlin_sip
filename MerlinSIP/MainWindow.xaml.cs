@@ -100,10 +100,10 @@ public partial class MainWindow : Window
         await Dispatcher.InvokeAsync(LoadDeviceSelectors, DispatcherPriority.Background);
         WindowsStartupService.EnableLaunchOnWindowsStartup();
         _licenseWatchdog.Start();
+        _ = CheckForUpdatesOnStartupAsync();
         await VerifyLicenseAsync();
         _ = RegisterSipAsync();
         _connectionWatchdog.Start();
-        _ = CheckForUpdatesOnStartupAsync();
     }
 
     private void MainWindow_Closed(object? sender, EventArgs e)
@@ -1084,6 +1084,21 @@ public partial class MainWindow : Window
         PresenceButton.ContextMenu.IsOpen = true;
     }
 
+    private void SetPresenceDisplay(string status)
+    {
+        PresenceText.Text = status;
+        var colour = status.ToLowerInvariant() switch
+        {
+            "available" => "#16A34A",
+            "busy" => "#EF4444",
+            "dnd" => "#DC2626",
+            "appear away" => "#F59E0B",
+            "appear offline" => "#94A3B8",
+            _ => "#16A34A"
+        };
+        PresenceDot.Fill = (WpfBrush)new BrushConverter().ConvertFromString(colour)!;
+    }
+
     private void PresenceMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem item || item.Header is not string status)
@@ -1091,7 +1106,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        PresenceButton.Content = status;
+        SetPresenceDisplay(status);
         if (status.Equals("DND", StringComparison.OrdinalIgnoreCase) && !_dndEnabled)
         {
             DndButton_Click(sender, e);
@@ -1402,11 +1417,11 @@ public partial class MainWindow : Window
         DndButton.Content = _dndEnabled ? "DND on" : "DND";
         if (_dndEnabled)
         {
-            PresenceButton.Content = "DND";
+            SetPresenceDisplay("DND");
         }
-        else if (string.Equals(PresenceButton.Content?.ToString(), "DND", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(PresenceText.Text, "DND", StringComparison.OrdinalIgnoreCase))
         {
-            PresenceButton.Content = "Available";
+            SetPresenceDisplay("Available");
         }
     }
 
@@ -1441,7 +1456,7 @@ public partial class MainWindow : Window
         }
 
         DndButton.Content = _dndEnabled ? "DND on" : "DND";
-        PresenceButton.Content = _dndEnabled ? "DND" : "Available";
+        SetPresenceDisplay(_dndEnabled ? "DND" : "Available");
         UpdateCallControls();
         if (!_dndEnabled || !_sipRegistrationService.HasPendingIncomingCall)
         {
@@ -2031,7 +2046,7 @@ public partial class MainWindow : Window
         }
 
         _startupUpdateCheckCompleted = true;
-        await Task.Delay(TimeSpan.FromSeconds(8));
+        await Task.Delay(TimeSpan.FromSeconds(2));
 
         var result = await _updateService.CheckForUpdatesAsync();
         if (!result.UpdateAvailable || string.IsNullOrWhiteSpace(result.DownloadUrl))
