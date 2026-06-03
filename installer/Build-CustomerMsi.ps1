@@ -39,6 +39,6 @@ New-Item -ItemType Directory -Force -Path $distDir | Out-Null
     -PublishDir $publishDir `
     -OutputPath $generatedWix
 
-& $wix build $generatedWix -arch x64 -o $msiPath
+& $wix build $generatedWix -arch x64 -ext WixToolset.UI.wixext -o $msiPath
 
 Get-Item -LiteralPath $msiPath
