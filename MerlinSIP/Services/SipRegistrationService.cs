@@ -33,6 +33,10 @@ public sealed class SipRegistrationService : IDisposable
     private int _registerCseq = 1;
     private int _messageCseq = 1;
     private int _subscribeCseq = 1;
+    private int _publishCseq = 1;
+    private string _publishCallId = "";
+    private string _publishLocalTag = "";
+    private string _publishEtag = "";
     private ActiveCall? _activeCall;
     private PendingIncomingCall? _pendingIncomingCall;
     private RtpAudioSession? _audioSession;
@@ -151,6 +155,83 @@ public sealed class SipRegistrationService : IDisposable
     public void SetHeldLocal(bool held)
     {
         _audioSession?.SetHeld(held);
+    }
+
+    public async Task PublishPresenceAsync(string status, CancellationToken cancellationToken = default)
+    {
+        if (!_registered || _config is null || string.IsNullOrEmpty(_domain))
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_publishCallId))
+        {
+            _publishCallId = Guid.NewGuid().ToString("N");
+            _publishLocalTag = Guid.NewGuid().ToString("N")[..12];
+        }
+
+        var publishCseq = _publishCseq++;
+        
+        var basicStatus = status.Equals("Offline", StringComparison.OrdinalIgnoreCase) ? "closed" : "open";
+        
+        var contentBuilder = new StringBuilder();
+        contentBuilder.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        contentBuilder.AppendLine($"<presence xmlns=\"urn:ietf:params:xml:ns:pidf\" entity=\"sip:{_config.Extension}@{_domain}\">");
+        contentBuilder.AppendLine($"  <tuple id=\"{_config.Extension}\">");
+        contentBuilder.AppendLine("    <status>");
+        contentBuilder.AppendLine($"      <basic>{basicStatus}</basic>");
+        contentBuilder.AppendLine("    </status>");
+        contentBuilder.AppendLine($"    <note>{status}</note>");
+        contentBuilder.AppendLine("  </tuple>");
+        contentBuilder.Append("</presence>");
+        
+        var content = contentBuilder.ToString();
+
+        var publishRequest = BuildPublish(_config.Extension, _publishCallId, _publishLocalTag, publishCseq, content, null);
+        
+        try
+        {
+            var response = await SendAndWaitFromListenerAsync(publishRequest, cancellationToken);
+            if (response.Code is >= 200 and < 300)
+            {
+                if (response.Headers.TryGetValue("sip-etag", out var etag))
+                {
+                    _publishEtag = etag;
+                }
+            }
+            else if (response.Code == 412)
+            {
+                _publishEtag = "";
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write($"Publish presence failed: {ex.Message}");
+        }
+    }
+
+    private string BuildPublish(string target, string callId, string localTag, int cseq, string content, string? authorization)
+    {
+        var sipIfMatch = string.IsNullOrEmpty(_publishEtag) ? "" : $"\r\nSIP-If-Match: {_publishEtag}";
+        var authHeader = authorization is null ? "" : $"\r\nProxy-Authorization: {authorization}";
+
+        var contentLength = Encoding.UTF8.GetByteCount(content);
+
+        var sb = new StringBuilder();
+        sb.Append($"PUBLISH sip:{target}@{_domain} SIP/2.0\r\n");
+        sb.Append($"Via: SIP/2.0/{SipTransportName} {_localAddress}:{_localPort};branch=z9hG4bK{Guid.NewGuid():N}\r\n");
+        sb.Append("Max-Forwards: 70\r\n");
+        sb.Append($"To: <sip:{target}@{_domain}>\r\n");
+        sb.Append($"From: <sip:{_config!.Extension}@{_domain}>;tag={localTag}\r\n");
+        sb.Append($"Call-ID: {callId}\r\n");
+        sb.Append($"CSeq: {cseq} PUBLISH\r\n");
+        sb.Append("Event: presence\r\n");
+        sb.Append("Expires: 3600\r\n");
+        sb.Append($"Content-Type: application/pidf+xml{sipIfMatch}{authHeader}\r\n");
+        sb.Append($"Content-Length: {contentLength}\r\n\r\n");
+        sb.Append(content);
+        
+        return sb.ToString();
     }
 
     public async Task<SipCallResult> SendDtmfAsync(char digit, CancellationToken cancellationToken = default)

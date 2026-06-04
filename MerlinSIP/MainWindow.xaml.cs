@@ -637,20 +637,12 @@ public partial class MainWindow : Window
         MobileNumberTextBox.Text = _config.MobileNumber;
         SelectComboBoxItem(DndModeComboBox, _config.DndMode);
         SelectComboBoxItem(DeclineActionComboBox, _config.DeclineIncomingAction);
-        CallWaitingCheckBox.IsChecked = _config.CallWaitingEnabled;
         SelectComboBoxItem(InternalBusyActionComboBox, _config.InternalBusyAction);
         SelectComboBoxItem(InternalNoAnswerTimeoutComboBox, $"{_config.InternalNoAnswerSeconds} seconds");
         SelectComboBoxItem(ExternalBusyActionComboBox, _config.ExternalBusyAction);
         SelectComboBoxItem(ExternalNoAnswerTimeoutComboBox, $"{_config.ExternalNoAnswerSeconds} seconds");
         QueuePickupCheckBox.IsChecked = _config.QueuePickupEnabled;
-        FlashCallStateCheckBox.IsChecked = _config.FlashCallState;
-        SelectComboBoxItem(MaxCallsComboBox, _config.MaxConcurrentCalls.ToString());
-        ShowCallStatsCheckBox.IsChecked = _config.ShowCallStatistics;
-        SingleClickTransferCheckBox.IsChecked = _config.SingleClickBlindTransfer;
         CombineContactsCheckBox.IsChecked = _config.CombineContactsInSearch;
-        SelectComboBoxItem(IncomingNotificationDurationComboBox, $"{_config.IncomingNotificationSeconds} seconds");
-        SelectComboBoxItem(FailedCallTimeoutComboBox, $"{_config.FailedCallDisplaySeconds} seconds");
-        FavouriteTransferCheckBox.IsChecked = _config.ShowFavouriteExtensionsOnTransfer;
     }
 
     private static void SelectComboBoxItem(System.Windows.Controls.ComboBox comboBox, string value)
@@ -1891,14 +1883,16 @@ public partial class MainWindow : Window
         SettingsOverlay.Visibility = Visibility.Collapsed;
     }
 
-    private void SettingsAccountButton_Click(object sender, RoutedEventArgs e)
+    private async void SettingsAccountButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsTabs.SelectedItem = SettingsAccountTab;
+        await RefreshConnectionDiagnosticsAsync();
+        await EnsureConnectionReadyAsync();
     }
 
-    private void SettingsPreferencesButton_Click(object sender, RoutedEventArgs e)
+    private void SettingsGeneralButton_Click(object sender, RoutedEventArgs e)
     {
-        SettingsTabs.SelectedItem = SettingsPreferencesTab;
+        SettingsTabs.SelectedItem = SettingsGeneralTab;
     }
 
     private void SettingsHandlingButton_Click(object sender, RoutedEventArgs e)
@@ -1909,23 +1903,6 @@ public partial class MainWindow : Window
     private void SettingsDevicesButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsTabs.SelectedItem = SettingsDevicesTab;
-    }
-
-    private void SettingsQueuesButton_Click(object sender, RoutedEventArgs e)
-    {
-        SettingsTabs.SelectedItem = SettingsQueuesTab;
-    }
-
-    private void SettingsAdvancedButton_Click(object sender, RoutedEventArgs e)
-    {
-        SettingsTabs.SelectedItem = SettingsAdvancedTab;
-    }
-
-    private async void SettingsStatusButton_Click(object sender, RoutedEventArgs e)
-    {
-        SettingsTabs.SelectedItem = SettingsStatusTab;
-        await RefreshConnectionDiagnosticsAsync();
-        await EnsureConnectionReadyAsync();
     }
 
     private async void SaveNetworkModeButton_Click(object sender, RoutedEventArgs e)
@@ -2069,7 +2046,6 @@ public partial class MainWindow : Window
             MobileNumber = MobileNumberTextBox.Text.Trim(),
             DndMode = ComboBoxText(DndModeComboBox, "Off"),
             DeclineIncomingAction = ComboBoxText(DeclineActionComboBox, "Send busy"),
-            CallWaitingEnabled = CallWaitingCheckBox.IsChecked == true,
             InternalBusyAction = ComboBoxText(InternalBusyActionComboBox, "Send busy"),
             InternalNoAnswerSeconds = ComboBoxSeconds(InternalNoAnswerTimeoutComboBox, 90),
             InternalNoAnswerAction = "Send busy",
@@ -2077,14 +2053,7 @@ public partial class MainWindow : Window
             ExternalNoAnswerSeconds = ComboBoxSeconds(ExternalNoAnswerTimeoutComboBox, 90),
             ExternalNoAnswerAction = "Send busy",
             QueuePickupEnabled = QueuePickupCheckBox.IsChecked == true,
-            FlashCallState = FlashCallStateCheckBox.IsChecked == true,
-            MaxConcurrentCalls = int.TryParse(ComboBoxText(MaxCallsComboBox, "2"), out var maxCalls) ? maxCalls : 2,
-            ShowCallStatistics = ShowCallStatsCheckBox.IsChecked == true,
-            SingleClickBlindTransfer = SingleClickTransferCheckBox.IsChecked == true,
-            CombineContactsInSearch = CombineContactsCheckBox.IsChecked == true,
-            IncomingNotificationSeconds = ComboBoxSeconds(IncomingNotificationDurationComboBox, 30),
-            FailedCallDisplaySeconds = ComboBoxSeconds(FailedCallTimeoutComboBox, 5),
-            ShowFavouriteExtensionsOnTransfer = FavouriteTransferCheckBox.IsChecked == true
+            CombineContactsInSearch = CombineContactsCheckBox.IsChecked == true
         };
 
         await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
@@ -2504,5 +2473,14 @@ public partial class MainWindow : Window
         return DateTimeOffset.TryParse(value, out var parsed)
             ? parsed
             : DateTimeOffset.MinValue;
+    }
+
+    private void ContactTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            SaveContactButton_Click(null, null);
+            e.Handled = true;
+        }
     }
 }
