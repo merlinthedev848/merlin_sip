@@ -1084,7 +1084,7 @@ public sealed class SipRegistrationService : IDisposable
             throw new InvalidOperationException("UDP SIP socket is not connected.");
         }
 
-        await SendToServerAsync(payload, cancellationToken);
+        await _client!.SendAsync(payload, GetRemoteSipEndPoint(), cancellationToken);
     }
 
     private async Task SendToRemoteAsync(byte[] payload, IPEndPoint remoteEndPoint, CancellationToken cancellationToken)
