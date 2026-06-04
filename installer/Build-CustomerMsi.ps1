@@ -25,7 +25,7 @@ if ([string]::IsNullOrWhiteSpace($version)) {
     throw "Unable to read product version from '$projectFile'."
 }
 
-& $dotnet publish $projectFile /p:PublishProfile=$publishProfile
+& $dotnet publish $projectFile -c Release -r win-x64 --self-contained false
 
 $publishDir = Join-Path $projectDir "MerlinSIP\bin\$Configuration\net8.0-windows\$RuntimeIdentifier\publish"
 $generatedWix = Join-Path $projectDir 'installer\MerlinSIP.generated.wxs'
@@ -39,6 +39,6 @@ New-Item -ItemType Directory -Force -Path $distDir | Out-Null
     -PublishDir $publishDir `
     -OutputPath $generatedWix
 
-& $wix build $generatedWix -arch x64 -o $msiPath
+& $wix build $generatedWix -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -o $msiPath
 
 Get-Item -LiteralPath $msiPath

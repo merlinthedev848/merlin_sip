@@ -182,7 +182,7 @@ function Add-DirectoryContent {
     }
 }
 
-[void] $builder.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">')
+[void] $builder.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">')
 [void] $builder.AppendLine('  <Package')
 [void] $builder.AppendLine('    Name="Merlin SIP"')
 [void] $builder.AppendLine('    Manufacturer="CK Media Services"')
@@ -235,7 +235,15 @@ Add-DirectoryContent -Builder $builder -RelativeDir '' -Indent 10
 [void] $builder.AppendLine('')
 [void] $builder.AppendLine('    <StandardDirectory Id="DesktopFolder" />')
 [void] $builder.AppendLine('')
-[void] $builder.AppendLine('    <Feature Id="MainFeature" Title="Merlin SIP" Level="1">')
+[void] $builder.AppendLine('    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch Merlin SIP" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#MerlinSipExe]" />
+    <CustomAction Id="LaunchApplication" BinaryRef="Wix4UtilCA_X64" DllEntry="WixShellExec" Impersonate="yes" />
+    <UI>
+        <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
+    <Feature Id="MainFeature" Title="Merlin SIP" Level="1">')
 [void] $builder.AppendLine('      <ComponentRef Id="MerlinSipExecutable" />')
 foreach ($componentId in $componentIds) {
     [void] $builder.AppendLine("      <ComponentRef Id=`"$componentId`" />")

@@ -2182,7 +2182,8 @@ public partial class MainWindow : Window
         {
             try
             {
-                var installerPath = await _updateService.DownloadInstallerAsync(result);
+                var progress = new Progress<int>(percent => { FooterStatusText.Text = $"Downloading update... {percent}%"; });
+                var installerPath = await _updateService.DownloadInstallerAsync(result, progress);
                 StartInstallerAndRestart(installerPath);
                 System.Windows.Application.Current.Shutdown();
             }
