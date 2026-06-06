@@ -65,7 +65,7 @@
             <Setter Property="Margin" Value="5" />
             <Setter Property="FontSize" Value="21" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="#F3F4F6" />
+            <Setter Property="Foreground" Value="#111827" />
             <Setter Property="Background" Value="{StaticResource DialFaceBrush}" />
             <Setter Property="BorderBrush" Value="#D7E3EF" />
             <Setter Property="BorderThickness" Value="1" />
@@ -114,7 +114,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="Card" Padding="14" CornerRadius="8" Background="{StaticResource SurfaceBrush}" BorderBrush="#27272A" BorderThickness="1">
+                        <Border x:Name="Card" Padding="14" CornerRadius="8" Background="{StaticResource SurfaceBrush}" BorderBrush="#D7E1EC" BorderThickness="1">
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="12" ShadowDepth="4" Opacity="0.08" Color="#07111E" />
                             </Border.Effect>
@@ -128,7 +128,7 @@
                                 <Setter TargetName="Card" Property="BorderBrush" Value="#AFC2D8" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Card" Property="Background" Value="#181A1F" />
+                                <Setter TargetName="Card" Property="Background" Value="#EEF4FB" />
                                 <Setter TargetName="Card" Property="BorderBrush" Value="#8FB3D9" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -162,7 +162,7 @@
         </Style>
 
         <Style TargetType="{x:Type MenuItem}">
-            <Setter Property="Foreground" Value="#F3F4F6" />
+            <Setter Property="Foreground" Value="#111827" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="Padding" Value="12,9" />
@@ -244,7 +244,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="Merlin SIP" Foreground="#F3F4F6" FontSize="34" FontWeight="SemiBold" />
+                    <TextBlock Text="Merlin SIP" Foreground="#111827" FontSize="34" FontWeight="SemiBold" />
                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                         <TextBlock x:Name="NoticeText" Text="Ready." Foreground="#5D6B7C" FontSize="14" VerticalAlignment="Center" />
                         <Border x:Name="MainConnectionPill" Background="#FFF1D6" CornerRadius="7" Padding="9,4" MinWidth="86" Margin="12,0,0,0" VerticalAlignment="Center">
@@ -257,7 +257,7 @@
                         Width="430"
                         HorizontalAlignment="Center"
                         Background="#FFFFFF"
-                        BorderBrush="#27272A"
+                        BorderBrush="#D7E1EC"
                         BorderThickness="1"
                         CornerRadius="8"
                         Padding="12,8"
@@ -271,7 +271,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Search or dial"
-                                   Foreground="#A1A1AA"
+                                   Foreground="#64748B"
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center" />
                         <TextBox Grid.Column="1"
@@ -280,7 +280,7 @@
                                  Padding="10,6"
                                  VerticalAlignment="Center"
                                  BorderBrush="#E2E8F0"
-                                 Background="#181A1F"
+                                 Background="#F8FBFE"
                                  ToolTip="Type a number or contact name, then press Enter"
                                  TextChanged="GlobalSearchTextBox_TextChanged"
                                  KeyDown="GlobalSearchTextBox_KeyDown" />
@@ -345,9 +345,9 @@
                                         <TextBlock x:Name="CallTimerText" Text="Inactive" FontWeight="SemiBold" Foreground="#9B1C1C" />
                                     </Border>
                                     <StackPanel>
-                                        <TextBlock Text="Dial" Foreground="#A1A1AA" FontWeight="Medium" />
-                                        <TextBlock x:Name="DestinationPreviewText" Text="Enter a number" Foreground="#F3F4F6" FontSize="30" FontWeight="SemiBold" />
-                                        <TextBlock x:Name="CallerLookupText" Text="No contact selected" Foreground="#A1A1AA" />
+                                        <TextBlock Text="Dial" Foreground="#64748B" FontWeight="Medium" />
+                                        <TextBlock x:Name="DestinationPreviewText" Text="Enter a number" Foreground="#111827" FontSize="30" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="CallerLookupText" Text="No contact selected" Foreground="#64748B" />
                                     </StackPanel>
                                 </DockPanel>
 
@@ -356,7 +356,7 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="94" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="DestinationTextBox" FontSize="18" Padding="14,12" BorderBrush="#27272A" Background="#F9FBFE" TextChanged="DestinationTextBox_TextChanged" KeyDown="DestinationTextBox_KeyDown" Margin="0,0,10,0" />
+                                    <TextBox x:Name="DestinationTextBox" FontSize="18" Padding="14,12" BorderBrush="#D7E1EC" Background="#F9FBFE" TextChanged="DestinationTextBox_TextChanged" KeyDown="DestinationTextBox_KeyDown" Margin="0,0,10,0" />
                                     <Button Grid.Column="1" Content="Clear" Style="{StaticResource SoftButton}" Click="ClearDestinationButton_Click" />
                                 </Grid>
 
@@ -401,7 +401,7 @@
                                 </Grid.RowDefinitions>
                                 <DockPanel Margin="0,0,0,14">
                                     <StackPanel>
-                                        <TextBlock Text="Directory" Foreground="#F3F4F6" FontSize="24" FontWeight="SemiBold" />
+                                        <TextBlock Text="Directory" Foreground="#111827" FontSize="24" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </DockPanel>
                                 <UniformGrid Grid.Row="1" Columns="2" HorizontalAlignment="Left" Width="260" Margin="0,0,0,12" VerticalAlignment="Top">
@@ -427,10 +427,10 @@
                                                                 <ColumnDefinition Width="95" />
                                                                 <ColumnDefinition Width="90" />
                                                             </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="Name" FontWeight="SemiBold" Foreground="#A1A1AA" Margin="12,8" />
-                                                            <TextBlock Grid.Column="1" Text="Number" FontWeight="SemiBold" Foreground="#A1A1AA" Margin="8" />
-                                                            <TextBlock Grid.Column="2" Text="Duration" FontWeight="SemiBold" Foreground="#A1A1AA" HorizontalAlignment="Center" Margin="8" />
-                                                            <TextBlock Grid.Column="3" Text="Status" FontWeight="SemiBold" Foreground="#A1A1AA" HorizontalAlignment="Center" Margin="8" />
+                                                            <TextBlock Text="Name" FontWeight="SemiBold" Foreground="#64748B" Margin="12,8" />
+                                                            <TextBlock Grid.Column="1" Text="Number" FontWeight="SemiBold" Foreground="#64748B" Margin="8" />
+                                                            <TextBlock Grid.Column="2" Text="Duration" FontWeight="SemiBold" Foreground="#64748B" HorizontalAlignment="Center" Margin="8" />
+                                                            <TextBlock Grid.Column="3" Text="Status" FontWeight="SemiBold" Foreground="#64748B" HorizontalAlignment="Center" Margin="8" />
                                                         </Grid>
                                                         <ScrollViewer Focusable="False">
                                                             <ItemsPresenter />
@@ -440,7 +440,7 @@
                                             </ListBox.Template>
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid Margin="0,0,0,1" Background="#181A1F">
+                                                    <Grid Margin="0,0,0,1" Background="#F8FBFE">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="1.2*" />
                                                             <ColumnDefinition Width="1*" />
@@ -448,12 +448,12 @@
                                                             <ColumnDefinition Width="90" />
                                                         </Grid.ColumnDefinitions>
                                                         <StackPanel Grid.Column="0" Margin="12,10">
-                                                            <TextBlock Text="{Binding Name}" Foreground="#F3F4F6" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{Binding Direction}" Foreground="#A1A1AA" FontSize="12" />
+                                                            <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Direction}" Foreground="#64748B" FontSize="12" />
                                                         </StackPanel>
-                                                        <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#A1A1AA" VerticalAlignment="Center" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Grid.Column="2" Text="{Binding Duration}" Foreground="#A1A1AA" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                                        <Border Grid.Column="3" Background="#181A1F" CornerRadius="6" Padding="6,3" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                        <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#64748B" VerticalAlignment="Center" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding Duration}" Foreground="#64748B" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                                        <Border Grid.Column="3" Background="#EEF4FB" CornerRadius="6" Padding="6,3" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
                                                             <TextBlock Text="{Binding Result}" Foreground="#2750A7" FontWeight="SemiBold" FontSize="12" />
                                                         </Border>
                                                     </Grid>
@@ -474,10 +474,10 @@
                                                                 <ColumnDefinition Width="0.8*" />
                                                                 <ColumnDefinition Width="0.9*" />
                                                             </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="Name" FontWeight="SemiBold" Foreground="#A1A1AA" Margin="12,8" />
-                                                            <TextBlock Grid.Column="1" Text="Company" FontWeight="SemiBold" Foreground="#A1A1AA" Margin="8" />
-                                                            <TextBlock Grid.Column="2" Text="Number" FontWeight="SemiBold" Foreground="#A1A1AA" Margin="8" />
-                                                            <TextBlock Grid.Column="3" Text="BLF" FontWeight="SemiBold" Foreground="#A1A1AA" Margin="8" HorizontalAlignment="Center" />
+                                                            <TextBlock Text="Name" FontWeight="SemiBold" Foreground="#64748B" Margin="12,8" />
+                                                            <TextBlock Grid.Column="1" Text="Company" FontWeight="SemiBold" Foreground="#64748B" Margin="8" />
+                                                            <TextBlock Grid.Column="2" Text="Number" FontWeight="SemiBold" Foreground="#64748B" Margin="8" />
+                                                            <TextBlock Grid.Column="3" Text="BLF" FontWeight="SemiBold" Foreground="#64748B" Margin="8" HorizontalAlignment="Center" />
                                                         </Grid>
                                                         <ScrollViewer Focusable="False">
                                                             <ItemsPresenter />
@@ -487,15 +487,15 @@
                                             </ListBox.Template>
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid Margin="0,0,0,1" Background="#181A1F">
+                                                    <Grid Margin="0,0,0,1" Background="#F8FBFE">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="1.2*" />
                                                             <ColumnDefinition Width="1*" />
                                                             <ColumnDefinition Width="0.8*" />
                                                             <ColumnDefinition Width="0.9*" />
                                                         </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="{Binding Name}" Foreground="#F3F4F6" FontWeight="SemiBold" Margin="12,10" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Grid.Column="1" Text="{Binding Company}" Foreground="#A1A1AA" Margin="8,10" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="SemiBold" Margin="12,10" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Company}" Foreground="#64748B" Margin="8,10" TextTrimming="CharacterEllipsis" />
                                                         <TextBlock Grid.Column="2" Text="{Binding Number}" Foreground="#0E987E" FontWeight="SemiBold" Margin="8,10" TextTrimming="CharacterEllipsis" />
                                                         <Border Grid.Column="3" Background="{Binding PresenceBackground}" CornerRadius="6" Padding="6,3" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                             <StackPanel Orientation="Horizontal">
@@ -530,7 +530,7 @@
                                 <DockPanel Margin="0,0,0,16">
                                     <Button DockPanel.Dock="Right" Content="Call selected" Style="{StaticResource SoftButton}" Width="130" Click="UseSelectedContactButton_Click" />
                                     <StackPanel>
-                                        <TextBlock Text="Contacts" FontSize="28" FontWeight="SemiBold" Foreground="#F3F4F6" />
+                                        <TextBlock Text="Contacts" FontSize="28" FontWeight="SemiBold" Foreground="#111827" />
                                     </StackPanel>
                                 </DockPanel>
                                 <ListBox x:Name="PhonebookContactsListView" Grid.Row="1" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource ContactCard}" SelectionChanged="PhonebookContactsListView_SelectionChanged" MouseDoubleClick="ContactsListView_MouseDoubleClick">
@@ -544,8 +544,8 @@
                                                     </StackPanel>
                                                 </Border>
                                                 <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" Foreground="#F3F4F6" FontSize="17" FontWeight="SemiBold" />
-                                                    <TextBlock Text="{Binding Company}" Foreground="#A1A1AA" />
+                                                    <TextBlock Text="{Binding Name}" Foreground="#111827" FontSize="17" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Company}" Foreground="#64748B" />
                                                     <TextBlock Text="{Binding Notes}" Foreground="#94A3B8" FontSize="12" />
                                                 </StackPanel>
                                             </DockPanel>
@@ -557,14 +557,14 @@
 
                         <Border Grid.Column="1" Style="{StaticResource Surface}">
                             <StackPanel>
-                                <TextBlock Text="Contact details" Foreground="#F3F4F6" FontSize="24" FontWeight="SemiBold" />
-                                <TextBlock Text="Name" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,16,0,4" />
+                                <TextBlock Text="Contact details" Foreground="#111827" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock Text="Name" Foreground="#64748B" FontWeight="Medium" Margin="0,16,0,4" />
                                 <TextBox x:Name="ContactNameTextBox" KeyDown="ContactTextBox_KeyDown" />
-                                <TextBlock Text="Number" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,12,0,4" />
+                                <TextBlock Text="Number" Foreground="#64748B" FontWeight="Medium" Margin="0,12,0,4" />
                                 <TextBox x:Name="ContactNumberTextBox" KeyDown="ContactTextBox_KeyDown" />
-                                <TextBlock Text="Company" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,12,0,4" />
+                                <TextBlock Text="Company" Foreground="#64748B" FontWeight="Medium" Margin="0,12,0,4" />
                                 <TextBox x:Name="ContactCompanyTextBox" KeyDown="ContactTextBox_KeyDown" />
-                                <TextBlock Text="Notes" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,12,0,4" />
+                                <TextBlock Text="Notes" Foreground="#64748B" FontWeight="Medium" Margin="0,12,0,4" />
                                 <TextBox x:Name="ContactNotesTextBox" AcceptsReturn="True" Height="96" TextWrapping="Wrap" />
                                 <Button Content="Save contact" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Margin="0,18,0,10" Click="SaveContactButton_Click" />
                                 <Button Content="Delete selected" Style="{StaticResource SoftButton}" Click="DeleteContactButton_Click" />
@@ -583,13 +583,13 @@
                             <DockPanel Margin="0,0,0,16">
                                 <Button DockPanel.Dock="Right" Content="Clear history" Style="{StaticResource SoftButton}" Width="130" Click="ClearHistoryButton_Click" />
                                 <StackPanel>
-                                    <TextBlock Text="Calls" FontSize="28" FontWeight="SemiBold" Foreground="#F3F4F6" />
+                                    <TextBlock Text="Calls" FontSize="28" FontWeight="SemiBold" Foreground="#111827" />
                                 </StackPanel>
                             </DockPanel>
                             <ListBox x:Name="CallHistoryListView" Grid.Row="1" BorderThickness="0" Background="Transparent" MouseDoubleClick="CallHistoryListView_MouseDoubleClick">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Margin="0,0,0,1" Background="#181A1F">
+                                        <Grid Margin="0,0,0,1" Background="#F8FBFE">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="1.25*" />
                                                 <ColumnDefinition Width="1*" />
@@ -598,13 +598,13 @@
                                                 <ColumnDefinition Width="100" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Margin="12,10">
-                                                <TextBlock Text="{Binding Name}" Foreground="#F3F4F6" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Direction}" Foreground="#A1A1AA" FontSize="12" />
+                                                <TextBlock Text="{Binding Name}" Foreground="#111827" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Direction}" Foreground="#64748B" FontSize="12" />
                                             </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#A1A1AA" VerticalAlignment="Center" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Grid.Column="2" Text="{Binding StartedAt}" Foreground="#A1A1AA" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Grid.Column="3" Text="{Binding Duration}" Foreground="#A1A1AA" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                            <Border Grid.Column="4" Background="#181A1F" CornerRadius="6" Padding="6,3" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Grid.Column="1" Text="{Binding Number}" Foreground="#64748B" VerticalAlignment="Center" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Text="{Binding StartedAt}" Foreground="#64748B" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Text="{Binding Duration}" Foreground="#64748B" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                            <Border Grid.Column="4" Background="#EEF4FB" CornerRadius="6" Padding="6,3" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
                                                 <TextBlock Text="{Binding Result}" Foreground="#2750A7" FontWeight="SemiBold" FontSize="12" />
                                             </Border>
                                         </Grid>
@@ -641,35 +641,35 @@
                                             Padding="8,0"
                                             Click="ClearChatThreadButton_Click" />
                                     <StackPanel>
-                                        <TextBlock x:Name="ChatThreadTitleText" Text="Choose a conversation" FontSize="28" FontWeight="SemiBold" Foreground="#F3F4F6" />
-                                        <TextBlock x:Name="ChatThreadSubtitleText" Text="" Foreground="#A1A1AA" />
+                                        <TextBlock x:Name="ChatThreadTitleText" Text="Choose a conversation" FontSize="28" FontWeight="SemiBold" Foreground="#111827" />
+                                        <TextBlock x:Name="ChatThreadSubtitleText" Text="" Foreground="#64748B" />
                                     </StackPanel>
                                 </DockPanel>
                                 <ListBox x:Name="ChatMessagesListView" Grid.Row="1" BorderThickness="0" Background="Transparent">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#181A1F" BorderBrush="#EAF1F8" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,8">
+                                            <Border Background="#F8FBFE" BorderBrush="#EAF1F8" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,8">
                                                 <Grid>
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition Height="Auto" />
                                                         <RowDefinition Height="Auto" />
                                                     </Grid.RowDefinitions>
                                                     <DockPanel>
-                                                        <Border DockPanel.Dock="Right" Background="#181A1F" CornerRadius="7" Padding="8,5">
+                                                        <Border DockPanel.Dock="Right" Background="#F8FBFE" CornerRadius="7" Padding="8,5">
                                                             <TextBlock Text="{Binding Result}" Foreground="#2750A7" FontWeight="SemiBold" FontSize="12" />
                                                         </Border>
                                                         <StackPanel>
-                                                            <TextBlock Text="{Binding Name}" Foreground="#F3F4F6" FontWeight="SemiBold" />
-                                                            <TextBlock Text="{Binding SentAt}" Foreground="#A1A1AA" FontSize="12" />
+                                                            <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="SemiBold" />
+                                                            <TextBlock Text="{Binding SentAt}" Foreground="#64748B" FontSize="12" />
                                                         </StackPanel>
                                                     </DockPanel>
-                                                    <TextBlock Grid.Row="1" Text="{Binding Message}" Foreground="#D4D4D8" TextWrapping="Wrap" Margin="0,10,0,0" />
+                                                    <TextBlock Grid.Row="1" Text="{Binding Message}" Foreground="#334155" TextWrapping="Wrap" Margin="0,10,0,0" />
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
-                                <Border Grid.Row="2" Background="#181A1F" BorderBrush="#27272A" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,14,0,0">
+                                <Border Grid.Row="2" Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,14,0,0">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -704,18 +704,18 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <StackPanel Margin="0,0,0,16">
-                                    <TextBlock Text="Conversations" FontSize="24" FontWeight="SemiBold" Foreground="#F3F4F6" />
+                                    <TextBlock Text="Conversations" FontSize="24" FontWeight="SemiBold" Foreground="#111827" />
                                 </StackPanel>
                                 <TextBox x:Name="MessageToTextBox" Visibility="Collapsed" />
                                 <ListBox x:Name="ChatContactsListView" Grid.Row="1" BorderThickness="0" Background="Transparent" SelectionChanged="ChatContactsListView_SelectionChanged" MouseDoubleClick="ChatContactsListView_MouseDoubleClick">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Background="#181A1F" Margin="0,0,0,1">
+                                            <Grid Background="#F8FBFE" Margin="0,0,0,1">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="135" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Name}" Foreground="#F3F4F6" FontWeight="SemiBold" Margin="10,8" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="SemiBold" Margin="10,8" TextTrimming="CharacterEllipsis" />
                                                 <Border Grid.Column="1" Background="{Binding PresenceBackground}" CornerRadius="6" Padding="6,3" Margin="8" HorizontalAlignment="Left" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal">
                                                         <Ellipse Width="7" Height="7" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" Margin="0,0,5,0" />
@@ -732,11 +732,11 @@
                 </TabItem>
             </TabControl>
 
-            <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" BorderBrush="#27272A" BorderThickness="1" CornerRadius="8" Padding="14,11" Margin="0,18,0,0">
+            <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14,11" Margin="0,18,0,0">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="20" ShadowDepth="8" Opacity="0.14" Color="#07111E" />
                 </Border.Effect>
-                <TextBlock x:Name="FooterStatusText" Text="Ready." Foreground="#A1A1AA" FontWeight="Medium" />
+                <TextBlock x:Name="FooterStatusText" Text="Ready." Foreground="#64748B" FontWeight="Medium" />
             </Border>
         </Grid>
 
@@ -751,7 +751,7 @@
                         <DockPanel Margin="0,0,0,18">
                             <Button DockPanel.Dock="Right" Content="Close" Style="{StaticResource SoftButton}" Width="90" Click="CloseSettingsButton_Click" />
                             <StackPanel>
-                                <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" Foreground="#F3F4F6" />
+                                <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" Foreground="#111827" />
                             </StackPanel>
                         </DockPanel>
 
@@ -771,7 +771,7 @@
 
                             <TabItem x:Name="SettingsAccountTab" Header="Account">
                                 <StackPanel>
-                                    <TextBlock Text="Provisioning code" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Provisioning code" Foreground="#64748B" FontWeight="Medium" />
                                     <Grid Margin="0,5,0,18">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -791,15 +791,15 @@
                                     </Grid>
 
                                     <StackPanel x:Name="PrivatePbxSettingsPanel" Visibility="Collapsed">
-                                        <TextBlock Text="PBX server" Foreground="#A1A1AA" FontWeight="Medium" />
+                                        <TextBlock Text="PBX server" Foreground="#64748B" FontWeight="Medium" />
                                         <TextBox x:Name="PrivatePbxSettingsTextBox" Margin="0,5,0,12" />
                                     </StackPanel>
 
-                                    <TextBlock Text="User / extension" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="User / extension" Foreground="#64748B" FontWeight="Medium" />
                                     <TextBox x:Name="ExtensionTextBox" Margin="0,5,0,12" />
-                                    <TextBlock Text="Auth username" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Auth username" Foreground="#64748B" FontWeight="Medium" />
                                     <TextBox x:Name="UsernameTextBox" Margin="0,5,0,12" />
-                                    <TextBlock Text="Password" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Password" Foreground="#64748B" FontWeight="Medium" />
                                     <PasswordBox x:Name="PasswordBox" Margin="0,5,0,18" />
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -814,16 +814,16 @@
 
                             <TabItem x:Name="SettingsGeneralTab" Header="Preferences">
                                 <StackPanel>
-                                    <TextBlock Text="Call Preferences" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                    <TextBlock Text="Mobile number" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Call Preferences" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <TextBlock Text="Mobile number" Foreground="#64748B" FontWeight="Medium" />
                                     <TextBox x:Name="MobileNumberTextBox" Margin="0,5,0,12" />
-                                    <TextBlock Text="DND mode" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="DND mode" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="DndModeComboBox" Margin="0,5,0,12">
                                         <ComboBoxItem Content="Off" />
                                         <ComboBoxItem Content="Reject calls" />
                                         <ComboBoxItem Content="Silent ringing" />
                                     </ComboBox>
-                                    <TextBlock Text="When I decline a call" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="When I decline a call" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="DeclineActionComboBox" Margin="0,5,0,12">
                                         <ComboBoxItem Content="Send busy" />
                                     </ComboBox>
@@ -834,24 +834,24 @@
 
                             <TabItem x:Name="SettingsHandlingTab" Header="Handling">
                                 <StackPanel>
-                                    <TextBlock Text="Call Handling" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                    <TextBlock Text="Internal calls when busy" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Call Handling" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <TextBlock Text="Internal calls when busy" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="InternalBusyActionComboBox" Margin="0,5,0,12">
                                         <ComboBoxItem Content="Send busy" />
                                         <ComboBoxItem Content="Keep ringing" />
                                     </ComboBox>
-                                    <TextBlock Text="Internal no-answer timeout" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Internal no-answer timeout" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="InternalNoAnswerTimeoutComboBox" Margin="0,5,0,12">
                                         <ComboBoxItem Content="30 seconds" />
                                         <ComboBoxItem Content="60 seconds" />
                                         <ComboBoxItem Content="90 seconds" />
                                     </ComboBox>
-                                    <TextBlock Text="External calls when busy" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="External calls when busy" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="ExternalBusyActionComboBox" Margin="0,5,0,12">
                                         <ComboBoxItem Content="Send busy" />
                                         <ComboBoxItem Content="Keep ringing" />
                                     </ComboBox>
-                                    <TextBlock Text="External no-answer timeout" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="External no-answer timeout" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="ExternalNoAnswerTimeoutComboBox" Margin="0,5,0,12">
                                         <ComboBoxItem Content="30 seconds" />
                                         <ComboBoxItem Content="60 seconds" />
@@ -863,13 +863,13 @@
 
                             <TabItem x:Name="SettingsDevicesTab" Header="Devices">
                                 <StackPanel>
-                                    <TextBlock Text="Audio input" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Audio input" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="AudioInputComboBox" Margin="0,5,0,12" />
-                                    <TextBlock Text="Audio output" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Audio output" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="AudioOutputComboBox" Margin="0,5,0,12" />
-                                    <TextBlock Text="Ringtone" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Ringtone" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="RingtoneComboBox" DisplayMemberPath="Name" Margin="0,5,0,12" />
-                                    <Border Background="#181A1F" BorderBrush="#27272A" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
+                                    <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto" />
@@ -878,7 +878,7 @@
                                             </Grid.RowDefinitions>
                                             <DockPanel Margin="0,0,0,12">
                                                 <Button DockPanel.Dock="Right" Content="Test tone" Style="{StaticResource SoftButton}" Width="105" Click="TestToneButton_Click" />
-                                                <TextBlock Text="Audio levels" Foreground="#F3F4F6" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <TextBlock Text="Audio levels" Foreground="#111827" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             </DockPanel>
                                             <Grid Grid.Row="1" Margin="0,0,0,10">
                                                 <Grid.ColumnDefinitions>
@@ -886,9 +886,9 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="54" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Headphones" Foreground="#A1A1AA" FontWeight="Medium" VerticalAlignment="Center" />
+                                                <TextBlock Text="Headphones" Foreground="#64748B" FontWeight="Medium" VerticalAlignment="Center" />
                                                 <Slider Grid.Column="1" x:Name="HeadphoneVolumeSlider" Minimum="25" Maximum="200" TickFrequency="5" Value="100" ValueChanged="VolumeSlider_ValueChanged" />
-                                                <TextBlock Grid.Column="2" x:Name="HeadphoneVolumeText" Text="100%" Foreground="#F3F4F6" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" x:Name="HeadphoneVolumeText" Text="100%" Foreground="#111827" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                             </Grid>
                                             <Grid Grid.Row="2">
                                                 <Grid.ColumnDefinitions>
@@ -896,13 +896,13 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="54" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Microphone" Foreground="#A1A1AA" FontWeight="Medium" VerticalAlignment="Center" />
+                                                <TextBlock Text="Microphone" Foreground="#64748B" FontWeight="Medium" VerticalAlignment="Center" />
                                                 <Slider Grid.Column="1" x:Name="MicrophoneVolumeSlider" Minimum="25" Maximum="200" TickFrequency="5" Value="100" ValueChanged="VolumeSlider_ValueChanged" />
-                                                <TextBlock Grid.Column="2" x:Name="MicrophoneVolumeText" Text="100%" Foreground="#F3F4F6" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" x:Name="MicrophoneVolumeText" Text="100%" Foreground="#111827" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                             </Grid>
                                         </Grid>
                                     </Border>
-                                    <TextBlock Text="Video source" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Video source" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="VideoSourceComboBox" Margin="0,5,0,18" />
                                     <Button Content="Save devices" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveDevicesButton_Click" />
                                 </StackPanel>
@@ -910,9 +910,9 @@
 
                             <TabItem x:Name="SettingsQueuesTab" Header="Queues">
                                 <StackPanel>
-                                    <TextBlock Text="Queue Settings" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                    <CheckBox x:Name="QueuePickupCheckBox" Content="Enable queue pickup shortcut" Foreground="#F3F4F6" FontWeight="SemiBold" Margin="0,0,0,14" />
-                                    <TextBlock Text="Queue pickup dials *8 from this handset when enabled." Foreground="#A1A1AA" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                    <TextBlock Text="Queue Settings" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <CheckBox x:Name="QueuePickupCheckBox" Content="Enable queue pickup shortcut" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,14" />
+                                    <TextBlock Text="Queue pickup dials *8 from this handset when enabled." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,14" />
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -926,7 +926,7 @@
 
                             <TabItem x:Name="SettingsAdvancedTab" Header="Advanced">
                                 <StackPanel>
-                                    <TextBlock Text="Advanced Settings" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <TextBlock Text="Advanced Settings" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
                                     <CheckBox x:Name="FlashCallStateCheckBox" Content="Flash call state changes" Visibility="Collapsed" />
                                     <ComboBox x:Name="MaxCallsComboBox" Visibility="Collapsed">
                                         <ComboBoxItem Content="1" />
@@ -935,13 +935,13 @@
                                     </ComboBox>
                                     <CheckBox x:Name="ShowCallStatsCheckBox" Content="Show call statistics" Visibility="Collapsed" />
                                     <CheckBox x:Name="SingleClickTransferCheckBox" Content="Single-click blind transfer" Visibility="Collapsed" />
-                                    <CheckBox x:Name="CombineContactsCheckBox" Content="Combine contacts in search" Foreground="#F3F4F6" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                    <CheckBox x:Name="CombineContactsCheckBox" Content="Combine contacts in search" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
                                     <ComboBox x:Name="IncomingNotificationDurationComboBox" Visibility="Collapsed">
                                         <ComboBoxItem Content="15 seconds" />
                                         <ComboBoxItem Content="30 seconds" />
                                         <ComboBoxItem Content="60 seconds" />
                                     </ComboBox>
-                                    <TextBlock Text="Failed call display timeout" Foreground="#A1A1AA" FontWeight="Medium" />
+                                    <TextBlock Text="Failed call display timeout" Foreground="#64748B" FontWeight="Medium" />
                                     <ComboBox x:Name="FailedCallTimeoutComboBox" Margin="0,5,0,12">
                                         <ComboBoxItem Content="5 seconds" />
                                         <ComboBoxItem Content="10 seconds" />
@@ -954,15 +954,15 @@
 
                             <TabItem x:Name="SettingsStatusTab" Header="Status">
                                 <StackPanel>
-                                    <Border Background="#181A1F" BorderBrush="#27272A" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                    <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
                                         <StackPanel>
                                             <DockPanel>
                                                 <Border DockPanel.Dock="Right" x:Name="ConnectionPill" Background="#FFF1D6" CornerRadius="7" Padding="9,5" VerticalAlignment="Center">
                                                     <TextBlock x:Name="ConnectionStatusText" Text="Connecting..." Foreground="#8A4F08" FontWeight="SemiBold" />
                                                 </Border>
-                                                <TextBlock Text="Connection" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <TextBlock Text="Connection" Foreground="#111827" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             </DockPanel>
-                                            <TextBlock x:Name="ServerStatusText" Text="Checking account connection." Foreground="#A1A1AA" FontWeight="Medium" Margin="0,10,0,0" TextWrapping="Wrap" />
+                                            <TextBlock x:Name="ServerStatusText" Text="Checking account connection." Foreground="#64748B" FontWeight="Medium" Margin="0,10,0,0" TextWrapping="Wrap" />
                                             <Grid Margin="0,12,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="120" />
@@ -974,39 +974,39 @@
                                                     <RowDefinition Height="Auto" />
                                                     <RowDefinition Height="Auto" />
                                                 </Grid.RowDefinitions>
-                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Latency" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="PingStatusText" Text="Not checked yet" Foreground="#F3F4F6" FontWeight="Medium" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Version" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AppVersionText" Text="-" Foreground="#F3F4F6" FontWeight="Medium" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Licensed to" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LicensedToText" Text="Checking" Foreground="#F3F4F6" FontWeight="Medium" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Product" Foreground="#A1A1AA" FontWeight="Medium" />
-                                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ProductIdText" Text="merlin-sip" Foreground="#F3F4F6" FontWeight="Medium" />
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Latency" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="PingStatusText" Text="Not checked yet" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Version" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AppVersionText" Text="-" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Licensed to" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LicensedToText" Text="Checking" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Product" Foreground="#64748B" FontWeight="Medium" />
+                                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ProductIdText" Text="merlin-sip" Foreground="#111827" FontWeight="Medium" />
                                             </Grid>
                                         </StackPanel>
                                     </Border>
-                                    <Border Background="#181A1F" BorderBrush="#27272A" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                    <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
                                         <StackPanel>
                                             <DockPanel>
                                                 <Button DockPanel.Dock="Right" Content="Save" Style="{StaticResource SoftButton}" Width="88" Click="SaveNetworkModeButton_Click" />
-                                                <TextBlock Text="Connection assist" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <TextBlock Text="Connection assist" Foreground="#111827" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             </DockPanel>
                                             <CheckBox x:Name="SipAlgCompatibilityCheckBox"
                                                       Content="Router keepalive assist"
-                                                      Foreground="#F3F4F6"
+                                                      Foreground="#111827"
                                                       FontWeight="SemiBold"
                                                       Margin="0,12,0,4"
                                                       Checked="SipAlgCompatibilityCheckBox_Changed"
                                                       Unchecked="SipAlgCompatibilityCheckBox_Changed" />
                                             <TextBlock Text="Adds extra UDP keepalive traffic for difficult routers. Normal SIP registration is unchanged. Some ISP SIP ALG faults require a PBX-side TCP/TLS profile."
-                                                       Foreground="#A1A1AA"
+                                                       Foreground="#64748B"
                                                        TextWrapping="Wrap" />
                                             <Grid Margin="0,12,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="150" />
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="Signalling mode" Foreground="#A1A1AA" FontWeight="Medium" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="0" Text="Signalling mode" Foreground="#64748B" FontWeight="Medium" VerticalAlignment="Center" />
                                                 <ComboBox Grid.Column="1" x:Name="SipTransportModeComboBox" Height="34" VerticalContentAlignment="Center" SelectionChanged="SipTransportModeComboBox_SelectionChanged">
                                                     <ComboBoxItem Content="Standard UDP" Tag="UDP" />
                                                     <ComboBoxItem Content="TCP signalling" Tag="TCP" />
@@ -1022,16 +1022,16 @@
                                                     <RowDefinition Height="Auto" />
                                                     <RowDefinition Height="Auto" />
                                                 </Grid.RowDefinitions>
-                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="NAT keepalive" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="NAT keepalive" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
                                                 <TextBlock Grid.Row="0" Grid.Column="1" x:Name="NatKeepaliveStatusText" Text="Off" Foreground="#106247" FontWeight="SemiBold" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="1" Grid.Column="0" Text="rport signalling" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,0,0,6" />
+                                                <TextBlock Grid.Row="1" Grid.Column="0" Text="rport signalling" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
                                                 <TextBlock Grid.Row="1" Grid.Column="1" x:Name="RportStatusText" Text="On" Foreground="#106247" FontWeight="SemiBold" Margin="0,0,0,6" />
-                                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Auto recovery" Foreground="#A1A1AA" FontWeight="Medium" />
+                                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Auto recovery" Foreground="#64748B" FontWeight="Medium" />
                                                 <TextBlock Grid.Row="2" Grid.Column="1" x:Name="AutoRecoveryStatusText" Text="On" Foreground="#106247" FontWeight="SemiBold" />
                                             </Grid>
                                         </StackPanel>
                                     </Border>
-                                    <Border Background="#181A1F" BorderBrush="#27272A" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                    <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
                                         <StackPanel>
                                             <DockPanel Margin="0,0,0,12">
                                                 <Button DockPanel.Dock="Right"
@@ -1040,15 +1040,15 @@
                                                         Style="{StaticResource SoftButton}"
                                                         Width="96"
                                                         Click="RunPbxDiagnosticsButton_Click" />
-                                                <TextBlock Text="PBX diagnostics" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <TextBlock Text="PBX diagnostics" Foreground="#111827" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             </DockPanel>
                                             <TextBlock Text="Checks registration, response time, messaging, audio packets, routing clues, and router compatibility."
-                                                       Foreground="#A1A1AA"
+                                                       Foreground="#64748B"
                                                        TextWrapping="Wrap"
                                                        Margin="0,0,0,12" />
                                             <TextBlock x:Name="PbxDiagnosticsText"
                                                        Text="Diagnostics have not been run yet."
-                                                       Foreground="#D4D4D8"
+                                                       Foreground="#334155"
                                                        FontWeight="Medium"
                                                        TextWrapping="Wrap" />
                                         </StackPanel>
@@ -1058,22 +1058,22 @@
                             </TabItem>
 
                             <TabItem x:Name="SettingsUpdatesTab" Header="Updates">
-                                <Border Background="#181A1F" BorderBrush="#27272A" BorderThickness="1" CornerRadius="8" Padding="14">
+                                <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14">
                                     <StackPanel>
                                         <DockPanel>
                                             <Button DockPanel.Dock="Right" x:Name="CheckUpdatesButton" Content="Check for updates" Style="{StaticResource SoftButton}" Width="150" Click="CheckUpdatesButton_Click" />
-                                            <TextBlock Text="Updates" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Text="Updates" Foreground="#111827" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                                         </DockPanel>
-                                        <TextBlock x:Name="UpdateStatusText" Text="Version checking" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,10,0,0" TextWrapping="Wrap" />
-                                        <TextBlock x:Name="UpdateNotesText" Foreground="#A1A1AA" Margin="0,8,0,0" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="UpdateStatusText" Text="Version checking" Foreground="#64748B" FontWeight="Medium" Margin="0,10,0,0" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="UpdateNotesText" Foreground="#64748B" Margin="0,8,0,0" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
                             </TabItem>
 
                             <TabItem x:Name="SettingsAboutTab" Header="About">
                                 <StackPanel>
-                                    <TextBlock Text="About Merlin SIP" Foreground="#F3F4F6" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                    <TextBlock Text="CK Media Services softphone for managed SIP, messaging, contacts, and reception workflows." Foreground="#A1A1AA" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                    <TextBlock Text="About Merlin SIP" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                    <TextBlock Text="CK Media Services softphone for managed SIP, messaging, contacts, and reception workflows." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,14" />
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120" />
@@ -1084,12 +1084,12 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Version" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,0,0,6" />
-                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ElementName=AppVersionText, Path=Text}" Foreground="#F3F4F6" FontWeight="Medium" Margin="0,0,0,6" />
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Product" Foreground="#A1A1AA" FontWeight="Medium" Margin="0,0,0,6" />
-                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="merlin-sip" Foreground="#F3F4F6" FontWeight="Medium" Margin="0,0,0,6" />
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Support" Foreground="#A1A1AA" FontWeight="Medium" />
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="CK Media Services" Foreground="#F3F4F6" FontWeight="Medium" />
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Version" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ElementName=AppVersionText, Path=Text}" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Product" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="merlin-sip" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Support" Foreground="#64748B" FontWeight="Medium" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="CK Media Services" Foreground="#111827" FontWeight="Medium" />
                                     </Grid>
                                 </StackPanel>
                             </TabItem>
@@ -1101,10 +1101,10 @@
         <Grid x:Name="IncomingCallOverlay" Grid.ColumnSpan="2" Visibility="Collapsed" Background="#9907111E">
             <Border Style="{StaticResource Surface}" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <StackPanel>
-                    <TextBlock Text="Incoming call" FontSize="28" FontWeight="SemiBold" Foreground="#F3F4F6" />
+                    <TextBlock Text="Incoming call" FontSize="28" FontWeight="SemiBold" Foreground="#111827" />
                     <TextBlock x:Name="IncomingCallerNameText" Text="Unknown caller" FontSize="22" FontWeight="SemiBold" Foreground="#0E987E" Margin="0,18,0,2" TextWrapping="Wrap" />
-                    <TextBlock x:Name="IncomingCallerNumberText" Text="" FontSize="15" FontWeight="Medium" Foreground="#A1A1AA" TextWrapping="Wrap" />
-                    <TextBlock Text="" Foreground="#A1A1AA" Margin="0,8,0,10" TextWrapping="Wrap" />
+                    <TextBlock x:Name="IncomingCallerNumberText" Text="" FontSize="15" FontWeight="Medium" Foreground="#64748B" TextWrapping="Wrap" />
+                    <TextBlock Text="" Foreground="#64748B" Margin="0,8,0,10" TextWrapping="Wrap" />
                     <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
