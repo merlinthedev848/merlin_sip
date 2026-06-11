@@ -104,9 +104,7 @@ public sealed class UpdateService
     {
         var currentNormalized = NormalizeVersion(current);
         var latestNormalized = NormalizeVersion(latest.Version);
-        var updateAvailable = latest.AuthoritativeFeed
-            ? latestNormalized != currentNormalized
-            : latestNormalized > currentNormalized;
+        var updateAvailable = latestNormalized > currentNormalized;
 
         if (updateAvailable)
         {

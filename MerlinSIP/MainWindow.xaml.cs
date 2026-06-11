@@ -643,6 +643,7 @@ public partial class MainWindow : Window
         SelectComboBoxItem(ExternalNoAnswerTimeoutComboBox, $"{_config.ExternalNoAnswerSeconds} seconds");
         QueuePickupCheckBox.IsChecked = _config.QueuePickupEnabled;
         CombineContactsCheckBox.IsChecked = _config.CombineContactsInSearch;
+        SelectComboBoxItem(FailedCallTimeoutComboBox, $"{_config.FailedCallDisplaySeconds} seconds");
     }
 
     private static void SelectComboBoxItem(System.Windows.Controls.ComboBox comboBox, string value)
@@ -2031,12 +2032,12 @@ public partial class MainWindow : Window
 
     private void SettingsUpdatesButton_Click(object sender, RoutedEventArgs e)
     {
-        SettingsTabs.SelectedItem = SettingsUpdatesTab;
+        SettingsTabs.SelectedItem = SettingsDevicesTab;
     }
 
     private void SettingsAboutButton_Click(object sender, RoutedEventArgs e)
     {
-        SettingsTabs.SelectedItem = SettingsAboutTab;
+        SettingsTabs.SelectedItem = SettingsDevicesTab;
     }
 
     private async void SaveApplicationSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -2053,7 +2054,8 @@ public partial class MainWindow : Window
             ExternalNoAnswerSeconds = ComboBoxSeconds(ExternalNoAnswerTimeoutComboBox, 90),
             ExternalNoAnswerAction = "Send busy",
             QueuePickupEnabled = QueuePickupCheckBox.IsChecked == true,
-            CombineContactsInSearch = CombineContactsCheckBox.IsChecked == true
+            CombineContactsInSearch = CombineContactsCheckBox.IsChecked == true,
+            FailedCallDisplaySeconds = ComboBoxSeconds(FailedCallTimeoutComboBox, 5)
         };
 
         await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
