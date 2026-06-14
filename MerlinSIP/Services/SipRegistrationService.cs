@@ -2,6 +2,7 @@ using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Net.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -15,7 +16,7 @@ public sealed class SipRegistrationService : IDisposable
     private static readonly TimeSpan RegisterRefreshInterval = TimeSpan.FromMinutes(10);
     private UdpClient? _client;
     private TcpClient? _tcpClient;
-    private NetworkStream? _tcpStream;
+    private Stream? _tcpStream;
     private AppStartupConfig? _config;
     private string _domain = "";
     private string _localAddress = "127.0.0.1";
@@ -56,14 +57,16 @@ public sealed class SipRegistrationService : IDisposable
     public bool HasInboundRtpAudio => _audioSession?.ReceivedPackets > 0;
 
     private bool UseTcpSignalling => _config?.UsesTcpSignalling == true;
+    private bool UseTlsSignalling => _config?.UsesTlsSignalling == true;
+    private bool UseStreamSignalling => UseTcpSignalling || UseTlsSignalling;
 
-    private bool IsTransportReady => UseTcpSignalling
+    private bool IsTransportReady => UseStreamSignalling
         ? _tcpClient?.Connected == true && _tcpStream is not null
         : _client is not null;
 
-    private string SipTransportName => UseTcpSignalling ? "TCP" : "UDP";
+    private string SipTransportName => UseTlsSignalling ? "TLS" : UseTcpSignalling ? "TCP" : "UDP";
 
-    private string ContactTransport => UseTcpSignalling ? "tcp" : "udp";
+    private string ContactTransport => UseTlsSignalling ? "tls" : UseTcpSignalling ? "tcp" : "udp";
 
     public string LastCallFailureReason => _lastCallFailureResponse is null
         ? "No outbound route failure has been recorded in this session."
@@ -260,16 +263,30 @@ public sealed class SipRegistrationService : IDisposable
         _config = config;
         _domain = string.IsNullOrWhiteSpace(config.Domain) ? config.Server : config.Domain;
         _localAddress = GetLocalAddress();
-        if (config.UsesTcpSignalling)
+        if (config.UsesTcpSignalling || config.UsesTlsSignalling)
         {
             _tcpClient = new TcpClient();
             await _tcpClient.ConnectAsync(config.Server, config.Port, cancellationToken);
             _tcpClient.NoDelay = true;
-            _tcpStream = _tcpClient.GetStream();
-            var localEndPoint = (IPEndPoint)_tcpClient.Client.LocalEndPoint!;
-            _localAddress = localEndPoint.Address.ToString();
-            _localPort = localEndPoint.Port;
-            DebugLog.Write($"SIP TCP connected local={_localAddress}:{_localPort} remote={config.Server}:{config.Port}");
+
+            if (config.UsesTlsSignalling)
+            {
+                var sslStream = new SslStream(_tcpClient.GetStream(), false, (sender, cert, chain, errs) => true);
+                await sslStream.AuthenticateAsClientAsync(config.Server);
+                _tcpStream = sslStream;
+                var localEndPoint = (IPEndPoint)_tcpClient.Client.LocalEndPoint!;
+                _localAddress = localEndPoint.Address.ToString();
+                _localPort = localEndPoint.Port;
+                DebugLog.Write($"SIP TLS connected local={_localAddress}:{_localPort} remote={config.Server}:{config.Port}");
+            }
+            else
+            {
+                _tcpStream = _tcpClient.GetStream();
+                var localEndPoint = (IPEndPoint)_tcpClient.Client.LocalEndPoint!;
+                _localAddress = localEndPoint.Address.ToString();
+                _localPort = localEndPoint.Port;
+                DebugLog.Write($"SIP TCP connected local={_localAddress}:{_localPort} remote={config.Server}:{config.Port}");
+            }
         }
         else
         {
@@ -1110,7 +1127,7 @@ public sealed class SipRegistrationService : IDisposable
         {
             while (!linked.Token.IsCancellationRequested)
             {
-                var text = UseTcpSignalling
+                var text = UseStreamSignalling
                     ? await ReceiveTcpMessageAsync(linked.Token)
                     : Encoding.UTF8.GetString((await _client!.ReceiveAsync(linked.Token)).Buffer);
                 if (text.StartsWith("SIP/2.0", StringComparison.OrdinalIgnoreCase))
@@ -1139,7 +1156,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task SendToServerAsync(byte[] payload, CancellationToken cancellationToken)
     {
-        if (UseTcpSignalling)
+        if (UseStreamSignalling)
         {
             if (_tcpStream is null)
             {
@@ -1170,7 +1187,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private async Task SendToRemoteAsync(byte[] payload, IPEndPoint remoteEndPoint, CancellationToken cancellationToken)
     {
-        if (UseTcpSignalling)
+        if (UseStreamSignalling)
         {
             await SendToServerAsync(payload, cancellationToken);
             return;
@@ -1461,13 +1478,11 @@ public sealed class SipRegistrationService : IDisposable
         {
             try
             {
-                if (_config?.SipAlgCompatibilityMode != true)
-                {
-                    await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
-                    continue;
-                }
+                var delay = _config?.SipAlgCompatibilityMode == true
+                    ? TimeSpan.FromSeconds(15)
+                    : TimeSpan.FromSeconds(25);
 
-                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+                await Task.Delay(delay, cancellationToken);
                 if (!IsTransportReady || _config is null || _activeCall is not null || _pendingResponse is not null)
                 {
                     continue;
@@ -1544,7 +1559,7 @@ public sealed class SipRegistrationService : IDisposable
             try
             {
                 var remoteEndPoint = GetRemoteSipEndPoint();
-                var message = UseTcpSignalling
+                var message = UseStreamSignalling
                     ? await ReceiveTcpMessageAsync(cancellationToken)
                     : Encoding.UTF8.GetString((await _client!.ReceiveAsync(cancellationToken)).Buffer);
 
@@ -2176,6 +2191,10 @@ public sealed class SipRegistrationService : IDisposable
         _pendingIncomingCall = null;
         _client?.Dispose();
         _client = null;
+        _tcpStream?.Dispose();
+        _tcpStream = null;
+        _tcpClient?.Dispose();
+        _tcpClient = null;
         _registered = false;
         _audioSession?.Dispose();
         _audioSession = null;

@@ -678,7 +678,9 @@ public partial class MainWindow : Window
     {
         var normalized = string.Equals(transport, AppStartupConfig.TransportTcp, StringComparison.OrdinalIgnoreCase)
             ? AppStartupConfig.TransportTcp
-            : AppStartupConfig.TransportUdp;
+            : string.Equals(transport, AppStartupConfig.TransportTls, StringComparison.OrdinalIgnoreCase)
+                ? AppStartupConfig.TransportTls
+                : AppStartupConfig.TransportUdp;
 
         foreach (var item in SipTransportModeComboBox.Items.OfType<ComboBoxItem>())
         {
@@ -1875,6 +1877,7 @@ public partial class MainWindow : Window
     {
         SettingsOverlay.Visibility = Visibility.Visible;
         SettingsTabs.SelectedItem = SettingsAccountTab;
+        UpdateActiveSettingsTab(TabBtnAccount);
         await RefreshConnectionDiagnosticsAsync();
         await EnsureConnectionReadyAsync();
     }
@@ -1884,9 +1887,32 @@ public partial class MainWindow : Window
         SettingsOverlay.Visibility = Visibility.Collapsed;
     }
 
+    private void UpdateActiveSettingsTab(System.Windows.Controls.Button activeBtn)
+    {
+        var activeBg = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("PrimaryBrush")!;
+        var activeFg = System.Windows.Media.Brushes.White;
+        var inactiveBg = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#F1F5F9")!;
+        var inactiveFg = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#475569")!;
+
+        foreach (var btn in new[] { TabBtnGeneral, TabBtnAccount, TabBtnHandling, TabBtnDevices })
+        {
+            if (btn == activeBtn)
+            {
+                btn.Background = activeBg;
+                btn.Foreground = activeFg;
+            }
+            else
+            {
+                btn.Background = inactiveBg;
+                btn.Foreground = inactiveFg;
+            }
+        }
+    }
+
     private async void SettingsAccountButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsTabs.SelectedItem = SettingsAccountTab;
+        UpdateActiveSettingsTab(TabBtnAccount);
         await RefreshConnectionDiagnosticsAsync();
         await EnsureConnectionReadyAsync();
     }
@@ -1894,16 +1920,19 @@ public partial class MainWindow : Window
     private void SettingsGeneralButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsTabs.SelectedItem = SettingsGeneralTab;
+        UpdateActiveSettingsTab(TabBtnGeneral);
     }
 
     private void SettingsHandlingButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsTabs.SelectedItem = SettingsHandlingTab;
+        UpdateActiveSettingsTab(TabBtnHandling);
     }
 
     private void SettingsDevicesButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsTabs.SelectedItem = SettingsDevicesTab;
+        UpdateActiveSettingsTab(TabBtnDevices);
     }
 
     private async void SaveNetworkModeButton_Click(object sender, RoutedEventArgs e)
@@ -1951,10 +1980,13 @@ public partial class MainWindow : Window
     private void UpdateNetworkAssistanceText()
     {
         var compatibilityOn = SipAlgCompatibilityCheckBox.IsChecked == true;
-        var tcpMode = string.Equals(ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp), AppStartupConfig.TransportTcp, StringComparison.OrdinalIgnoreCase);
+        var transport = ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp);
+        var tcpMode = string.Equals(transport, AppStartupConfig.TransportTcp, StringComparison.OrdinalIgnoreCase);
+        var tlsMode = string.Equals(transport, AppStartupConfig.TransportTls, StringComparison.OrdinalIgnoreCase);
+
         NatKeepaliveStatusText.Text = compatibilityOn ? "On" : "Off";
         NatKeepaliveStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(compatibilityOn ? "#106247" : "#64748B")!;
-        RportStatusText.Text = tcpMode ? "TCP" : "On";
+        RportStatusText.Text = tlsMode ? "TLS" : tcpMode ? "TCP" : "On";
         AutoRecoveryStatusText.Text = "On";
     }
 
@@ -2011,7 +2043,11 @@ public partial class MainWindow : Window
 
         report.AppendLine($"RTP audio: {_sipRegistrationService.RtpStatus}");
         report.AppendLine($"Outbound route clue: {_sipRegistrationService.LastCallFailureReason}");
-        if (_config.UsesTcpSignalling)
+        if (_config.UsesTlsSignalling)
+        {
+            report.AppendLine("TLS signalling: Selected. (Note: TLS traffic is fully encrypted, completely bypassing any router SIP ALG inspection).");
+        }
+        else if (_config.UsesTcpSignalling)
         {
             var tcpProbe = await _sipsorceryCompatibilityService.TestTcpRegistrationAsync(_config);
             report.AppendLine($"TCP/SIPSorcery signalling: {(tcpProbe.Supported ? "OK" : "Failed")}. {tcpProbe.Message}");

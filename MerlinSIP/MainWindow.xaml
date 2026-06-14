@@ -107,6 +107,29 @@
             <Setter Property="FontSize" Value="13" />
         </Style>
 
+        <Style x:Key="SettingsTabButton" TargetType="Button">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#475569" />
+            <Setter Property="Background" Value="#F1F5F9" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ContactCard" TargetType="ListBoxItem">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0,0,0,10" />
@@ -756,10 +779,10 @@
                         </DockPanel>
 
                         <WrapPanel Grid.Row="1" Margin="0,0,0,18">
-                            <Button Content="General" Style="{StaticResource SoftButton}" Width="104" Margin="0,0,8,8" Click="SettingsGeneralButton_Click" />
-                            <Button Content="Account &amp; Network" Style="{StaticResource SoftButton}" Width="140" Margin="0,0,8,8" Click="SettingsAccountButton_Click" />
-                            <Button Content="Call Handling" Style="{StaticResource SoftButton}" Width="114" Margin="0,0,8,8" Click="SettingsHandlingButton_Click" />
-                            <Button Content="Devices &amp; About" Style="{StaticResource SoftButton}" Width="124" Margin="0,0,8,8" Click="SettingsDevicesButton_Click" />
+                            <Button x:Name="TabBtnGeneral" Content="General" Style="{StaticResource SettingsTabButton}" Width="104" Margin="0,0,8,8" Click="SettingsGeneralButton_Click" />
+                            <Button x:Name="TabBtnAccount" Content="Account &amp; Network" Style="{StaticResource SettingsTabButton}" Width="140" Margin="0,0,8,8" Click="SettingsAccountButton_Click" />
+                            <Button x:Name="TabBtnHandling" Content="Call Handling" Style="{StaticResource SettingsTabButton}" Width="114" Margin="0,0,8,8" Click="SettingsHandlingButton_Click" />
+                            <Button x:Name="TabBtnDevices" Content="Devices &amp; About" Style="{StaticResource SettingsTabButton}" Width="124" Margin="0,0,8,8" Click="SettingsDevicesButton_Click" />
                         </WrapPanel>
 
                         <TabControl x:Name="SettingsTabs" Grid.Row="2" Background="Transparent" BorderThickness="0">
@@ -772,48 +795,69 @@
                             <TabItem x:Name="SettingsAccountTab" Header="Account">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="0,0,12,0">
-                                        <!-- Provisioning -->
-                                        <TextBlock Text="Account Provisioning" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                        <TextBlock Text="Provisioning code" Foreground="#64748B" FontWeight="Medium" />
-                                        <Grid Margin="0,5,0,18">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="180" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox Grid.Column="0"
-                                                     x:Name="SettingsProvisioningCodeTextBox"
-                                                     MaxLength="8"
-                                                     Margin="0,0,10,0" />
-                                            <Button Grid.Column="1"
-                                                    x:Name="ProvisionAndReconnectButton"
-                                                    Content="Provision"
-                                                    Style="{StaticResource SoftButton}"
-                                                    Background="{StaticResource PrimaryBrush}"
-                                                    Foreground="White"
-                                                    Click="ProvisionAndReconnectButton_Click" />
-                                        </Grid>
+                                        <!-- Provisioning Card -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                            <StackPanel>
+                                                <TextBlock Text="Account Provisioning" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                <TextBlock Text="Provisioning code" Foreground="#64748B" FontWeight="Medium" />
+                                                <Grid Margin="0,5,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="180" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Grid.Column="0"
+                                                             x:Name="SettingsProvisioningCodeTextBox"
+                                                             MaxLength="8"
+                                                             Margin="0,0,10,0" />
+                                                    <Button Grid.Column="1"
+                                                            x:Name="ProvisionAndReconnectButton"
+                                                            Content="Provision"
+                                                            Style="{StaticResource SoftButton}"
+                                                            Background="{StaticResource PrimaryBrush}"
+                                                            Foreground="White"
+                                                            Click="ProvisionAndReconnectButton_Click" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
 
-                                        <!-- PBX Details -->
-                                        <StackPanel x:Name="PrivatePbxSettingsPanel" Visibility="Collapsed">
-                                            <TextBlock Text="PBX server" Foreground="#64748B" FontWeight="Medium" />
-                                            <TextBox x:Name="PrivatePbxSettingsTextBox" Margin="0,5,0,12" />
-                                        </StackPanel>
+                                        <!-- PBX Details & Credentials -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                            <StackPanel>
+                                                <TextBlock Text="Account Credentials" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                
+                                                <StackPanel x:Name="PrivatePbxSettingsPanel" Visibility="Collapsed">
+                                                    <TextBlock Text="PBX server" Foreground="#64748B" FontWeight="Medium" />
+                                                    <TextBox x:Name="PrivatePbxSettingsTextBox" Margin="0,5,0,12" />
+                                                </StackPanel>
 
-                                        <TextBlock Text="User / extension" Foreground="#64748B" FontWeight="Medium" />
-                                        <TextBox x:Name="ExtensionTextBox" Margin="0,5,0,12" />
-                                        <TextBlock Text="Auth username" Foreground="#64748B" FontWeight="Medium" />
-                                        <TextBox x:Name="UsernameTextBox" Margin="0,5,0,12" />
-                                        <TextBlock Text="Password" Foreground="#64748B" FontWeight="Medium" />
-                                        <PasswordBox x:Name="PasswordBox" Margin="0,5,0,18" />
-                                        
-                                        <Grid Margin="0,0,0,24">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Content="Save and reconnect" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Margin="0,0,8,0" Click="ReconnectButton_Click" />
-                                            <Button Grid.Column="1" Content="Reset app" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="ResetCacheButton_Click" />
-                                        </Grid>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                        <TextBlock Text="User / extension" Foreground="#64748B" FontWeight="Medium" />
+                                                        <TextBox x:Name="ExtensionTextBox" Margin="0,5,0,12" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="Auth username" Foreground="#64748B" FontWeight="Medium" />
+                                                        <TextBox x:Name="UsernameTextBox" Margin="0,5,0,12" />
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <TextBlock Text="Password" Foreground="#64748B" FontWeight="Medium" />
+                                                <PasswordBox x:Name="PasswordBox" Margin="0,5,0,18" />
+
+                                                <Grid Margin="0,6,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Content="Save credentials" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Margin="0,0,8,0" Click="ReconnectButton_Click" />
+                                                    <Button Grid.Column="1" Content="Reset app" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="ResetCacheButton_Click" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
 
                                         <!-- Network Status & Diagnostics -->
                                         <Border BorderBrush="#D7E1EC" BorderThickness="0,1,0,0" Padding="0,18,0,0">
@@ -877,6 +921,7 @@
                                                             <ComboBox Grid.Column="1" x:Name="SipTransportModeComboBox" Height="34" VerticalContentAlignment="Center" SelectionChanged="SipTransportModeComboBox_SelectionChanged">
                                                                 <ComboBoxItem Content="Standard UDP" Tag="UDP" />
                                                                 <ComboBoxItem Content="TCP signalling" Tag="TCP" />
+                                                                <ComboBoxItem Content="Encrypted TLS" Tag="TLS" />
                                                             </ComboBox>
                                                         </Grid>
                                                         <Grid Margin="0,12,0,0">
@@ -931,38 +976,53 @@
                             <TabItem x:Name="SettingsGeneralTab" Header="Preferences">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="0,0,12,0">
-                                        <!-- Call Preferences -->
-                                        <TextBlock Text="Call Preferences" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                        <TextBlock Text="Mobile number" Foreground="#64748B" FontWeight="Medium" />
-                                        <TextBox x:Name="MobileNumberTextBox" Margin="0,5,0,12" />
-                                        <TextBlock Text="DND mode" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="DndModeComboBox" Margin="0,5,0,12">
-                                            <ComboBoxItem Content="Off" />
-                                            <ComboBoxItem Content="Reject calls" />
-                                            <ComboBoxItem Content="Silent ringing" />
-                                        </ComboBox>
-                                        <TextBlock Text="When I decline a call" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="DeclineActionComboBox" Margin="0,5,0,18">
-                                            <ComboBoxItem Content="Send busy" />
-                                        </ComboBox>
-
-                                        <!-- Queue Settings -->
-                                        <Border BorderBrush="#D7E1EC" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,0,0,18">
+                                        <!-- Call Preferences Card -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
                                             <StackPanel>
-                                                <TextBlock Text="Queue Settings" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                                <CheckBox x:Name="QueuePickupCheckBox" Content="Enable queue pickup shortcut" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
-                                                <TextBlock Text="Queue pickup dials *8 from this handset when enabled." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,12" />
-                                                <Button Content="Pick up queue call" Style="{StaticResource SoftButton}" Width="160" HorizontalAlignment="Left" Click="QueuePickupButton_Click" Margin="0,0,0,6" />
+                                                <TextBlock Text="Call Preferences" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                <TextBlock Text="Mobile number" Foreground="#64748B" FontWeight="Medium" />
+                                                <TextBox x:Name="MobileNumberTextBox" Margin="0,5,0,12" />
+                                                
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                        <TextBlock Text="DND mode" Foreground="#64748B" FontWeight="Medium" />
+                                                        <ComboBox x:Name="DndModeComboBox" Margin="0,5,0,0">
+                                                            <ComboBoxItem Content="Off" />
+                                                            <ComboBoxItem Content="Reject calls" />
+                                                            <ComboBoxItem Content="Silent ringing" />
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="When I decline a call" Foreground="#64748B" FontWeight="Medium" />
+                                                        <ComboBox x:Name="DeclineActionComboBox" Margin="0,5,0,0">
+                                                            <ComboBoxItem Content="Send busy" />
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                </Grid>
                                             </StackPanel>
                                         </Border>
 
-                                        <!-- Advanced Settings -->
-                                        <Border BorderBrush="#D7E1EC" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,0,0,18">
+                                        <!-- Queue Settings Card -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
                                             <StackPanel>
-                                                <TextBlock Text="Advanced Settings" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                <TextBlock Text="Queue Settings" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                <CheckBox x:Name="QueuePickupCheckBox" Content="Enable queue pickup shortcut" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                                <TextBlock Text="Queue pickup dials *8 from this handset when enabled." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,12" />
+                                                <Button Content="Pick up queue call" Style="{StaticResource SoftButton}" Width="160" HorizontalAlignment="Left" Click="QueuePickupButton_Click" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Advanced Settings Card -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                            <StackPanel>
+                                                <TextBlock Text="Advanced Settings" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
                                                 <CheckBox x:Name="CombineContactsCheckBox" Content="Combine contacts in search" Foreground="#111827" FontWeight="SemiBold" Margin="0,0,0,12" />
                                                 <TextBlock Text="Failed call display timeout" Foreground="#64748B" FontWeight="Medium" />
-                                                <ComboBox x:Name="FailedCallTimeoutComboBox" Margin="0,5,0,18">
+                                                <ComboBox x:Name="FailedCallTimeoutComboBox" Margin="0,5,0,0">
                                                     <ComboBoxItem Content="5 seconds" />
                                                     <ComboBoxItem Content="10 seconds" />
                                                     <ComboBoxItem Content="15 seconds" />
@@ -978,29 +1038,58 @@
                             <TabItem x:Name="SettingsHandlingTab" Header="Handling">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="0,0,12,0">
-                                        <TextBlock Text="Call Handling" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                        <TextBlock Text="Internal calls when busy" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="InternalBusyActionComboBox" Margin="0,5,0,12">
-                                            <ComboBoxItem Content="Send busy" />
-                                            <ComboBoxItem Content="Keep ringing" />
-                                        </ComboBox>
-                                        <TextBlock Text="Internal no-answer timeout" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="InternalNoAnswerTimeoutComboBox" Margin="0,5,0,12">
-                                            <ComboBoxItem Content="30 seconds" />
-                                            <ComboBoxItem Content="60 seconds" />
-                                            <ComboBoxItem Content="90 seconds" />
-                                        </ComboBox>
-                                        <TextBlock Text="External calls when busy" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="ExternalBusyActionComboBox" Margin="0,5,0,12">
-                                            <ComboBoxItem Content="Send busy" />
-                                            <ComboBoxItem Content="Keep ringing" />
-                                        </ComboBox>
-                                        <TextBlock Text="External no-answer timeout" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="ExternalNoAnswerTimeoutComboBox" Margin="0,5,0,18">
-                                            <ComboBoxItem Content="30 seconds" />
-                                            <ComboBoxItem Content="60 seconds" />
-                                            <ComboBoxItem Content="90 seconds" />
-                                        </ComboBox>
+                                        <!-- Call Handling Card -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                            <StackPanel>
+                                                <TextBlock Text="Call Routing &amp; Timeouts" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                
+                                                <TextBlock Text="Internal Calls" Foreground="#0E987E" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8" />
+                                                <Grid Margin="0,0,0,12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                        <TextBlock Text="Action when busy" Foreground="#64748B" FontWeight="Medium" />
+                                                        <ComboBox x:Name="InternalBusyActionComboBox" Margin="0,5,0,0">
+                                                            <ComboBoxItem Content="Send busy" />
+                                                            <ComboBoxItem Content="Keep ringing" />
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="No-answer timeout" Foreground="#64748B" FontWeight="Medium" />
+                                                        <ComboBox x:Name="InternalNoAnswerTimeoutComboBox" Margin="0,5,0,0">
+                                                            <ComboBoxItem Content="30 seconds" />
+                                                            <ComboBoxItem Content="60 seconds" />
+                                                            <ComboBoxItem Content="90 seconds" />
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                </Grid>
+                                                
+                                                <TextBlock Text="External Calls" Foreground="#0E987E" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,8" />
+                                                <Grid Margin="0,0,0,12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                        <TextBlock Text="Action when busy" Foreground="#64748B" FontWeight="Medium" />
+                                                        <ComboBox x:Name="ExternalBusyActionComboBox" Margin="0,5,0,0">
+                                                            <ComboBoxItem Content="Send busy" />
+                                                            <ComboBoxItem Content="Keep ringing" />
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="No-answer timeout" Foreground="#64748B" FontWeight="Medium" />
+                                                        <ComboBox x:Name="ExternalNoAnswerTimeoutComboBox" Margin="0,5,0,0">
+                                                            <ComboBoxItem Content="30 seconds" />
+                                                            <ComboBoxItem Content="60 seconds" />
+                                                            <ComboBoxItem Content="90 seconds" />
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
                                         <Button Content="Save handling" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" Width="180" HorizontalAlignment="Left" Margin="0,0,0,10" />
                                     </StackPanel>
                                 </ScrollViewer>
@@ -1009,14 +1098,30 @@
                             <TabItem x:Name="SettingsDevicesTab" Header="Devices">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="0,0,12,0">
-                                        <!-- Audio/Video Devices -->
-                                        <TextBlock Text="Audio &amp; Video Devices" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                        <TextBlock Text="Audio input" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="AudioInputComboBox" Margin="0,5,0,12" />
-                                        <TextBlock Text="Audio output" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="AudioOutputComboBox" Margin="0,5,0,12" />
-                                        <TextBlock Text="Ringtone" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="RingtoneComboBox" DisplayMemberPath="Name" Margin="0,5,0,12" />
+                                        <!-- Hardware Selection Card -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                            <StackPanel>
+                                                <TextBlock Text="Hardware Selection" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                <TextBlock Text="Audio input" Foreground="#64748B" FontWeight="Medium" />
+                                                <ComboBox x:Name="AudioInputComboBox" Margin="0,5,0,12" />
+                                                <TextBlock Text="Audio output" Foreground="#64748B" FontWeight="Medium" />
+                                                <ComboBox x:Name="AudioOutputComboBox" Margin="0,5,0,12" />
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                        <TextBlock Text="Ringtone" Foreground="#64748B" FontWeight="Medium" />
+                                                        <ComboBox x:Name="RingtoneComboBox" DisplayMemberPath="Name" Margin="0,5,0,0" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="Video source" Foreground="#64748B" FontWeight="Medium" />
+                                                        <ComboBox x:Name="VideoSourceComboBox" Margin="0,5,0,0" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
                                         
                                         <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
                                             <Grid>
@@ -1052,20 +1157,17 @@
                                             </Grid>
                                         </Border>
                                         
-                                        <TextBlock Text="Video source" Foreground="#64748B" FontWeight="Medium" />
-                                        <ComboBox x:Name="VideoSourceComboBox" Margin="0,5,0,18" />
-                                        
                                         <Button Content="Save devices" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveDevicesButton_Click" Width="180" HorizontalAlignment="Left" Margin="0,0,0,24" />
 
-                                        <!-- Software Updates -->
-                                        <Border BorderBrush="#D7E1EC" BorderThickness="0,1,0,0" Padding="0,18,0,0" Margin="0,0,0,24">
+                                        <!-- Software Updates Card -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,24">
                                             <StackPanel>
-                                                <TextBlock Text="Software Updates" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                                <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14">
+                                                <TextBlock Text="Software Updates" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                <Border Background="Transparent" BorderThickness="0">
                                                     <StackPanel>
                                                         <DockPanel>
                                                             <Button DockPanel.Dock="Right" x:Name="CheckUpdatesButton" Content="Check for updates" Style="{StaticResource SoftButton}" Width="150" Click="CheckUpdatesButton_Click" />
-                                                            <TextBlock Text="Update Status" Foreground="#111827" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                            <TextBlock Text="Update Status" Foreground="#111827" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                         </DockPanel>
                                                         <TextBlock x:Name="UpdateStatusText" Text="Version checking" Foreground="#64748B" FontWeight="Medium" Margin="0,10,0,0" TextWrapping="Wrap" />
                                                         <TextBlock x:Name="UpdateNotesText" Foreground="#64748B" Margin="0,8,0,0" TextWrapping="Wrap" />
@@ -1074,12 +1176,12 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <!-- About Merlin SIP -->
-                                        <Border BorderBrush="#D7E1EC" BorderThickness="0,1,0,0" Padding="0,18,0,0">
+                                        <!-- About Merlin SIP Card -->
+                                        <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
                                             <StackPanel>
-                                                <TextBlock Text="About Merlin SIP" Foreground="#111827" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                <TextBlock Text="About Merlin SIP" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
                                                 <TextBlock Text="CK Media Services softphone for managed SIP, messaging, contacts, and reception workflows." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,14" />
-                                                <Grid Margin="0,0,0,10">
+                                                <Grid Margin="0,0,0,0">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="120" />
                                                         <ColumnDefinition Width="*" />

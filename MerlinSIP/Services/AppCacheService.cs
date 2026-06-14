@@ -203,7 +203,9 @@ public sealed class AppCacheService
     {
         return string.Equals(transport, AppStartupConfig.TransportTcp, StringComparison.OrdinalIgnoreCase)
             ? AppStartupConfig.TransportTcp
-            : AppStartupConfig.TransportUdp;
+            : string.Equals(transport, AppStartupConfig.TransportTls, StringComparison.OrdinalIgnoreCase)
+                ? AppStartupConfig.TransportTls
+                : AppStartupConfig.TransportUdp;
     }
 
     private sealed record SavedAppSettings(

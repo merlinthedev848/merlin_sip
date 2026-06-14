@@ -43,9 +43,13 @@ public sealed record AppStartupConfig(
     public const string DefaultRingtone = "merlin";
     public const string TransportUdp = "UDP";
     public const string TransportTcp = "TCP";
+    public const string TransportTls = "TLS";
 
     public bool UsesTcpSignalling =>
         string.Equals(SipSignallingTransport, TransportTcp, StringComparison.OrdinalIgnoreCase);
+
+    public bool UsesTlsSignalling =>
+        string.Equals(SipSignallingTransport, TransportTls, StringComparison.OrdinalIgnoreCase);
 
     public bool AllowsCustomSipEndpoint =>
         LicenseKey.StartsWith("PR", StringComparison.OrdinalIgnoreCase);
@@ -57,14 +61,14 @@ public sealed record AppStartupConfig(
             return this with
             {
                 Domain = string.IsNullOrWhiteSpace(Domain) ? Server : Domain,
-                Port = Port > 0 ? Port : FixedSipPort
+                Port = Port > 0 ? Port : (UsesTlsSignalling ? 5061 : FixedSipPort)
             };
         }
 
         return this with
         {
             Server = FixedSipServer,
-            Port = FixedSipPort,
+            Port = UsesTlsSignalling ? 5061 : FixedSipPort,
             Domain = FixedSipServer
         };
     }

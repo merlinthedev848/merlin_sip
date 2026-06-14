@@ -244,19 +244,20 @@ public sealed class RtpAudioSession : IDisposable
             return;
         }
 
-        if (_muted)
-        {
-            WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
-            return;
-        }
-
         var pcm = new byte[header.BytesRecorded];
         Marshal.Copy(header.Data, pcm, 0, pcm.Length);
         var payload = new byte[pcm.Length / 2];
         for (var i = 0; i < payload.Length; i++)
         {
             var sample = BitConverter.ToInt16(pcm, i * 2);
-            sample = ApplyGain(sample, _inputGain);
+            if (_muted)
+            {
+                sample = 0;
+            }
+            else
+            {
+                sample = ApplyGain(sample, _inputGain);
+            }
             payload[i] = _payloadType == 8 ? G711Codec.LinearToALaw(sample) : G711Codec.LinearToMuLaw(sample);
         }
 
@@ -319,6 +320,15 @@ public sealed class RtpAudioSession : IDisposable
                 if (result.Buffer.Length <= 12)
                 {
                     continue;
+                }
+
+                if (Volatile.Read(ref _receivedPackets) == 0 && _remoteEndPoint is not null && result.RemoteEndPoint is IPEndPoint receivedEp)
+                {
+                    if (receivedEp.Address.Equals(_remoteEndPoint.Address) && receivedEp.Port != _remoteEndPoint.Port)
+                    {
+                        DebugLog.Write($"RTP symmetric latching: updating remote port from {_remoteEndPoint.Port} to {receivedEp.Port} based on first packet from {receivedEp}");
+                        _remoteEndPoint = receivedEp;
+                    }
                 }
 
                 var payloadType = result.Buffer[1] & 0x7F;
