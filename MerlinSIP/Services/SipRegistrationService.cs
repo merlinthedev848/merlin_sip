@@ -758,6 +758,7 @@ public sealed class SipRegistrationService : IDisposable
                 ? await SendAndWaitFromListenerAsync(first, cancellationToken)
                 : await SendAndReceiveDirectAsync(first, cancellationToken);
             DebugLog.Write($"REGISTER RESPONSE code={firstResponse.Code} reason={firstResponse.Reason}");
+            UpdateLocalEndpointFromResponse(firstResponse);
             if (firstResponse.Code == 200)
             {
                 _registered = true;
@@ -781,6 +782,7 @@ public sealed class SipRegistrationService : IDisposable
                 ? await SendAndWaitFromListenerAsync(second, cancellationToken)
                 : await SendAndReceiveDirectAsync(second, cancellationToken);
             DebugLog.Write($"AUTH REGISTER RESPONSE code={secondResponse.Code} reason={secondResponse.Reason}");
+            UpdateLocalEndpointFromResponse(secondResponse);
 
             _registered = secondResponse.Code == 200;
             return _registered
@@ -1837,6 +1839,47 @@ public sealed class SipRegistrationService : IDisposable
         return match.Success
             ? new SipResponse(int.Parse(match.Groups[1].Value), match.Groups[2].Value, headers, raw)
             : new SipResponse(0, "Invalid SIP response.", headers, raw);
+    }
+
+    private void UpdateLocalEndpointFromResponse(SipResponse response)
+    {
+        if (UseStreamSignalling)
+        {
+            return;
+        }
+
+        if (response.Headers.TryGetValue("via", out var viaHeader) && !string.IsNullOrWhiteSpace(viaHeader))
+        {
+            var receivedMatch = Regex.Match(viaHeader, @"received=([a-fA-F0-9\.:]+)");
+            var rportMatch = Regex.Match(viaHeader, @"rport=(\d+)");
+
+            var updated = false;
+            if (receivedMatch.Success)
+            {
+                var serverAddress = receivedMatch.Groups[1].Value;
+                if (_localAddress != serverAddress)
+                {
+                    DebugLog.Write($"NAT traversal: updating local IP from {_localAddress} to public {serverAddress}");
+                    _localAddress = serverAddress;
+                    updated = true;
+                }
+            }
+
+            if (rportMatch.Success && int.TryParse(rportMatch.Groups[1].Value, out var serverPort))
+            {
+                if (_localPort != serverPort)
+                {
+                    DebugLog.Write($"NAT traversal: updating local port from {_localPort} to public {serverPort}");
+                    _localPort = serverPort;
+                    updated = true;
+                }
+            }
+
+            if (updated)
+            {
+                DebugLog.Write($"NAT traversal: public endpoint detected as {_localAddress}:{_localPort}");
+            }
+        }
     }
 
     private static Dictionary<string, string> ParseHeaders(string raw)

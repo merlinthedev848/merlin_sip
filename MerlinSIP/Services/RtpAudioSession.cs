@@ -163,26 +163,45 @@ public sealed class RtpAudioSession : IDisposable
     public void Dispose()
     {
         Stop();
-        foreach (var buffer in _inputBuffers)
-        {
-            buffer.Dispose();
-        }
-
-        foreach (var buffer in _outputBuffers)
-        {
-            buffer.Dispose();
-        }
 
         if (_waveIn != IntPtr.Zero)
         {
+            foreach (var buffer in _inputBuffers)
+            {
+                WinMm.waveInUnprepareHeader(_waveIn, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+                buffer.Dispose();
+            }
+            _inputBuffers.Clear();
             WinMm.waveInClose(_waveIn);
             _waveIn = IntPtr.Zero;
+        }
+        else
+        {
+            foreach (var buffer in _inputBuffers)
+            {
+                buffer.Dispose();
+            }
+            _inputBuffers.Clear();
         }
 
         if (_waveOut != IntPtr.Zero)
         {
+            foreach (var buffer in _outputBuffers)
+            {
+                WinMm.waveOutUnprepareHeader(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+                buffer.Dispose();
+            }
+            _outputBuffers.Clear();
             WinMm.waveOutClose(_waveOut);
             _waveOut = IntPtr.Zero;
+        }
+        else
+        {
+            foreach (var buffer in _outputBuffers)
+            {
+                buffer.Dispose();
+            }
+            _outputBuffers.Clear();
         }
 
         _devicesPrepared = false;
@@ -405,6 +424,10 @@ public sealed class RtpAudioSession : IDisposable
         {
             var old = _outputBuffers[0];
             _outputBuffers.RemoveAt(0);
+            if (_waveOut != IntPtr.Zero)
+            {
+                WinMm.waveOutUnprepareHeader(_waveOut, old.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+            }
             old.Dispose();
         }
     }
@@ -533,6 +556,9 @@ internal static partial class WinMm
     public static extern int waveInPrepareHeader(IntPtr waveIn, IntPtr header, int size);
 
     [DllImport("winmm.dll")]
+    public static extern int waveInUnprepareHeader(IntPtr waveIn, IntPtr header, int size);
+
+    [DllImport("winmm.dll")]
     public static extern int waveInAddBuffer(IntPtr waveIn, IntPtr header, int size);
 
     [DllImport("winmm.dll")]
@@ -552,6 +578,9 @@ internal static partial class WinMm
 
     [DllImport("winmm.dll")]
     public static extern int waveOutPrepareHeader(IntPtr waveOut, IntPtr header, int size);
+
+    [DllImport("winmm.dll")]
+    public static extern int waveOutUnprepareHeader(IntPtr waveOut, IntPtr header, int size);
 
     [DllImport("winmm.dll")]
     public static extern int waveOutWrite(IntPtr waveOut, IntPtr header, int size);

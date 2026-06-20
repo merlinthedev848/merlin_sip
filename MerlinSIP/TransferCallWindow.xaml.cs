@@ -7,12 +7,34 @@ public partial class TransferCallWindow : Window
 {
     public string TransferTarget => TransferTargetTextBox.Text.Trim();
 
-    public TransferCallWindow(string currentTarget = "")
+    public TransferCallWindow(string currentTarget = "", System.Collections.Generic.IEnumerable<Models.ContactEntry>? favorites = null)
     {
         InitializeComponent();
         TransferTargetTextBox.Text = currentTarget;
         TransferTargetTextBox.CaretIndex = TransferTargetTextBox.Text.Length;
         Loaded += (_, _) => TransferTargetTextBox.Focus();
+
+        var favList = favorites?.ToList() ?? [];
+        if (favList.Count > 0)
+        {
+            FavoritesListView.ItemsSource = favList;
+            FavoritesPanel.Visibility = Visibility.Visible;
+            Height = 440;
+        }
+        else
+        {
+            FavoritesPanel.Visibility = Visibility.Collapsed;
+            Height = 260;
+        }
+    }
+
+    private void FavoritesListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (FavoritesListView.SelectedItem is Models.ContactEntry contact)
+        {
+            TransferTargetTextBox.Text = contact.Number;
+            TransferButton_Click(sender, e);
+        }
     }
 
     private void TransferButton_Click(object sender, RoutedEventArgs e)

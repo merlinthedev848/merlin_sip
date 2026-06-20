@@ -115,6 +115,7 @@
             <Setter Property="Background" Value="#F1F5F9" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -123,7 +124,7 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0" />
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" Margin="12,0" />
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -427,9 +428,10 @@
                                         <TextBlock Text="Directory" Foreground="#111827" FontSize="24" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </DockPanel>
-                                <UniformGrid Grid.Row="1" Columns="2" HorizontalAlignment="Left" Width="260" Margin="0,0,0,12" VerticalAlignment="Top">
-                                    <Button Content="History" Style="{StaticResource SoftButton}" Margin="0,0,8,0" Click="ShowDirectoryHistoryButton_Click" />
-                                    <Button Content="Contacts" Style="{StaticResource SoftButton}" Margin="8,0,0,0" Click="ShowDirectoryContactsButton_Click" />
+                                 <UniformGrid Grid.Row="1" Columns="3" HorizontalAlignment="Left" Width="360" Margin="0,0,0,12" VerticalAlignment="Top">
+                                    <Button Content="History" Style="{StaticResource SoftButton}" Margin="0,0,4,0" Click="ShowDirectoryHistoryButton_Click" />
+                                    <Button Content="Contacts" Style="{StaticResource SoftButton}" Margin="4,0,4,0" Click="ShowDirectoryContactsButton_Click" />
+                                    <Button Content="Favorites" Style="{StaticResource SoftButton}" Margin="4,0,0,0" Click="ShowDirectoryFavoritesButton_Click" />
                                 </UniformGrid>
 
                                 <TabControl x:Name="DirectoryTabs" Grid.Row="1" Margin="0,54,0,0">
@@ -531,6 +533,53 @@
                                             </ListBox.ItemTemplate>
                                         </ListBox>
                                     </TabItem>
+
+                                    <TabItem x:Name="DirectoryFavoritesTab" Header="Favorites">
+                                        <ListBox x:Name="DialFavoritesListView" BorderThickness="0" Background="Transparent" MouseDoubleClick="FavoritesListView_MouseDoubleClick">
+                                            <ListBox.Template>
+                                                <ControlTemplate TargetType="ListBox">
+                                                    <DockPanel>
+                                                        <Grid DockPanel.Dock="Top" Background="#EAF1F8" Margin="0,0,0,2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="1.2*" />
+                                                                <ColumnDefinition Width="1*" />
+                                                                <ColumnDefinition Width="0.8*" />
+                                                                <ColumnDefinition Width="0.9*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Name" FontWeight="SemiBold" Foreground="#64748B" Margin="12,8" />
+                                                            <TextBlock Grid.Column="1" Text="Company" FontWeight="SemiBold" Foreground="#64748B" Margin="8" />
+                                                            <TextBlock Grid.Column="2" Text="Number" FontWeight="SemiBold" Foreground="#64748B" Margin="8" />
+                                                            <TextBlock Grid.Column="3" Text="BLF" FontWeight="SemiBold" Foreground="#64748B" Margin="8" HorizontalAlignment="Center" />
+                                                        </Grid>
+                                                        <ScrollViewer Focusable="False">
+                                                            <ItemsPresenter />
+                                                        </ScrollViewer>
+                                                    </DockPanel>
+                                                </ControlTemplate>
+                                            </ListBox.Template>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,1" Background="#F8FBFE">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="1.2*" />
+                                                            <ColumnDefinition Width="1*" />
+                                                            <ColumnDefinition Width="0.8*" />
+                                                            <ColumnDefinition Width="0.9*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" Foreground="#111827" FontWeight="SemiBold" Margin="12,10" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Company}" Foreground="#64748B" Margin="8,10" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding Number}" Foreground="#0E987E" FontWeight="SemiBold" Margin="8,10" TextTrimming="CharacterEllipsis" />
+                                                        <Border Grid.Column="3" Background="{Binding PresenceBackground}" CornerRadius="6" Padding="6,3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Ellipse Width="7" Height="7" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" Margin="0,0,5,0" />
+                                                                <TextBlock Text="{Binding PresenceLabel}" Foreground="{Binding PresenceForeground}" FontWeight="Medium" FontSize="12" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </TabItem>
                                 </TabControl>
                             </Grid>
                         </Border>
@@ -588,9 +637,17 @@
                                 <TextBlock Text="Company" Foreground="#64748B" FontWeight="Medium" Margin="0,12,0,4" />
                                 <TextBox x:Name="ContactCompanyTextBox" KeyDown="ContactTextBox_KeyDown" />
                                 <TextBlock Text="Notes" Foreground="#64748B" FontWeight="Medium" Margin="0,12,0,4" />
-                                <TextBox x:Name="ContactNotesTextBox" AcceptsReturn="True" Height="96" TextWrapping="Wrap" />
-                                <Button Content="Save contact" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Margin="0,18,0,10" Click="SaveContactButton_Click" />
-                                <Button Content="Delete selected" Style="{StaticResource SoftButton}" Click="DeleteContactButton_Click" />
+                                <TextBox x:Name="ContactNotesTextBox" AcceptsReturn="True" Height="96" TextWrapping="Wrap" Margin="0,0,0,12" />
+                                <CheckBox x:Name="ContactIsFavoriteCheckBox" Content="Add to favorites / speed dial" Foreground="#111827" FontWeight="SemiBold" Margin="0,4,0,14" />
+                                <Button Content="Save contact" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Margin="0,0,0,10" Click="SaveContactButton_Click" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="Delete selected" Style="{StaticResource SoftButton}" Click="DeleteContactButton_Click" Margin="0,0,6,0" />
+                                    <Button Grid.Column="1" x:Name="NewContactButton" Content="New / Clear" Style="{StaticResource SoftButton}" Click="NewContactButton_Click" Margin="6,0,0,0" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -764,28 +821,41 @@
         </Grid>
 
         <Grid x:Name="SettingsOverlay" Grid.ColumnSpan="2" Visibility="Collapsed" Background="#D9000000">
-            <Border Style="{StaticResource Surface}" Width="680" Height="620" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Style="{StaticResource Surface}" Width="780" Height="580" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                        <DockPanel Margin="0,0,0,18">
-                            <Button DockPanel.Dock="Right" Content="Close" Style="{StaticResource SoftButton}" Width="90" Click="CloseSettingsButton_Click" />
-                            <StackPanel>
-                                <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" Foreground="#111827" />
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Sidebar Panel -->
+                    <Border Grid.Column="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="0,0,1,0" CornerRadius="8,0,0,8" Padding="16,20">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Title -->
+                            <TextBlock Grid.Row="0" Text="Settings" FontSize="24" FontWeight="SemiBold" Foreground="#0F172A" Margin="0,0,0,24" />
+                            
+                            <!-- Sidebar Tabs -->
+                            <StackPanel Grid.Row="1">
+                                <Button x:Name="TabBtnGeneral" Content="General" Style="{StaticResource SettingsTabButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="SettingsGeneralButton_Click" Margin="0,0,0,6" />
+                                <Button x:Name="TabBtnAccount" Content="Account &amp; Network" Style="{StaticResource SettingsTabButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="SettingsAccountButton_Click" Margin="0,0,0,6" />
+                                <Button x:Name="TabBtnHandling" Content="Call Handling" Style="{StaticResource SettingsTabButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="SettingsHandlingButton_Click" Margin="0,0,0,6" />
+                                <Button x:Name="TabBtnDevices" Content="Devices &amp; About" Style="{StaticResource SettingsTabButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="SettingsDevicesButton_Click" Margin="0,0,0,6" />
                             </StackPanel>
-                        </DockPanel>
 
-                        <WrapPanel Grid.Row="1" Margin="0,0,0,18">
-                            <Button x:Name="TabBtnGeneral" Content="General" Style="{StaticResource SettingsTabButton}" Width="104" Margin="0,0,8,8" Click="SettingsGeneralButton_Click" />
-                            <Button x:Name="TabBtnAccount" Content="Account &amp; Network" Style="{StaticResource SettingsTabButton}" Width="140" Margin="0,0,8,8" Click="SettingsAccountButton_Click" />
-                            <Button x:Name="TabBtnHandling" Content="Call Handling" Style="{StaticResource SettingsTabButton}" Width="114" Margin="0,0,8,8" Click="SettingsHandlingButton_Click" />
-                            <Button x:Name="TabBtnDevices" Content="Devices &amp; About" Style="{StaticResource SettingsTabButton}" Width="124" Margin="0,0,8,8" Click="SettingsDevicesButton_Click" />
-                        </WrapPanel>
+                            <!-- Close Button -->
+                            <Button Grid.Row="2" Content="Close" Style="{StaticResource SoftButton}" HorizontalAlignment="Stretch" Click="CloseSettingsButton_Click" />
+                        </Grid>
+                    </Border>
 
-                        <TabControl x:Name="SettingsTabs" Grid.Row="2" Background="Transparent" BorderThickness="0">
+                    <!-- Settings Content Panel -->
+                    <Grid Grid.Column="1" Margin="20,20,12,20">
+                        <TabControl x:Name="SettingsTabs" Background="Transparent" BorderThickness="0">
                             <TabControl.Resources>
                                 <Style TargetType="TabItem">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -1204,6 +1274,7 @@
                                 </ScrollViewer>
                             </TabItem>
                         </TabControl>
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>

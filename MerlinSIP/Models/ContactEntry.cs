@@ -8,6 +8,7 @@ public sealed record ContactEntry
     public string Number { get; init; } = "";
     public string Company { get; init; } = "";
     public string Notes { get; init; } = "";
+    public bool IsFavorite { get; init; } = false;
 
     [JsonIgnore]
     public string Presence { get; init; } = "Offline";

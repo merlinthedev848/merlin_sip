@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ChatMessageEntry> _chatMessages = [];
     private readonly ObservableCollection<ChatMessageEntry> _chatThreadMessages = [];
     private readonly ObservableCollection<ContactEntry> _filteredDirectoryContacts = [];
+    private readonly ObservableCollection<ContactEntry> _filteredDirectoryFavorites = [];
     private readonly ObservableCollection<ContactEntry> _filteredPhonebookContacts = [];
     private readonly ObservableCollection<CallHistoryEntry> _filteredRecentCalls = [];
     private readonly ObservableCollection<CallHistoryEntry> _filteredCallHistory = [];
@@ -80,6 +81,7 @@ public partial class MainWindow : Window
         ApplyAppVersion();
         LoadDefaultDeviceSelectors();
         DialContactsListView.ItemsSource = _filteredDirectoryContacts;
+        DialFavoritesListView.ItemsSource = _filteredDirectoryFavorites;
         PhonebookContactsListView.ItemsSource = _filteredPhonebookContacts;
         ChatContactsListView.ItemsSource = _contacts;
         RecentCallsListView.ItemsSource = _filteredRecentCalls;
@@ -1048,9 +1050,23 @@ public partial class MainWindow : Window
     {
         var query = GlobalSearchTextBox.Text.Trim();
         ReplaceCollection(_filteredDirectoryContacts, FilterContacts(query));
+        ReplaceCollection(_filteredDirectoryFavorites, FilterFavorites(query));
         ReplaceCollection(_filteredPhonebookContacts, FilterContacts(query));
         ReplaceCollection(_filteredRecentCalls, FilterCalls(query));
         ReplaceCollection(_filteredCallHistory, FilterCalls(query));
+    }
+
+    private IEnumerable<ContactEntry> FilterFavorites(string query)
+    {
+        var favorites = _contacts.Where(c => c.IsFavorite);
+        return string.IsNullOrWhiteSpace(query)
+            ? favorites
+            : favorites.Where(contact =>
+                ContainsSearchText(contact.Name, query) ||
+                ContainsSearchText(contact.Number, query) ||
+                ContainsSearchText(contact.Company, query) ||
+                ContainsSearchText(contact.Notes, query) ||
+                ContainsSearchText(contact.PresenceLabel, query));
     }
 
     private IEnumerable<ContactEntry> FilterContacts(string query)
@@ -1477,7 +1493,8 @@ public partial class MainWindow : Window
 
     private async void TransferButton_Click(object sender, RoutedEventArgs e)
     {
-        var transferWindow = new TransferCallWindow(DestinationTextBox.Text)
+        var favorites = _config.ShowFavouriteExtensionsOnTransfer ? _contacts.Where(c => c.IsFavorite) : null;
+        var transferWindow = new TransferCallWindow(DestinationTextBox.Text, favorites)
         {
             Owner = this
         };
@@ -1607,6 +1624,7 @@ public partial class MainWindow : Window
         ContactNumberTextBox.Text = contact.Number;
         ContactCompanyTextBox.Text = contact.Company;
         ContactNotesTextBox.Text = contact.Notes;
+        ContactIsFavoriteCheckBox.IsChecked = contact.IsFavorite;
         FooterStatusText.Text = $"Editing {contact.Name}.";
     }
 
@@ -1657,7 +1675,8 @@ public partial class MainWindow : Window
             Name = name,
             Number = number,
             Company = ContactCompanyTextBox.Text.Trim(),
-            Notes = ContactNotesTextBox.Text.Trim()
+            Notes = ContactNotesTextBox.Text.Trim(),
+            IsFavorite = ContactIsFavoriteCheckBox.IsChecked == true
         };
 
         _contacts.Add(savedContact);
@@ -1669,6 +1688,7 @@ public partial class MainWindow : Window
         ContactNumberTextBox.Text = "";
         ContactCompanyTextBox.Text = "";
         ContactNotesTextBox.Text = "";
+        ContactIsFavoriteCheckBox.IsChecked = false;
         ApplyGlobalSearchFilter();
         FooterStatusText.Text = "Contact saved.";
         _ = RefreshPresenceSubscriptionsAsync();
@@ -1689,8 +1709,21 @@ public partial class MainWindow : Window
         ContactNumberTextBox.Text = "";
         ContactCompanyTextBox.Text = "";
         ContactNotesTextBox.Text = "";
+        ContactIsFavoriteCheckBox.IsChecked = false;
         ApplyGlobalSearchFilter();
         FooterStatusText.Text = "Contact deleted.";
+    }
+
+    private void NewContactButton_Click(object sender, RoutedEventArgs e)
+    {
+        PhonebookContactsListView.SelectedItem = null;
+        _editingContact = null;
+        ContactNameTextBox.Text = "";
+        ContactNumberTextBox.Text = "";
+        ContactCompanyTextBox.Text = "";
+        ContactNotesTextBox.Text = "";
+        ContactIsFavoriteCheckBox.IsChecked = false;
+        FooterStatusText.Text = "Ready to create a new contact.";
     }
 
     private async void ReconnectButton_Click(object sender, RoutedEventArgs e)
@@ -1859,6 +1892,19 @@ public partial class MainWindow : Window
         DirectoryTabs.SelectedItem = DirectoryContactsTab;
     }
 
+    private void ShowDirectoryFavoritesButton_Click(object sender, RoutedEventArgs e)
+    {
+        DirectoryTabs.SelectedItem = DirectoryFavoritesTab;
+    }
+
+    private void FavoritesListView_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (DialFavoritesListView.SelectedItem is ContactEntry contact)
+        {
+            UseSelectedContact(contact);
+        }
+    }
+
     private void ShowCallsButton_Click(object sender, RoutedEventArgs e)
     {
         MainTabs.SelectedItem = CallsTab;
@@ -1889,7 +1935,7 @@ public partial class MainWindow : Window
 
     private void UpdateActiveSettingsTab(System.Windows.Controls.Button activeBtn)
     {
-        var activeBg = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("PrimaryBrush")!;
+        var activeBg = (System.Windows.Media.Brush)this.FindResource("PrimaryBrush")!;
         var activeFg = System.Windows.Media.Brushes.White;
         var inactiveBg = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#F1F5F9")!;
         var inactiveFg = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#475569")!;
@@ -2518,7 +2564,7 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Enter)
         {
-            SaveContactButton_Click(null, null);
+            SaveContactButton_Click(this, new RoutedEventArgs());
             e.Handled = true;
         }
     }
