@@ -408,7 +408,30 @@ async function registerSip(config, expires = 300) {
 
   if (sipSocket) sipSocket.close();
   sipSocket = dgram.createSocket("udp4");
-  await new Promise(resolve => sipSocket.bind(0, resolve));
+  
+  let bound = false;
+  for (const p of [5060, 5062, 5064, 5066]) {
+    try {
+      await new Promise((resolve, reject) => {
+        const onError = (err) => {
+          sipSocket.close();
+          reject(err);
+        };
+        sipSocket.once("error", onError);
+        sipSocket.bind(p, () => {
+          sipSocket.off("error", onError);
+          bound = true;
+          resolve();
+        });
+      });
+      break;
+    } catch (e) {
+      sipSocket = dgram.createSocket("udp4");
+    }
+  }
+  if (!bound) {
+    await new Promise(resolve => sipSocket.bind(0, resolve));
+  }
 
   const callId = `${crypto.randomBytes(12).toString("hex")}@merlin-sip`;
   const first = buildRegisterMessage({ ...config, sipHost: host }, { callId, cseq: 1, expires });

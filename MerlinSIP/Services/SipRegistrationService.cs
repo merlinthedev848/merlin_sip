@@ -262,7 +262,7 @@ public sealed class SipRegistrationService : IDisposable
 
         _config = config;
         _domain = string.IsNullOrWhiteSpace(config.Domain) ? config.Server : config.Domain;
-        _localAddress = GetLocalAddress();
+        _localAddress = GetLocalAddress(config.Server);
         if (config.UsesTcpSignalling || config.UsesTlsSignalling)
         {
             _tcpClient = new TcpClient();
@@ -290,8 +290,27 @@ public sealed class SipRegistrationService : IDisposable
         }
         else
         {
-            _client = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
-            _localPort = ((IPEndPoint)_client.Client.LocalEndPoint!).Port;
+            var bound = false;
+            foreach (var port in new[] { 5060, 5062, 5064, 5066 })
+            {
+                try
+                {
+                    _client = new UdpClient(new IPEndPoint(IPAddress.Any, port));
+                    bound = true;
+                    break;
+                }
+                catch (SocketException)
+                {
+                    // Port already in use, try the next one
+                }
+            }
+
+            if (!bound)
+            {
+                _client = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+            }
+
+            _localPort = ((IPEndPoint)_client!.Client.LocalEndPoint!).Port;
         }
 
         SipRegistrationResult result;
@@ -2196,8 +2215,48 @@ public sealed class SipRegistrationService : IDisposable
         DebugLog.Write($"REGISTER post-call refresh exhausted reason={reason}");
     }
 
-    private static string GetLocalAddress()
+    private static string GetLocalAddress(string remoteServer)
     {
+        try
+        {
+            using var tempSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            tempSocket.Connect(remoteServer, 5060);
+            if (tempSocket.LocalEndPoint is IPEndPoint localEP)
+            {
+                return localEP.Address.ToString();
+            }
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"GetLocalAddress socket connect failed: {error.Message}");
+        }
+
+        // Fallback: search active interfaces but filter out virtual ones (WSL, Hyper-V, VPNs, VMware, VirtualBox)
+        foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (networkInterface.OperationalStatus != OperationalStatus.Up)
+            {
+                continue;
+            }
+
+            var name = networkInterface.Name.ToLowerInvariant();
+            var desc = networkInterface.Description.ToLowerInvariant();
+            if (name.Contains("virtual") || name.Contains("wsl") || name.Contains("hyper-v") || name.Contains("vmware") || name.Contains("virtualbox") || name.Contains("vbox") || name.Contains("vpn") || name.Contains("loopback") || name.Contains("pseudo") ||
+                desc.Contains("virtual") || desc.Contains("wsl") || desc.Contains("hyper-v") || desc.Contains("vmware") || desc.Contains("virtualbox") || desc.Contains("vbox") || desc.Contains("vpn") || desc.Contains("loopback") || desc.Contains("pseudo"))
+            {
+                continue;
+            }
+
+            foreach (var address in networkInterface.GetIPProperties().UnicastAddresses)
+            {
+                if (address.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address.Address))
+                {
+                    return address.Address.ToString();
+                }
+            }
+        }
+
+        // Final fallback: any non-loopback IP
         foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
         {
             if (networkInterface.OperationalStatus != OperationalStatus.Up)
