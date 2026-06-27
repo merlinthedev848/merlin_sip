@@ -115,8 +115,15 @@ public partial class StartupWindow : Window
 
         if (ProvisionCodeRadioButton.IsChecked == true)
         {
+            var provisionCode = ProvisioningCodeTextBox.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(provisionCode))
+            {
+                ErrorText.Text = "Enter a provisioning code.";
+                return;
+            }
+
             var provisioned = await _provisioningService.ProvisionAsync(
-                ProvisioningCodeTextBox.Text,
+                provisionCode,
                 _licenseKey,
                 _licenseStatus,
                 _licenseService.LocalKey ?? string.Empty,

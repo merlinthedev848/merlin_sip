@@ -18,6 +18,7 @@ public sealed class RtpAudioSession : IDisposable
     private readonly List<AudioBuffer> _outputBuffers = [];
     private readonly WinMm.WaveInProc _waveInCallback;
     private readonly object _sendSync = new();
+    private readonly object _buffersSync = new();
     private IntPtr _waveIn;
     private IntPtr _waveOut;
     private IPEndPoint? _remoteEndPoint;
@@ -26,11 +27,11 @@ public sealed class RtpAudioSession : IDisposable
     private uint _timestamp;
     private readonly uint _ssrc = (uint)Random.Shared.Next();
     private int _payloadType;
-    private bool _running;
-    private bool _devicesPrepared;
-    private bool _transmitMicrophone;
-    private bool _muted;
-    private bool _held;
+    private volatile bool _running;
+    private volatile bool _devicesPrepared;
+    private volatile bool _transmitMicrophone;
+    private volatile bool _muted;
+    private volatile bool _held;
     private int _receivedPackets;
     private int _sentPackets;
 
@@ -103,15 +104,18 @@ public sealed class RtpAudioSession : IDisposable
         _running = false;
         _receiveCancellation?.Cancel();
         DebugLog.Write("RTP stop");
-        if (_waveIn != IntPtr.Zero)
+        lock (_buffersSync)
         {
-            WinMm.waveInStop(_waveIn);
-            WinMm.waveInReset(_waveIn);
-        }
+            if (_waveIn != IntPtr.Zero)
+            {
+                WinMm.waveInStop(_waveIn);
+                WinMm.waveInReset(_waveIn);
+            }
 
-        if (_waveOut != IntPtr.Zero)
-        {
-            WinMm.waveOutReset(_waveOut);
+            if (_waveOut != IntPtr.Zero)
+            {
+                WinMm.waveOutReset(_waveOut);
+            }
         }
 
         _remoteEndPoint = null;
@@ -164,49 +168,52 @@ public sealed class RtpAudioSession : IDisposable
     {
         Stop();
 
-        if (_waveIn != IntPtr.Zero)
+        lock (_buffersSync)
         {
-            foreach (var buffer in _inputBuffers)
+            if (_waveIn != IntPtr.Zero)
             {
-                WinMm.waveInUnprepareHeader(_waveIn, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
-                buffer.Dispose();
+                foreach (var buffer in _inputBuffers)
+                {
+                    WinMm.waveInUnprepareHeader(_waveIn, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+                    buffer.Dispose();
+                }
+                _inputBuffers.Clear();
+                WinMm.waveInClose(_waveIn);
+                _waveIn = IntPtr.Zero;
             }
-            _inputBuffers.Clear();
-            WinMm.waveInClose(_waveIn);
-            _waveIn = IntPtr.Zero;
-        }
-        else
-        {
-            foreach (var buffer in _inputBuffers)
+            else
             {
-                buffer.Dispose();
+                foreach (var buffer in _inputBuffers)
+                {
+                    buffer.Dispose();
+                }
+                _inputBuffers.Clear();
             }
-            _inputBuffers.Clear();
-        }
 
-        if (_waveOut != IntPtr.Zero)
-        {
-            foreach (var buffer in _outputBuffers)
+            if (_waveOut != IntPtr.Zero)
             {
-                WinMm.waveOutUnprepareHeader(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
-                buffer.Dispose();
+                foreach (var buffer in _outputBuffers)
+                {
+                    WinMm.waveOutUnprepareHeader(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+                    buffer.Dispose();
+                }
+                _outputBuffers.Clear();
+                WinMm.waveOutClose(_waveOut);
+                _waveOut = IntPtr.Zero;
             }
-            _outputBuffers.Clear();
-            WinMm.waveOutClose(_waveOut);
-            _waveOut = IntPtr.Zero;
-        }
-        else
-        {
-            foreach (var buffer in _outputBuffers)
+            else
             {
-                buffer.Dispose();
+                foreach (var buffer in _outputBuffers)
+                {
+                    buffer.Dispose();
+                }
+                _outputBuffers.Clear();
             }
-            _outputBuffers.Clear();
-        }
 
-        _devicesPrepared = false;
-        _receiveCancellation?.Dispose();
-        _rtpClient.Dispose();
+            _devicesPrepared = false;
+            _receiveCancellation?.Dispose();
+            _rtpClient.Dispose();
+        }
     }
 
     private void OpenWaveIn()
@@ -341,11 +348,11 @@ public sealed class RtpAudioSession : IDisposable
                     continue;
                 }
 
-                if (Volatile.Read(ref _receivedPackets) == 0 && _remoteEndPoint is not null && result.RemoteEndPoint is IPEndPoint receivedEp)
+                if (Volatile.Read(ref _receivedPackets) == 0 && result.RemoteEndPoint is IPEndPoint receivedEp)
                 {
-                    if (receivedEp.Address.Equals(_remoteEndPoint.Address) && receivedEp.Port != _remoteEndPoint.Port)
+                    if (_remoteEndPoint is null || !receivedEp.Equals(_remoteEndPoint))
                     {
-                        DebugLog.Write($"RTP symmetric latching: updating remote port from {_remoteEndPoint.Port} to {receivedEp.Port} based on first packet from {receivedEp}");
+                        DebugLog.Write($"RTP symmetric latching: updating remote endpoint from {_remoteEndPoint} to {receivedEp} based on first packet");
                         _remoteEndPoint = receivedEp;
                     }
                 }
@@ -401,34 +408,42 @@ public sealed class RtpAudioSession : IDisposable
             return parsed;
         }
 
-        var addresses = await Dns.GetHostAddressesAsync(remoteAddress);
-        return addresses.FirstOrDefault(item => item.AddressFamily == AddressFamily.InterNetwork)
-            ?? addresses.FirstOrDefault()
-            ?? throw new InvalidOperationException($"Unable to resolve RTP address {remoteAddress}.");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            var addresses = await Dns.GetHostAddressesAsync(remoteAddress, cts.Token);
+            return addresses.FirstOrDefault(item => item.AddressFamily == AddressFamily.InterNetwork)
+                ?? addresses.FirstOrDefault()
+                ?? throw new InvalidOperationException($"Unable to resolve RTP address {remoteAddress}.");
+        }
+        catch (Exception error)
+        {
+            throw new InvalidOperationException($"Unable to resolve RTP address {remoteAddress}: {error.Message}");
+        }
     }
 
     private void PlayPcm(byte[] pcm)
     {
-        if (_waveOut == IntPtr.Zero)
+        lock (_buffersSync)
         {
-            return;
-        }
-
-        var buffer = new AudioBuffer(pcm.Length);
-        Marshal.Copy(pcm, 0, buffer.DataPointer, pcm.Length);
-        _outputBuffers.Add(buffer);
-        WinMm.waveOutPrepareHeader(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
-        WinMm.waveOutWrite(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
-
-        if (_outputBuffers.Count > 120)
-        {
-            var old = _outputBuffers[0];
-            _outputBuffers.RemoveAt(0);
-            if (_waveOut != IntPtr.Zero)
+            if (_waveOut == IntPtr.Zero)
             {
-                WinMm.waveOutUnprepareHeader(_waveOut, old.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+                return;
             }
-            old.Dispose();
+
+            var buffer = new AudioBuffer(pcm.Length);
+            Marshal.Copy(pcm, 0, buffer.DataPointer, pcm.Length);
+            _outputBuffers.Add(buffer);
+            WinMm.waveOutPrepareHeader(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+            WinMm.waveOutWrite(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+
+            if (_outputBuffers.Count > 120)
+            {
+                var old = _outputBuffers[0];
+                _outputBuffers.RemoveAt(0);
+                WinMm.waveOutUnprepareHeader(_waveOut, old.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+                old.Dispose();
+            }
         }
     }
 

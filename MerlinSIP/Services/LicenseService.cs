@@ -11,7 +11,9 @@ public sealed class LicenseService
 {
     public const string ProductId = "merlin-sip";
 
+#if DEBUG
     private const string TestLicenseKey = "TEST-BFC2-DF38-F81D-F08E-135A-9058";
+#endif
     private static readonly Uri VerifyUrl = new("https://accounts.chriskendall.media/license/verify");
     private static readonly Uri ActivateUrl = new("https://accounts.chriskendall.media/license/activate");
     private static readonly HttpClient HttpClient = new()
@@ -30,12 +32,14 @@ public sealed class LicenseService
             return LicenseActivationResult.Fail("Enter a valid license key.");
         }
 
+#if DEBUG
         if (string.Equals(licenseKey, TestLicenseKey, StringComparison.OrdinalIgnoreCase))
         {
             Status = "Licensed";
             LocalKey = null;
             return LicenseActivationResult.Ok(Status);
         }
+#endif
 
         try
         {
@@ -73,12 +77,14 @@ public sealed class LicenseService
             return LicenseVerificationResult.Inactive("No licence key is saved.");
         }
 
+#if DEBUG
         if (string.Equals(licenseKey, TestLicenseKey, StringComparison.OrdinalIgnoreCase))
         {
             Status = "Licensed to CK Media Services";
             LocalKey = null;
             return LicenseVerificationResult.Valid(Status, "CK Media Services");
         }
+#endif
 
         try
         {

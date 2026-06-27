@@ -5,7 +5,8 @@ namespace MerlinSip;
 
 public partial class TransferCallWindow : Window
 {
-    public string TransferTarget => TransferTargetTextBox.Text.Trim();
+    private string _transferTarget = "";
+    public string TransferTarget => _transferTarget;
 
     public TransferCallWindow(string currentTarget = "", System.Collections.Generic.IEnumerable<Models.ContactEntry>? favorites = null)
     {
@@ -33,13 +34,14 @@ public partial class TransferCallWindow : Window
         if (FavoritesListView.SelectedItem is Models.ContactEntry contact)
         {
             TransferTargetTextBox.Text = contact.Number;
-            TransferButton_Click(sender, e);
+            TransferButton_Click(this, new RoutedEventArgs());
         }
     }
 
     private void TransferButton_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = !string.IsNullOrWhiteSpace(TransferTarget);
+        _transferTarget = TransferTargetTextBox.Text.Trim();
+        DialogResult = !string.IsNullOrWhiteSpace(_transferTarget);
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)

@@ -25,10 +25,26 @@ public partial class IncomingCallWindow : Window
     private void AnswerButton_Click(object sender, RoutedEventArgs e)
     {
         AnswerRequested?.Invoke(this, EventArgs.Empty);
+        Close();
     }
 
     private void DeclineButton_Click(object sender, RoutedEventArgs e)
     {
         DeclineRequested?.Invoke(this, EventArgs.Empty);
+        Close();
+    }
+
+    private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter)
+        {
+            e.Handled = true;
+            AnswerButton_Click(this, new RoutedEventArgs());
+        }
+        else if (e.Key == System.Windows.Input.Key.Escape)
+        {
+            e.Handled = true;
+            DeclineButton_Click(this, new RoutedEventArgs());
+        }
     }
 }

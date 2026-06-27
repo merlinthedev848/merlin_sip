@@ -222,6 +222,13 @@ public partial class MainWindow : Window
             _registered = true;
             SetConnectionState("Connected", "#DFF8EE", "#106247");
         }
+        catch (Exception error)
+        {
+            DebugLog.Write($"EnsureConnectionReady failed error={error.Message}");
+            _registered = false;
+            SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
+            UpdateCallControls();
+        }
         finally
         {
             _connectionCheckInProgress = false;
@@ -896,10 +903,46 @@ public partial class MainWindow : Window
         }
         else
         {
-            _registered = false;
-            SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
-            ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
-            FooterStatusText.Text = "Connection status is available in Settings.";
+            if (!_config.UsesTcpSignalling && !_config.UsesTlsSignalling &&
+                (result.Message.Contains("Timed out", StringComparison.OrdinalIgnoreCase) || 
+                 result.Message.Contains("Socket error", StringComparison.OrdinalIgnoreCase) ||
+                 result.Message.Contains("Unable to connect", StringComparison.OrdinalIgnoreCase)))
+            {
+                DebugLog.Write("UDP register failed/timed out. Attempting automatic fallback to TCP signalling for SIP ALG / Virgin Media line compatibility...");
+                var tcpConfig = _config with { SipSignallingTransport = AppStartupConfig.TransportTcp };
+                try
+                {
+                    var tcpResult = await _sipRegistrationService.RegisterAsync(tcpConfig);
+                    if (tcpResult.Connected)
+                    {
+                        DebugLog.Write("TCP fallback registration successful! Updating config to use TCP.");
+                        _config = tcpConfig;
+                        await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
+                        ApplyStartupConfig();
+                        result = tcpResult;
+                    }
+                }
+                catch (Exception tcpError)
+                {
+                    DebugLog.Write($"TCP fallback failed: {tcpError.Message}");
+                }
+            }
+
+            if (result.Connected)
+            {
+                _registered = true;
+                SetConnectionState("Connected", "#DFF8EE", "#106247");
+                ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
+                FooterStatusText.Text = "Ready.";
+                await RefreshPresenceSubscriptionsAsync();
+            }
+            else
+            {
+                _registered = false;
+                SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
+                ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
+                FooterStatusText.Text = "Connection status is available in Settings.";
+            }
         }
 
         await RefreshConnectionDiagnosticsAsync();

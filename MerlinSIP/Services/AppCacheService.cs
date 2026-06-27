@@ -12,9 +12,16 @@ public sealed class AppCacheService
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "MerlinSIP");
 
-    private string SettingsPath => Path.Combine(_root, "settings.json");
-    private string ContactsPath => Path.Combine(_root, "contacts.json");
-    private string HistoryPath => Path.Combine(_root, "call-history.json");
+    private readonly string SettingsPath;
+    private readonly string ContactsPath;
+    private readonly string HistoryPath;
+
+    public AppCacheService()
+    {
+        SettingsPath = Path.Combine(_root, "settings.json");
+        ContactsPath = Path.Combine(_root, "contacts.json");
+        HistoryPath = Path.Combine(_root, "call-history.json");
+    }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -59,7 +66,7 @@ public sealed class AppCacheService
             Unprotect(settings.Username, settings.EncryptedUsername),
             Unprotect(settings.Password, settings.EncryptedPassword),
             licenseKey,
-            settings.LicenseStatus,
+            settings.LicenseStatus ?? "Licensed",
             settings.AudioInput,
             settings.AudioOutput,
             settings.VideoSource,
@@ -220,7 +227,7 @@ public sealed class AppCacheService
         int? Port,
         string? LicenseKey,
         string? EncryptedLicenseKey,
-        string LicenseStatus,
+        string? LicenseStatus,
         MediaDeviceInfo AudioInput,
         MediaDeviceInfo AudioOutput,
         MediaDeviceInfo VideoSource,

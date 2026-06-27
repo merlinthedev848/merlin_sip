@@ -17,10 +17,11 @@ public partial class ConfirmDialogWindow : Window
 
     public static bool Confirm(Window owner, string title, string message, string confirmText = "Confirm", string cancelText = "Cancel")
     {
-        var dialog = new ConfirmDialogWindow(title, message, confirmText, cancelText)
+        var dialog = new ConfirmDialogWindow(title, message, confirmText, cancelText);
+        if (owner != null && owner.IsLoaded)
         {
-            Owner = owner
-        };
+            dialog.Owner = owner;
+        }
 
         return dialog.ShowDialog() == true;
     }
@@ -32,14 +33,22 @@ public partial class ConfirmDialogWindow : Window
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = false;
+        try
+        {
+            DialogResult = false;
+        }
+        catch (System.InvalidOperationException)
+        {
+            Close();
+        }
     }
 
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
         {
-            DialogResult = false;
+            e.Handled = true;
+            CancelButton_Click(this, new RoutedEventArgs());
         }
     }
 }

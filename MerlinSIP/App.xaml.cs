@@ -8,6 +8,18 @@ public partial class App : System.Windows.Application
 
     private async void Application_Startup(object sender, StartupEventArgs e)
     {
+        DispatcherUnhandledException += (s, args) =>
+        {
+            Services.DebugLog.Write($"UNHANDLED DISPATCHER EXCEPTION: {args.Exception}");
+            args.Handled = true;
+            System.Windows.MessageBox.Show($"An unexpected error occurred: {args.Exception.Message}\n\nCheck debug.log for details.", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+        {
+            Services.DebugLog.Write($"UNHANDLED APPDOMAIN EXCEPTION: {args.ExceptionObject}");
+        };
+
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         _singleInstanceService = new Services.SingleInstanceService();
         if (!_singleInstanceService.IsPrimaryInstance)

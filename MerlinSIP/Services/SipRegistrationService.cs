@@ -26,7 +26,7 @@ public sealed class SipRegistrationService : IDisposable
     private CancellationTokenSource? _natKeepAliveCancellation;
     private readonly SemaphoreSlim _tcpWriteLock = new(1, 1);
     private readonly StringBuilder _tcpReceiveBuffer = new();
-    private PendingSipTransaction? _pendingResponse;
+    private volatile PendingSipTransaction? _pendingResponse;
     private readonly SemaphoreSlim _registrationLock = new(1, 1);
     private bool _listenerStarted;
     private bool _registered;
@@ -735,7 +735,7 @@ public sealed class SipRegistrationService : IDisposable
         var bye = BuildBye(call);
         var payload = Encoding.UTF8.GetBytes(bye);
         DebugLog.Write($"SEND BYE after transfer callId={call.CallId} bytes={payload.Length}");
-        await _client!.SendAsync(payload, _config.Server, _config.Port, cancellationToken);
+        await SendToServerAsync(payload, cancellationToken);
     }
 
     public void Dispose()
@@ -1904,13 +1904,23 @@ public sealed class SipRegistrationService : IDisposable
     private static Dictionary<string, string> ParseHeaders(string raw)
     {
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var headerSection = raw.Split(["\r\n\r\n", "\n\n"], 2, StringSplitOptions.None)[0];
 
-        foreach (var line in raw.Split(["\r\n", "\n"], StringSplitOptions.None).Skip(1))
+        foreach (var line in headerSection.Split(["\r\n", "\n"], StringSplitOptions.None).Skip(1))
         {
             var index = line.IndexOf(':');
             if (index > 0)
             {
-                headers[line[..index].Trim().ToLowerInvariant()] = line[(index + 1)..].Trim();
+                var key = line[..index].Trim().ToLowerInvariant();
+                var value = line[(index + 1)..].Trim();
+                if (headers.TryGetValue(key, out var existing))
+                {
+                    headers[key] = existing + "\r\n" + line[..index] + ": " + value;
+                }
+                else
+                {
+                    headers[key] = value;
+                }
             }
         }
 
