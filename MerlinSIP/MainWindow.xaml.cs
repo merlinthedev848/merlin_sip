@@ -69,6 +69,7 @@ public partial class MainWindow : Window
     private bool _allowExit;
     private string _selectedChatNumber = "";
     private string _activeRemoteNumber = "";
+    private string _userSelectedPresence = "Available";
     private ContactEntry? _editingContact;
     private IncomingCallWindow? _incomingCallWindow;
 
@@ -248,6 +249,16 @@ public partial class MainWindow : Window
         CallTimerText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString("#106247")!;
         UpdateCallTimer();
         _callTimer.Start();
+    }
+
+    private void ShowDialingCallTimer()
+    {
+        _callTimer.Stop();
+        _activeCallConnectedAt = null;
+        CallTimerText.Text = "Ringing";
+        CallTimerPill.Visibility = Visibility.Visible;
+        CallTimerPill.Background = (WpfBrush)new BrushConverter().ConvertFromString("#FFF3D6")!;
+        CallTimerText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString("#8A4F08")!;
     }
 
     private void StopCallTimer()
@@ -471,6 +482,8 @@ public partial class MainWindow : Window
             var useDesktopPopup = !silentRinging && ShouldUseDesktopIncomingPopup();
             _activeRemoteNumber = e.CallerNumber;
             SetContactPresence(e.CallerNumber, "Ringing");
+            SetPresenceDisplay("Busy");
+            ShowDialingCallTimer();
             DestinationTextBox.Text = e.CallerNumber;
             IncomingCallerNameText.Text = callerName;
             IncomingCallerNumberText.Text = e.CallerNumber;
@@ -1277,6 +1290,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _userSelectedPresence = status;
         SetPresenceDisplay(status);
         if (status.Equals("DND", StringComparison.OrdinalIgnoreCase) && !_dndEnabled)
         {
@@ -1372,6 +1386,8 @@ public partial class MainWindow : Window
         _activeRemoteNumber = destination;
         SetContactPresence(destination, "Ringing");
         _ = _sipRegistrationService.PublishPresenceAsync("Busy");
+        SetPresenceDisplay("Busy");
+        ShowDialingCallTimer();
         _callInProgress = true;
         _callConnected = false;
         UpdateCallControls();
