@@ -146,101 +146,101 @@ public sealed class RingtonePlayer : IDisposable
                 });
                 return 12000;
             case "office":
-                Repeat(4, () =>
+                Repeat(2, () =>
                 {
-                    QueueTone(659.25, 0.10, 0.30);
-                    QueueTone(783.99, 0.10, 0.30);
-                    QueueTone(880.00, 0.10, 0.30);
-                    QueueTone(987.77, 0.15, 0.30);
-                    QueueTone(1174.66, 0.15, 0.30);
-                    QueueTone(1318.51, 0.30, 0.30);
-                    QueuePause(1.80);
+                    QueueChord([261.63, 329.63, 392.00, 523.25], 0.50, 0.30);
+                    QueuePause(0.10);
+                    QueueChord([349.23, 440.00, 523.25, 698.46], 0.50, 0.30);
+                    QueuePause(0.10);
+                    QueueChord([392.00, 493.88, 587.33, 783.99], 0.50, 0.30);
+                    QueuePause(0.10);
+                    QueueChord([523.25, 659.25, 783.99, 1046.50], 0.80, 0.30);
+                    QueuePause(2.00);
                 });
-                return 11000;
+                return 10000;
             case "teams":
-                Repeat(4, () =>
+                Repeat(2, () =>
                 {
-                    QueueTone(554.37, 0.08, 0.35);
-                    QueueTone(622.25, 0.08, 0.35);
-                    QueueTone(830.61, 0.08, 0.35);
-                    QueueTone(622.25, 0.08, 0.35);
-                    QueueTone(932.33, 0.08, 0.35);
-                    QueueTone(830.61, 0.30, 0.35);
-                    QueuePause(1.60);
+                    QueueChord([277.18, 415.30, 554.37, 659.25, 783.99], 0.60, 0.28);
+                    QueuePause(0.15);
+                    QueueChord([233.08, 349.23, 466.16, 587.33, 698.46], 0.60, 0.28);
+                    QueuePause(0.15);
+                    QueueChord([311.13, 466.16, 622.25, 698.46, 830.61], 0.60, 0.28);
+                    QueuePause(0.15);
+                    QueueChord([415.30, 622.25, 830.61, 932.33, 1046.50], 0.90, 0.28);
+                    QueuePause(1.80);
                 });
                 return 10000;
             case "skype":
-                Repeat(4, () =>
+                Repeat(2, () =>
                 {
-                    QueueTone(698.46, 0.06, 0.25);
-                    QueueTone(880.00, 0.06, 0.25);
-                    QueueTone(1046.50, 0.06, 0.25);
-                    QueueTone(1396.91, 0.06, 0.25);
-                    QueueTone(1760.00, 0.15, 0.25);
-                    QueueTone(1396.91, 0.12, 0.25);
-                    QueueTone(1046.50, 0.12, 0.25);
-                    QueueTone(880.00, 0.20, 0.25);
-                    QueuePause(1.60);
+                    QueueChord([349.23, 523.25, 698.46, 880.00], 0.40, 0.28);
+                    QueueChord([523.25, 659.25, 783.99, 1046.50], 0.40, 0.28);
+                    QueueChord([392.00, 587.33, 783.99, 987.77], 0.40, 0.28);
+                    QueueChord([293.66, 440.00, 587.33, 783.99], 0.40, 0.28);
+                    QueueChord([587.33, 783.99, 1046.50, 1174.66], 0.60, 0.28);
+                    QueuePause(2.20);
                 });
-                return 10500;
+                return 9500;
             case "desk":
                 Repeat(3, () =>
                 {
-                    QueueTone(440.00, 0.75, 0.50);
-                    QueueTone(480.00, 0.75, 0.50);
+                    QueueChord([440.00, 480.00], 0.75, 0.45);
+                    QueuePause(0.20);
+                    QueueChord([440.00, 480.00], 0.75, 0.45);
                     QueuePause(1.80);
                 });
                 return 10500;
             case "double":
                 Repeat(4, () =>
                 {
-                    QueueTone(425.00, 0.17, 0.38);
+                    QueueChord([425.00, 475.00], 0.17, 0.38);
                     QueuePause(0.18);
-                    QueueTone(425.00, 0.17, 0.38);
+                    QueueChord([425.00, 475.00], 0.17, 0.38);
                     QueuePause(1.55);
                 });
                 return 10500;
             case "reception":
-                Repeat(4, () =>
+                Repeat(3, () =>
                 {
-                    QueueTone(659.25, 0.16, 0.25);
-                    QueueTone(523.25, 0.16, 0.25);
-                    QueueTone(587.33, 0.16, 0.25);
-                    QueueTone(392.00, 0.30, 0.25);
+                    QueueChord([659.25, 880.00], 0.20, 0.25);
+                    QueueChord([523.25, 698.46], 0.20, 0.25);
+                    QueueChord([587.33, 783.99], 0.20, 0.25);
+                    QueueChord([392.00, 523.25], 0.40, 0.25);
                     QueuePause(1.80);
                 });
-                return 10500;
+                return 9500;
             case "marimba":
-                Repeat(4, () =>
+                Repeat(3, () =>
                 {
-                    QueueTone(523.25, 0.08, 0.30);
-                    QueueTone(659.25, 0.08, 0.30);
-                    QueueTone(783.99, 0.08, 0.30);
-                    QueueTone(659.25, 0.08, 0.30);
-                    QueueTone(880.00, 0.08, 0.30);
-                    QueueTone(783.99, 0.08, 0.30);
-                    QueueTone(1046.50, 0.25, 0.30);
-                    QueuePause(1.60);
+                    QueueChord([261.63, 329.63], 0.15, 0.32);
+                    QueueChord([329.63, 392.00], 0.15, 0.32);
+                    QueueChord([392.00, 523.25], 0.15, 0.32);
+                    QueueChord([329.63, 392.00], 0.15, 0.32);
+                    QueueChord([440.00, 554.37], 0.15, 0.32);
+                    QueueChord([392.00, 523.25], 0.15, 0.32);
+                    QueueChord([523.25, 659.25], 0.30, 0.32);
+                    QueuePause(1.80);
                 });
-                return 10500;
+                return 9500;
             case "piano":
-                Repeat(3, () =>
+                Repeat(2, () =>
                 {
-                    QueueChord([329.63, 440.00, 523.25, 659.25], 0.30, 0.35);
-                    QueuePause(0.10);
-                    QueueChord([349.23, 440.00, 587.33, 698.46], 0.30, 0.35);
-                    QueuePause(0.10);
-                    QueueChord([392.00, 493.88, 587.33, 783.99], 0.50, 0.35);
-                    QueuePause(1.80);
+                    QueueChord([220.00, 329.63, 392.00, 440.00, 523.25, 659.25], 0.80, 0.28);
+                    QueuePause(0.20);
+                    QueueChord([174.61, 261.63, 329.63, 349.23, 440.00, 523.25], 0.80, 0.28);
+                    QueuePause(0.20);
+                    QueueChord([196.00, 293.66, 349.23, 392.00, 493.88, 587.33], 1.20, 0.28);
+                    QueuePause(2.50);
                 });
-                return 10500;
+                return 11500;
             case "night":
-                Repeat(3, () =>
+                Repeat(2, () =>
                 {
-                    QueueChord([293.66, 440.00, 554.37, 659.25], 0.40, 0.35);
-                    QueuePause(0.15);
-                    QueueChord([329.63, 493.88, 587.33, 659.25], 0.60, 0.35);
-                    QueuePause(1.80);
+                    QueueChord([146.83, 293.66, 440.00, 554.37, 659.25, 739.99], 1.20, 0.28);
+                    QueuePause(0.30);
+                    QueueChord([164.81, 329.63, 493.88, 587.33, 659.25, 830.61], 1.20, 0.28);
+                    QueuePause(2.50);
                 });
                 return 10500;
             case "urgent":
@@ -256,15 +256,16 @@ public sealed class RingtonePlayer : IDisposable
                 return 10500;
             case "merlin":
             default:
-                Repeat(4, () =>
+                Repeat(2, () =>
                 {
-                    QueueTone(659.25, 0.10, 0.25);
-                    QueueTone(783.99, 0.10, 0.25);
-                    QueueTone(880.00, 0.10, 0.25);
-                    QueueTone(1046.50, 0.20, 0.30);
-                    QueuePause(1.50);
+                    QueueChord([261.63, 329.63, 392.00], 0.15, 0.28);
+                    QueueChord([329.63, 392.00, 523.25], 0.15, 0.28);
+                    QueueChord([392.00, 523.25, 659.25], 0.15, 0.28);
+                    QueueChord([523.25, 659.25, 783.99], 0.15, 0.28);
+                    QueueChord([523.25, 659.25, 783.99, 1046.50], 0.80, 0.28);
+                    QueuePause(2.50);
                 });
-                return 10500;
+                return 10000;
         }
     }
 

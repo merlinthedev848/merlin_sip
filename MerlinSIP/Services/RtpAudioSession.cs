@@ -59,7 +59,6 @@ public sealed class RtpAudioSession : IDisposable
             return;
         }
 
-        OpenWaveOut();
         OpenWaveIn();
         _devicesPrepared = true;
         DebugLog.Write($"RTP devices prepared input={_inputDevice.Name} output={_outputDevice.Name} localPort={LocalPort}");
@@ -428,7 +427,15 @@ public sealed class RtpAudioSession : IDisposable
         {
             if (_waveOut == IntPtr.Zero)
             {
-                return;
+                try
+                {
+                    OpenWaveOut();
+                }
+                catch (Exception ex)
+                {
+                    DebugLog.Write($"RTP lazy OpenWaveOut failed: {ex.Message}");
+                    return;
+                }
             }
 
             var buffer = new AudioBuffer(pcm.Length);
