@@ -1998,6 +1998,28 @@ public sealed class SipRegistrationService : IDisposable
             return "";
         }
 
+        var noteMatch = Regex.Match(body, @"<note>\s*([^<]+)\s*</note>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        if (noteMatch.Success)
+        {
+            var note = noteMatch.Groups[1].Value.Trim();
+            if (note.Equals("Available", StringComparison.OrdinalIgnoreCase) ||
+                note.Equals("Busy", StringComparison.OrdinalIgnoreCase) ||
+                note.Equals("DND", StringComparison.OrdinalIgnoreCase) ||
+                note.Equals("Away", StringComparison.OrdinalIgnoreCase) ||
+                note.Equals("Offline", StringComparison.OrdinalIgnoreCase))
+            {
+                return note.ToLowerInvariant() switch
+                {
+                    "available" => "Available",
+                    "busy" => "Busy",
+                    "dnd" => "Busy",
+                    "away" => "Away",
+                    "offline" => "Offline",
+                    _ => "Offline"
+                };
+            }
+        }
+
         if (Regex.IsMatch(body, @"<state>\s*early\s*</state>|<dialog[^>]*>\s*<state>\s*early", RegexOptions.IgnoreCase | RegexOptions.Singleline))
         {
             return "Ringing";

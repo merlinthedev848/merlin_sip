@@ -517,6 +517,7 @@ public partial class MainWindow : Window
                 StopLocalRingback();
                 HideIncomingCallSurfaces();
                 SetContactPresence(_activeRemoteNumber, "Busy");
+                _ = _sipRegistrationService.PublishPresenceAsync("Busy");
                 NoticeText.Text = "Call connected.";
                 FooterStatusText.Text = "Call connected. Audio session is active.";
                 _incomingRinging = false;
@@ -1240,11 +1241,33 @@ public partial class MainWindow : Window
             "available" => "#16A34A",
             "busy" => "#EF4444",
             "dnd" => "#DC2626",
-            "appear away" => "#F59E0B",
-            "appear offline" => "#94A3B8",
+            "away" or "appear away" => "#F59E0B",
+            "offline" or "appear offline" => "#94A3B8",
             _ => "#16A34A"
         };
         PresenceDot.Fill = (WpfBrush)new BrushConverter().ConvertFromString(colour)!;
+        PublishCurrentPresence();
+    }
+
+    private void PublishCurrentPresence()
+    {
+        if (!_registered)
+        {
+            return;
+        }
+
+        var status = PresenceText.Text;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _sipRegistrationService.PublishPresenceAsync(status);
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write($"Error publishing presence: {ex.Message}");
+            }
+        });
     }
 
     private void PresenceMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1348,6 +1371,7 @@ public partial class MainWindow : Window
         _activeCallDirection = "Outbound";
         _activeRemoteNumber = destination;
         SetContactPresence(destination, "Ringing");
+        _ = _sipRegistrationService.PublishPresenceAsync("Busy");
         _callInProgress = true;
         _callConnected = false;
         UpdateCallControls();
@@ -2392,6 +2416,7 @@ public partial class MainWindow : Window
             await AddCallHistory(direction, name, number, resultState, message, startAt);
         }
 
+        PublishCurrentPresence();
         UpdateCallControls();
     }
 

@@ -19,6 +19,7 @@ public sealed record ContactEntry
         "Available" => "Available",
         "Ringing" => "Ringing",
         "Busy" => "Busy",
+        "Away" or "Appear Away" => "Away",
         "Offline" => "Offline",
         _ => "Offline"
     };
@@ -29,6 +30,7 @@ public sealed record ContactEntry
         "Available" => "#10B981",
         "Ringing" => "#F59E0B",
         "Busy" => "#EF4444",
+        "Away" or "Appear Away" => "#F59E0B",
         "Offline" => "#94A3B8",
         _ => "#94A3B8"
     };
@@ -39,6 +41,7 @@ public sealed record ContactEntry
         "Available" => "#DFF8EE",
         "Ringing" => "#FFF3D6",
         "Busy" => "#FFE2E2",
+        "Away" or "Appear Away" => "#FFF3D6",
         "Offline" => "#EEF2F7",
         _ => "#EEF2F7"
     };
@@ -49,6 +52,7 @@ public sealed record ContactEntry
         "Available" => "#106247",
         "Ringing" => "#8A4F08",
         "Busy" => "#9B1C1C",
+        "Away" or "Appear Away" => "#8A4F08",
         "Offline" => "#475569",
         _ => "#475569"
     };
