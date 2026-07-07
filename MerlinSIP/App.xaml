@@ -3,12 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Startup="Application_Startup">
     <Application.Resources>
-        <Color x:Key="InkColor">#172033</Color>
-        <Color x:Key="MutedColor">#667085</Color>
-        <Color x:Key="PanelColor">#FCFEFF</Color>
-        <Color x:Key="LineColor">#D8E1EE</Color>
-        <Color x:Key="TealColor">#0F8F78</Color>
-        <Color x:Key="NightColor">#121621</Color>
+        <Color x:Key="InkColor">#111317</Color>
+        <Color x:Key="MutedColor">#78716C</Color>
+        <Color x:Key="PanelColor">#FAF6EB</Color>
+        <Color x:Key="LineColor">#E6DFD3</Color>
+        <Color x:Key="TealColor">#D97706</Color>
+        <Color x:Key="NightColor">#111317</Color>
 
         <SolidColorBrush x:Key="InkBrush" Color="{StaticResource InkColor}" />
         <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedColor}" />
@@ -17,16 +17,16 @@
         <SolidColorBrush x:Key="TealBrush" Color="{StaticResource TealColor}" />
         <SolidColorBrush x:Key="NightBrush" Color="{StaticResource NightColor}" />
         <LinearGradientBrush x:Key="PanelGradientBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#FFFFFF" Offset="0" />
-            <GradientStop Color="#F7FAFD" Offset="1" />
+            <GradientStop Color="#FDFBF7" Offset="0" />
+            <GradientStop Color="#FAF6EB" Offset="1" />
         </LinearGradientBrush>
         <LinearGradientBrush x:Key="PrimaryGradientBrush" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#22BFA4" Offset="0" />
-            <GradientStop Color="#0F8F78" Offset="1" />
+            <GradientStop Color="#FCD34D" Offset="0" />
+            <GradientStop Color="#FBBF24" Offset="1" />
         </LinearGradientBrush>
         <LinearGradientBrush x:Key="DangerGradientBrush" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#E35A5A" Offset="0" />
-            <GradientStop Color="#B82F2F" Offset="1" />
+            <GradientStop Color="#EF4444" Offset="0" />
+            <GradientStop Color="#DC2626" Offset="1" />
         </LinearGradientBrush>
 
         <DropShadowEffect x:Key="PanelShadow" BlurRadius="22" ShadowDepth="7" Opacity="0.10" Color="#172033" />

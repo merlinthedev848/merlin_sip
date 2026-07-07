@@ -505,7 +505,6 @@ public partial class MainWindow : Window
             }
 
             StartIncomingNoAnswerTimeout(e.CallerNumber);
-            _ = AddCallHistory("Inbound", callerName, e.CallerNumber, "Ringing", "Incoming call received.");
         });
     }
 
@@ -561,17 +560,16 @@ public partial class MainWindow : Window
 
             if (e.Code >= 300)
             {
-                StopLocalRingback();
-                HideIncomingCallSurfaces();
                 NoticeText.Text = e.Message;
                 FooterStatusText.Text = e.Message;
                 _ = ResetFailedCallDisplayAsync(e.Message);
-                _incomingRinging = false;
-                _callInProgress = false;
-                _callConnected = false;
-                SetContactPresence(_activeRemoteNumber, "Offline");
-                _activeRemoteNumber = "";
-                UpdateCallControls();
+                
+                string state = "Failed";
+                if (e.Code == 486) state = "Busy";
+                else if (e.Code == 487) state = "Cancelled";
+                else if (e.Code == 603) state = "Declined";
+                
+                _ = OnCallFinished(state, e.Message);
             }
         });
     }
@@ -583,26 +581,17 @@ public partial class MainWindow : Window
 
     private void SipRegistrationService_CallEnded(object? sender, CallEndedEventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        _ = Dispatcher.InvokeAsync(async () =>
         {
-            HideIncomingCallSurfaces();
-            StopLocalRingback();
-            _ringtonePlayer.Stop();
             NoticeText.Text = "Call ended.";
             FooterStatusText.Text = e.Message;
-            _activeCallStartedAt = null;
-            _incomingRinging = false;
-            _callInProgress = false;
-            _callConnected = false;
-            _muted = false;
-            _held = false;
-            SetContactPresence(_activeRemoteNumber, "Offline");
-            _activeRemoteNumber = "";
-            StopCallTimer();
-            ClearDialpadAfterCall();
-            MuteButton.Content = "Mute";
-            HoldButton.Content = "Hold";
-            UpdateCallControls();
+            
+            string state = "Ended";
+            if (!_callConnected)
+            {
+                state = _activeCallDirection == "Outbound" ? "No Answer" : "Missed";
+            }
+            await OnCallFinished(state, e.Message);
         });
     }
 
@@ -1364,49 +1353,26 @@ public partial class MainWindow : Window
         UpdateCallControls();
         var result = await _sipRegistrationService.InviteAsync(destination);
         FooterStatusText.Text = result.Message;
-        await AddCallHistory("Outbound", name, destination, result.Signalled ? "Signalled" : "Failed", result.Message);
         if (!result.Signalled)
         {
-            StopLocalRingback();
             NoticeText.Text = result.Message;
             _ = ResetFailedCallDisplayAsync(result.Message);
-            _callInProgress = false;
-            _callConnected = false;
-            SetContactPresence(destination, "Offline");
-            _activeRemoteNumber = "";
-            UpdateCallControls();
+            await OnCallFinished("Failed", result.Message);
         }
     }
 
     private async void HangupButton_Click(object sender, RoutedEventArgs e)
     {
         var result = await _sipRegistrationService.EndCallAsync();
-        StopLocalRingback();
-        _ringtonePlayer.Stop();
-        HideIncomingCallSurfaces();
-        _muted = false;
-        _held = false;
-        _sipRegistrationService.SetMuted(false);
-        _sipRegistrationService.SetHeldLocal(false);
-        MuteButton.Content = "Mute";
-        HoldButton.Content = "Hold";
-        _incomingRinging = false;
-        _callInProgress = false;
-        _callConnected = false;
-        SetContactPresence(_activeRemoteNumber, "Offline");
-        _activeRemoteNumber = "";
-        UpdateCallControls();
         NoticeText.Text = "Call ended.";
         FooterStatusText.Text = result.Message;
-        if (_activeCallStartedAt is not null && !string.IsNullOrWhiteSpace(DestinationTextBox.Text))
+        
+        string state = "Ended";
+        if (!_callConnected)
         {
-            var number = DestinationTextBox.Text.Trim();
-            var contact = _contactStore.FindByNumber(_contacts, number);
-            await AddCallHistory(_activeCallDirection, contact?.Name ?? number, number, result.Signalled ? "Ended" : "Cleared", result.Message, _activeCallStartedAt.Value);
-            _activeCallStartedAt = null;
+            state = _activeCallDirection == "Outbound" ? "No Answer" : "Declined";
         }
-        StopCallTimer();
-        ClearDialpadAfterCall();
+        await OnCallFinished(state, result.Message);
     }
 
     private void AnswerIncomingCallButton_Click(object sender, RoutedEventArgs e)
@@ -1450,19 +1416,9 @@ public partial class MainWindow : Window
     private async void DeclineIncomingCall()
     {
         var result = await _sipRegistrationService.EndCallAsync();
-        StopLocalRingback();
-        _ringtonePlayer.Stop();
-        HideIncomingCallSurfaces();
-        FooterStatusText.Text = result.Message;
         NoticeText.Text = "Incoming call declined.";
-        _incomingRinging = false;
-        _callInProgress = false;
-        _callConnected = false;
-        SetContactPresence(_activeRemoteNumber, "Offline");
-        _activeRemoteNumber = "";
-        StopCallTimer();
-        ClearDialpadAfterCall();
-        UpdateCallControls();
+        FooterStatusText.Text = result.Message;
+        await OnCallFinished("Declined", result.Message);
     }
 
     private void ClearDialpadAfterCall()
@@ -2400,6 +2356,43 @@ public partial class MainWindow : Window
         _chatMessages.Clear();
         await Task.Delay(50);
         System.Windows.Application.Current.Shutdown();
+    }
+
+    private async Task OnCallFinished(string resultState, string message)
+    {
+        HideIncomingCallSurfaces();
+        StopLocalRingback();
+        _ringtonePlayer.Stop();
+        
+        _incomingRinging = false;
+        _callInProgress = false;
+        _callConnected = false;
+        _muted = false;
+        _held = false;
+        _sipRegistrationService.SetMuted(false);
+        _sipRegistrationService.SetHeldLocal(false);
+        MuteButton.Content = "Mute";
+        HoldButton.Content = "Hold";
+
+        StopCallTimer();
+        ClearDialpadAfterCall();
+
+        var number = _activeRemoteNumber;
+        var direction = _activeCallDirection;
+        var startAt = _activeCallStartedAt;
+
+        _activeCallStartedAt = null;
+        _activeRemoteNumber = "";
+        
+        if (!string.IsNullOrWhiteSpace(number))
+        {
+            SetContactPresence(number, "Offline");
+            var contact = _contactStore.FindByNumber(_contacts, number);
+            var name = contact?.Name ?? number;
+            await AddCallHistory(direction, name, number, resultState, message, startAt);
+        }
+
+        UpdateCallControls();
     }
 
     private async Task AddCallHistory(string direction, string name, string number, string result, string detail, DateTimeOffset? startedAt = null)

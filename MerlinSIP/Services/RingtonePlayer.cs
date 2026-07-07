@@ -66,16 +66,22 @@ public sealed class RingtonePlayer : IDisposable
         _cancellation?.Dispose();
         _cancellation = null;
 
-        if (_waveOut != IntPtr.Zero)
-        {
-            WinMm.waveOutReset(_waveOut);
-            WinMm.waveOutClose(_waveOut);
-            _waveOut = IntPtr.Zero;
-            DebugLog.Write("RINGTONE stop");
-        }
-
         lock (_sync)
         {
+            if (_waveOut != IntPtr.Zero)
+            {
+                WinMm.waveOutReset(_waveOut);
+
+                foreach (var buffer in _buffers)
+                {
+                    WinMm.waveOutUnprepareHeader(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+                }
+
+                WinMm.waveOutClose(_waveOut);
+                _waveOut = IntPtr.Zero;
+                DebugLog.Write("RINGTONE stop");
+            }
+
             foreach (var buffer in _buffers)
             {
                 buffer.Dispose();
@@ -92,20 +98,37 @@ public sealed class RingtonePlayer : IDisposable
 
     private async Task PlayLoopAsync(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested && _waveOut != IntPtr.Zero)
+        try
         {
-            var pause = PlayPattern();
-
-            try
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(pause, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
+                IntPtr waveOut;
+                lock (_sync)
+                {
+                    waveOut = _waveOut;
+                }
+                if (waveOut == IntPtr.Zero)
+                {
+                    break;
+                }
 
-            TrimBuffers();
+                var pause = PlayPattern();
+
+                try
+                {
+                    await Task.Delay(pause, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+
+                TrimBuffers();
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write($"RINGTONE play loop error: {ex.Message}");
         }
     }
 
@@ -282,11 +305,15 @@ public sealed class RingtonePlayer : IDisposable
         Marshal.Copy(pcm, 0, buffer.DataPointer, pcm.Length);
         lock (_sync)
         {
+            if (_waveOut == IntPtr.Zero)
+            {
+                buffer.Dispose();
+                return;
+            }
             _buffers.Add(buffer);
+            WinMm.waveOutPrepareHeader(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
+            WinMm.waveOutWrite(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
         }
-
-        WinMm.waveOutPrepareHeader(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
-        WinMm.waveOutWrite(_waveOut, buffer.HeaderPointer, Marshal.SizeOf<WaveHeader>());
     }
 
     private void TrimBuffers()
