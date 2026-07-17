@@ -173,7 +173,7 @@ public partial class MainWindow : Window
     private void ExitFromTray()
     {
         _allowExit = true;
-        Close();
+        System.Windows.Application.Current.Shutdown();
     }
 
     private async void ConnectionWatchdog_Tick(object? sender, EventArgs e)
