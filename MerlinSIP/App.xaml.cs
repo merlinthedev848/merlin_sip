@@ -50,7 +50,6 @@ public partial class App : System.Windows.Application
         _singleInstanceService.ActivationRequested += (_, _) => mainWindow.RestoreFromTray();
         _singleInstanceService.StartListening(Dispatcher);
         MainWindow = mainWindow;
-        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         mainWindow.Show();
     }
 

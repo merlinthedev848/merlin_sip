@@ -725,6 +725,31 @@ public sealed class SipRegistrationService : IDisposable
         return new SipCallResult(true, $"Transfer requested to {destination}. Call cleared locally.");
     }
 
+    public async Task<SipCallResult> ConferenceAsync(string destination, CancellationToken cancellationToken = default)
+    {
+        if (!IsTransportReady || _config is null || _activeCall is null || !_activeCall.Established)
+        {
+            return new SipCallResult(false, "Connect a call before conferencing.");
+        }
+
+        var conferenceTarget = destination.Contains('@') ? destination : $"{destination}@{_domain}";
+        var refer = BuildRefer(_activeCall, conferenceTarget);
+        var payload = Encoding.UTF8.GetBytes(refer);
+        DebugLog.Write($"SEND REFER for conference callId={_activeCall.CallId} target={conferenceTarget} bytes={payload.Length}");
+        try
+        {
+            await SendToServerAsync(payload, cancellationToken);
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"SEND REFER for conference failed callId={_activeCall.CallId} error={error.Message}");
+            return new SipCallResult(false, $"Unable to add to conference: {error.Message}");
+        }
+
+        // Note: Unlike transfer, we keep the active call for conference
+        return new SipCallResult(true, $"Conference request sent to {destination}.");
+    }
+
     private async Task SendByeAfterTransferAsync(ActiveCall call, CancellationToken cancellationToken)
     {
         if (!IsTransportReady || _config is null)

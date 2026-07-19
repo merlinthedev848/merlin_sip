@@ -172,8 +172,12 @@ public partial class MainWindow : Window
 
     private void ExitFromTray()
     {
+        // Trigger full application shutdown ensuring all resources are cleaned up
         _allowExit = true;
-        System.Windows.Application.Current.Shutdown();
+        // Close the main window which will invoke cleanup in MainWindow_Closed
+        Close();
+        // Explicitly shutdown the WPF application (ShutdownMode is OnExplicitShutdown)
+        System.Windows.Application.Current?.Shutdown();
     }
 
     private async void ConnectionWatchdog_Tick(object? sender, EventArgs e)
@@ -590,7 +594,27 @@ public partial class MainWindow : Window
 
     private void SipRegistrationService_ContactPresenceChanged(object? sender, ContactPresenceEventArgs e)
     {
-        Dispatcher.Invoke(() => SetContactPresence(e.Number, e.Presence));
+        Dispatcher.Invoke(() =>
+        {
+            var isOwnExtension = false;
+            if (!string.IsNullOrWhiteSpace(_config.Extension) &&
+                string.Equals(NormalizeDialDestination(e.Number), NormalizeDialDestination(_config.Extension), StringComparison.OrdinalIgnoreCase))
+            {
+                isOwnExtension = true;
+            }
+            else if (!string.IsNullOrWhiteSpace(_config.Username) &&
+                     string.Equals(NormalizeDialDestination(e.Number), NormalizeDialDestination(_config.Username), StringComparison.OrdinalIgnoreCase))
+            {
+                isOwnExtension = true;
+            }
+
+            if (isOwnExtension)
+            {
+                UpdateMainPresenceDisplayOnly(e.Presence);
+            }
+
+            SetContactPresence(e.Number, e.Presence);
+        });
     }
 
     private void SipRegistrationService_CallEnded(object? sender, CallEndedEventArgs e)
@@ -779,7 +803,7 @@ public partial class MainWindow : Window
 
     private static string ShortLicenseStatus(string status)
     {
-        return string.IsNullOrWhiteSpace(status) ? "Licensed" : "Licensed";
+        return string.IsNullOrWhiteSpace(status) ? "Licensed" : status;
     }
 
     private static string LicenseeFromStatus(string status)
@@ -1057,7 +1081,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        await _sipRegistrationService.SubscribeToContactPresenceAsync(_contacts.Select(contact => contact.Number));
+        var extensions = _contacts.Select(contact => contact.Number);
+        if (!string.IsNullOrWhiteSpace(_config.Extension))
+        {
+            extensions = extensions.Concat(new[] { _config.Extension });
+        }
+        await _sipRegistrationService.SubscribeToContactPresenceAsync(extensions.Distinct());
     }
 
     private void SetContactPresence(string number, string presence)
@@ -1246,7 +1275,7 @@ public partial class MainWindow : Window
         PresenceButton.ContextMenu.IsOpen = true;
     }
 
-    private void SetPresenceDisplay(string status)
+    private void UpdateMainPresenceDisplayOnly(string status)
     {
         PresenceText.Text = status;
         var colour = status.ToLowerInvariant() switch
@@ -1259,6 +1288,11 @@ public partial class MainWindow : Window
             _ => "#16A34A"
         };
         PresenceDot.Fill = (WpfBrush)new BrushConverter().ConvertFromString(colour)!;
+    }
+
+    private void SetPresenceDisplay(string status)
+    {
+        UpdateMainPresenceDisplayOnly(status);
         PublishCurrentPresence();
     }
 
@@ -1528,6 +1562,41 @@ public partial class MainWindow : Window
         FooterStatusText.Text = _held
             ? "Call is on hold. PBX hold music will be used if enabled."
             : "Call resumed.";
+    }
+
+    private async void ConferenceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_sipRegistrationService.CanControlAudio)
+        {
+            FooterStatusText.Text = "Connect a call before using conference.";
+            return;
+        }
+
+        var favorites = _config.ShowFavouriteExtensionsOnTransfer ? _contacts.Where(c => c.IsFavorite) : null;
+        var conferenceWindow = new TransferCallWindow(DestinationTextBox.Text, favorites)
+        {
+            Owner = this,
+            Title = "Add to conference"
+        };
+
+        if (conferenceWindow.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var target = NormalizeDialDestination(conferenceWindow.TransferTarget);
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            FooterStatusText.Text = "Enter a number to conference in.";
+            return;
+        }
+
+        var result = await _sipRegistrationService.ConferenceAsync(target);
+        FooterStatusText.Text = result.Message;
+        if (result.Signalled)
+        {
+            NoticeText.Text = "Conference call in progress.";
+        }
     }
 
     private async void TransferButton_Click(object sender, RoutedEventArgs e)
@@ -2346,8 +2415,23 @@ public partial class MainWindow : Window
         HangupButton.IsEnabled = !_licenseLocked && (_callInProgress || _incomingRinging);
         MuteButton.IsEnabled = !_licenseLocked && _callConnected && _sipRegistrationService.CanControlAudio;
         HoldButton.IsEnabled = !_licenseLocked && _callConnected && _sipRegistrationService.CanControlAudio;
+        ConferenceButton.IsEnabled = !_licenseLocked && _callConnected && _sipRegistrationService.CanControlAudio;
         TransferButton.IsEnabled = !_licenseLocked && _callConnected;
         DndButton.IsEnabled = !_licenseLocked;
+
+        // Hide DialButton and widen HangupButton during active call
+        if (_callInProgress || _incomingRinging)
+        {
+            DialButton.Visibility = Visibility.Collapsed;
+            DialButtonColumn.Width = new GridLength(0);
+            HangupButtonColumn.Width = new GridLength(1, GridUnitType.Star);
+        }
+        else
+        {
+            DialButton.Visibility = Visibility.Visible;
+            DialButtonColumn.Width = new GridLength(1, GridUnitType.Star);
+            HangupButtonColumn.Width = new GridLength(1, GridUnitType.Star);
+        }
     }
 
     private void SendErrorLogButton_Click(object sender, RoutedEventArgs e)
@@ -2426,13 +2510,14 @@ public partial class MainWindow : Window
         
         if (!string.IsNullOrWhiteSpace(number))
         {
-            SetContactPresence(number, "Offline");
+            // Let BLF system handle contact presence updates naturally
             var contact = _contactStore.FindByNumber(_contacts, number);
             var name = contact?.Name ?? number;
             await AddCallHistory(direction, name, number, resultState, message, startAt);
         }
 
-        PublishCurrentPresence();
+        // Restore user's selected presence after call ends
+        SetPresenceDisplay(_userSelectedPresence);
         UpdateCallControls();
     }
 

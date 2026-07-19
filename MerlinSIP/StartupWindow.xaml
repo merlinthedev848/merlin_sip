@@ -140,7 +140,7 @@
                     <Button Grid.Column="1"
                             x:Name="ContinueButton"
                             Content="Provision"
-                            Background="{StaticResource TealBrush}"
+                            Background="{StaticResource AmberBrush}"
                             Foreground="White"
                             Click="ContinueButton_Click" />
                 </Grid>

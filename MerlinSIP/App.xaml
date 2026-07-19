@@ -7,14 +7,14 @@
         <Color x:Key="MutedColor">#5D6B7C</Color>
         <Color x:Key="PanelColor">#F3F4F6</Color>
         <Color x:Key="LineColor">#E2E8F0</Color>
-        <Color x:Key="TealColor">#D97706</Color>
+        <Color x:Key="AmberColor">#D97706</Color>
         <Color x:Key="NightColor">#111317</Color>
 
         <SolidColorBrush x:Key="InkBrush" Color="{StaticResource InkColor}" />
         <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedColor}" />
         <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource PanelColor}" />
         <SolidColorBrush x:Key="LineBrush" Color="{StaticResource LineColor}" />
-        <SolidColorBrush x:Key="TealBrush" Color="{StaticResource TealColor}" />
+        <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
         <SolidColorBrush x:Key="NightBrush" Color="{StaticResource NightColor}" />
         <LinearGradientBrush x:Key="PanelGradientBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#FFFFFF" Offset="0" />
