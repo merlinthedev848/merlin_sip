@@ -2419,6 +2419,8 @@ public partial class MainWindow : Window
         TransferButton.IsEnabled = !_licenseLocked && _callConnected;
         DndButton.IsEnabled = !_licenseLocked;
 
+        var activeCall = _callInProgress || _incomingRinging || _callConnected;
+
         // Hide DialButton and widen HangupButton during active call
         if (_callInProgress || _incomingRinging)
         {
@@ -2431,6 +2433,30 @@ public partial class MainWindow : Window
             DialButton.Visibility = Visibility.Visible;
             DialButtonColumn.Width = new GridLength(1, GridUnitType.Star);
             HangupButtonColumn.Width = new GridLength(1, GridUnitType.Star);
+        }
+
+        // Show in-call controls and enlarge call details only when a call is active
+        if (activeCall)
+        {
+            MuteButton.Visibility = Visibility.Visible;
+            HoldButton.Visibility = Visibility.Visible;
+            ConferenceButton.Visibility = Visibility.Visible;
+            TransferButton.Visibility = Visibility.Visible;
+            InCallButtonsGrid.Columns = 5;
+
+            DestinationPreviewText.FontSize = 36;
+            CallerLookupText.FontSize = 15;
+        }
+        else
+        {
+            MuteButton.Visibility = Visibility.Collapsed;
+            HoldButton.Visibility = Visibility.Collapsed;
+            ConferenceButton.Visibility = Visibility.Collapsed;
+            TransferButton.Visibility = Visibility.Collapsed;
+            InCallButtonsGrid.Columns = 1;
+
+            DestinationPreviewText.FontSize = 28;
+            CallerLookupText.FontSize = 13;
         }
     }
 
