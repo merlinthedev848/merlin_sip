@@ -2067,7 +2067,7 @@ public sealed class SipRegistrationService : IDisposable
 
         if (Regex.IsMatch(body, @"<state>\s*terminated\s*</state>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
         {
-            return "Offline";
+            return "Available";
         }
 
         if (body.Contains("busy", StringComparison.OrdinalIgnoreCase))

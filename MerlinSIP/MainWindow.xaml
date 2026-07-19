@@ -431,13 +431,15 @@
                                     <Button Grid.Column="1" x:Name="HangupButton" Content="End" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="HangupButton_Click" />
                                 </Grid>
 
-                                <UniformGrid x:Name="InCallButtonsGrid" Grid.Row="4" Columns="5" Rows="1">
-                                    <Button x:Name="MuteButton" Content="Mute" Style="{StaticResource SoftButton}" FontSize="11" Click="MuteButton_Click" />
-                                    <Button x:Name="HoldButton" Content="Hold" Style="{StaticResource SoftButton}" FontSize="11" Click="HoldButton_Click" />
-                                    <Button x:Name="ConferenceButton" Content="Conf" Style="{StaticResource SoftButton}" FontSize="11" Click="ConferenceButton_Click" />
-                                    <Button x:Name="TransferButton" Content="Transfer" Style="{StaticResource SoftButton}" FontSize="11" Click="TransferButton_Click" />
-                                    <Button x:Name="DndButton" Content="DND" Style="{StaticResource SoftButton}" FontSize="11" Click="DndButton_Click" />
-                                </UniformGrid>
+                                <Grid Grid.Row="4">
+                                     <UniformGrid x:Name="InCallButtonsGrid" Columns="4" Rows="1" Visibility="Collapsed">
+                                         <Button x:Name="MuteButton" Content="Mute" Style="{StaticResource SoftButton}" Click="MuteButton_Click" />
+                                         <Button x:Name="HoldButton" Content="Hold" Style="{StaticResource SoftButton}" Click="HoldButton_Click" />
+                                         <Button x:Name="ConferenceButton" Content="Conf" Style="{StaticResource SoftButton}" Click="ConferenceButton_Click" />
+                                         <Button x:Name="TransferButton" Content="Transfer" Style="{StaticResource SoftButton}" Click="TransferButton_Click" />
+                                     </UniformGrid>
+                                     <Button x:Name="DndButton" Content="DND" Style="{StaticResource SoftButton}" Width="120" HorizontalAlignment="Center" Click="DndButton_Click" />
+                                 </Grid>
                             </Grid>
                         </Border>
 

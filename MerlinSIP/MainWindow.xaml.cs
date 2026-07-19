@@ -610,7 +610,14 @@ public partial class MainWindow : Window
 
             if (isOwnExtension)
             {
-                UpdateMainPresenceDisplayOnly(e.Presence);
+                if (e.Presence == "Busy" || e.Presence == "Ringing")
+                {
+                    UpdateMainPresenceDisplayOnly(e.Presence);
+                }
+                else
+                {
+                    UpdateMainPresenceDisplayOnly(_userSelectedPresence);
+                }
             }
 
             SetContactPresence(e.Number, e.Presence);
@@ -2435,25 +2442,19 @@ public partial class MainWindow : Window
             HangupButtonColumn.Width = new GridLength(1, GridUnitType.Star);
         }
 
-        // Show in-call controls and enlarge call details only when a call is active
+        // Show/hide in-call controls vs DND button
         if (activeCall)
         {
-            MuteButton.Visibility = Visibility.Visible;
-            HoldButton.Visibility = Visibility.Visible;
-            ConferenceButton.Visibility = Visibility.Visible;
-            TransferButton.Visibility = Visibility.Visible;
-            InCallButtonsGrid.Columns = 5;
+            InCallButtonsGrid.Visibility = Visibility.Visible;
+            DndButton.Visibility = Visibility.Collapsed;
 
             DestinationPreviewText.FontSize = 36;
             CallerLookupText.FontSize = 15;
         }
         else
         {
-            MuteButton.Visibility = Visibility.Collapsed;
-            HoldButton.Visibility = Visibility.Collapsed;
-            ConferenceButton.Visibility = Visibility.Collapsed;
-            TransferButton.Visibility = Visibility.Collapsed;
-            InCallButtonsGrid.Columns = 1;
+            InCallButtonsGrid.Visibility = Visibility.Collapsed;
+            DndButton.Visibility = Visibility.Visible;
 
             DestinationPreviewText.FontSize = 28;
             CallerLookupText.FontSize = 13;

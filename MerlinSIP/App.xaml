@@ -33,6 +33,7 @@
         <DropShadowEffect x:Key="RaisedShadow" BlurRadius="8" ShadowDepth="2" Opacity="0.05" Color="#1E293B" />
 
         <Style TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
             <Setter Property="Background" Value="#FFFFFF" />
@@ -100,18 +101,31 @@
         </Style>
 
         <Style TargetType="TabControl">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
 
         <Style TargetType="TabItem">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Padding" Value="14,9" />
             <Setter Property="Margin" Value="0,0,8,0" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
         </Style>
 
+        <Style TargetType="ListBox">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
         <Style TargetType="TextBox">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Padding" Value="12,10" />
             <Setter Property="BorderBrush" Value="#D4C9B3" />
             <Setter Property="BorderThickness" Value="1" />
@@ -121,6 +135,7 @@
         </Style>
 
         <Style TargetType="PasswordBox">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Padding" Value="12,10" />
             <Setter Property="BorderBrush" Value="#D4C9B3" />
             <Setter Property="BorderThickness" Value="1" />
@@ -130,6 +145,7 @@
         </Style>
 
         <Style TargetType="ComboBox">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="MinHeight" Value="42" />
             <Setter Property="Padding" Value="12,10" />
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
