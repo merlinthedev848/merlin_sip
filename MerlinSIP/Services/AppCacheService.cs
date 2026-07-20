@@ -176,8 +176,18 @@ public sealed class AppCacheService
         }
 
         var plainBytes = Encoding.UTF8.GetBytes(value);
-        var encrypted = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
-        return Convert.ToBase64String(encrypted);
+        if (OperatingSystem.IsWindows())
+        {
+#pragma warning disable CA1416
+            var encrypted = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
+            return Convert.ToBase64String(encrypted);
+#pragma warning restore CA1416
+        }
+        else
+        {
+            // Simple Base64 encode for non-Windows for now
+            return Convert.ToBase64String(plainBytes);
+        }
     }
 
     private static string Unprotect(string? legacyPlainText, string? encrypted)
@@ -190,8 +200,18 @@ public sealed class AppCacheService
         try
         {
             var encryptedBytes = Convert.FromBase64String(encrypted);
-            var plainBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(plainBytes);
+            if (OperatingSystem.IsWindows())
+            {
+#pragma warning disable CA1416
+                var plainBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
+                return Encoding.UTF8.GetString(plainBytes);
+#pragma warning restore CA1416
+            }
+            else
+            {
+                // Simple Base64 decode for non-Windows for now
+                return Encoding.UTF8.GetString(encryptedBytes);
+            }
         }
         catch (Exception error)
         {
