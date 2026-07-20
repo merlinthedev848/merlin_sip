@@ -931,6 +931,7 @@
                                 <Button x:Name="TabBtnAccount" Content="Account &amp; Network" Style="{StaticResource SettingsTabButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="SettingsAccountButton_Click" Margin="0,0,0,6" />
                                 <Button x:Name="TabBtnHandling" Content="Call Handling" Style="{StaticResource SettingsTabButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="SettingsHandlingButton_Click" Margin="0,0,0,6" />
                                 <Button x:Name="TabBtnDevices" Content="Devices &amp; About" Style="{StaticResource SettingsTabButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="SettingsDevicesButton_Click" Margin="0,0,0,6" />
+                                <Button x:Name="TabBtnDiagnostics" Content="Troubleshooting" Style="{StaticResource SettingsTabButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="SettingsDiagnosticsButton_Click" Margin="0,0,0,6" />
                             </StackPanel>
 
                             <!-- Close Button -->
@@ -940,7 +941,11 @@
 
                     <!-- Settings Content Panel -->
                     <Grid Grid.Column="1" Margin="20,20,12,20">
-                        <TabControl x:Name="SettingsTabs" Background="Transparent" BorderThickness="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TabControl Grid.Row="0" x:Name="SettingsTabs" Background="Transparent" BorderThickness="0">
                             <TabControl.Resources>
                                 <Style TargetType="TabItem">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -1002,15 +1007,6 @@
 
                                                 <TextBlock Text="Password" Foreground="#64748B" FontWeight="Medium" />
                                                 <PasswordBox x:Name="PasswordBox" Margin="0,5,0,18" />
-
-                                                <Grid Margin="0,6,0,0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Button Grid.Column="0" Content="Save credentials" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Margin="0,0,8,0" Click="ReconnectButton_Click" />
-                                                    <Button Grid.Column="1" Content="Reset app" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="ResetCacheButton_Click" />
-                                                </Grid>
                                             </StackPanel>
                                         </Border>
 
@@ -1054,7 +1050,6 @@
                                                 <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
                                                     <StackPanel>
                                                         <DockPanel>
-                                                            <Button DockPanel.Dock="Right" Content="Save Mode" Style="{StaticResource SoftButton}" Width="98" Click="SaveNetworkModeButton_Click" />
                                                             <TextBlock Text="Connection Assist" Foreground="#111827" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                         </DockPanel>
                                                         <CheckBox x:Name="SipAlgCompatibilityCheckBox"
@@ -1098,30 +1093,6 @@
                                                         </Grid>
                                                     </StackPanel>
                                                 </Border>
-
-                                                <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
-                                                    <StackPanel>
-                                                        <DockPanel Margin="0,0,0,12">
-                                                            <Button DockPanel.Dock="Right"
-                                                                    x:Name="RunPbxDiagnosticsButton"
-                                                                    Content="Run test"
-                                                                    Style="{StaticResource SoftButton}"
-                                                                    Width="96"
-                                                                    Click="RunPbxDiagnosticsButton_Click" />
-                                                            <TextBlock Text="PBX diagnostics" Foreground="#111827" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                        </DockPanel>
-                                                        <TextBlock Text="Checks registration, response time, messaging, audio packets, routing clues, and router compatibility."
-                                                                   Foreground="#64748B"
-                                                                   TextWrapping="Wrap"
-                                                                   Margin="0,0,0,12" />
-                                                        <TextBlock x:Name="PbxDiagnosticsText"
-                                                                   Text="Diagnostics have not been run yet."
-                                                                   Foreground="#334155"
-                                                                   FontWeight="Medium"
-                                                                   TextWrapping="Wrap" />
-                                                    </StackPanel>
-                                                </Border>
-                                                <Button Content="Send error log" Style="{StaticResource SoftButton}" Click="SendErrorLogButton_Click" Width="150" HorizontalAlignment="Left" Margin="0,0,0,10" />
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
@@ -1185,7 +1156,6 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <Button Content="Save preferences" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" Width="180" HorizontalAlignment="Left" Margin="0,0,0,10" />
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
@@ -1245,7 +1215,6 @@
                                                 </Grid>
                                             </StackPanel>
                                         </Border>
-                                        <Button Content="Save handling" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveApplicationSettingsButton_Click" Width="180" HorizontalAlignment="Left" Margin="0,0,0,10" />
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
@@ -1261,20 +1230,8 @@
                                                 <ComboBox x:Name="AudioInputComboBox" Margin="0,5,0,12" />
                                                 <TextBlock Text="Audio output" Foreground="#64748B" FontWeight="Medium" />
                                                 <ComboBox x:Name="AudioOutputComboBox" Margin="0,5,0,12" />
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                                        <TextBlock Text="Ringtone" Foreground="#64748B" FontWeight="Medium" />
-                                                        <ComboBox x:Name="RingtoneComboBox" DisplayMemberPath="Name" Margin="0,5,0,0" />
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                        <TextBlock Text="Video source" Foreground="#64748B" FontWeight="Medium" />
-                                                        <ComboBox x:Name="VideoSourceComboBox" Margin="0,5,0,0" />
-                                                    </StackPanel>
-                                                </Grid>
+                                                <TextBlock Text="Ringtone" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,5" />
+                                                <ComboBox x:Name="RingtoneComboBox" DisplayMemberPath="Name" Margin="0,0,0,12" />
                                             </StackPanel>
                                         </Border>
                                         
@@ -1311,8 +1268,6 @@
                                                 </Grid>
                                             </Grid>
                                         </Border>
-                                        
-                                        <Button Content="Save devices" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="SaveDevicesButton_Click" Width="180" HorizontalAlignment="Left" Margin="0,0,0,24" />
 
                                         <!-- Software Updates Card -->
                                         <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,24">
@@ -1351,18 +1306,72 @@
                                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Product" Foreground="#64748B" FontWeight="Medium" Margin="0,0,0,6" />
                                                     <TextBlock Grid.Row="1" Grid.Column="1" Text="merlin-sip" Foreground="#111827" FontWeight="Medium" Margin="0,0,0,6" />
                                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Support" Foreground="#64748B" FontWeight="Medium" />
-                                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="CK Media Services" Foreground="#111827" FontWeight="Medium" />
-                                                </Grid>
-                                            </StackPanel>
-                                        </Border>
-                                    </StackPanel>
-                                </ScrollViewer>
-                            </TabItem>
-                        </TabControl>
+                                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="CK Media Services" Foreground="#111827" FontWeight="Medium" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </TabItem>
+
+                                <TabItem x:Name="SettingsDiagnosticsTab" Header="Troubleshooting">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <StackPanel Margin="0,0,12,0">
+                                            <!-- PBX diagnostics Card -->
+                                            <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                                <StackPanel>
+                                                    <DockPanel Margin="0,0,0,12">
+                                                        <Button DockPanel.Dock="Right"
+                                                                x:Name="RunPbxDiagnosticsButton"
+                                                                Content="Run test"
+                                                                Style="{StaticResource SoftButton}"
+                                                                Width="96"
+                                                                Click="RunPbxDiagnosticsButton_Click" />
+                                                        <TextBlock Text="PBX diagnostics" Foreground="#111827" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    </DockPanel>
+                                                    <TextBlock Text="Checks registration, response time, messaging, audio packets, routing clues, and router compatibility."
+                                                               Foreground="#64748B"
+                                                               TextWrapping="Wrap"
+                                                               Margin="0,0,0,12" />
+                                                    <TextBlock x:Name="PbxDiagnosticsText"
+                                                               Text="Diagnostics have not been run yet."
+                                                               Foreground="#334155"
+                                                               FontWeight="Medium"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Support Actions Card -->
+                                            <Border Background="#F8FBFE" BorderBrush="#D7E1EC" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,18">
+                                                <StackPanel>
+                                                    <TextBlock Text="Support &amp; Troubleshooting" Foreground="#111827" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                    <TextBlock Text="If you are experiencing issues, you can send an error log to support or reset the application data to its initial state." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button Grid.Column="0" Content="Send error log" Style="{StaticResource SoftButton}" Margin="0,0,8,0" Click="SendErrorLogButton_Click" />
+                                                        <Button Grid.Column="1" Content="Reset app" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="ResetCacheButton_Click" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </TabItem>
+                            </TabControl>
+
+                            <!-- Unified Action Buttons -->
+                            <Border Grid.Row="1" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,10,0,0">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="Cancel" Style="{StaticResource SoftButton}" Width="100" Margin="0,0,10,0" Click="CloseSettingsButton_Click" />
+                                    <Button Content="Save Changes" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Width="130" Click="SaveAllSettingsButton_Click" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
                     </Grid>
-                </Grid>
-            </Border>
-        </Grid>
+                </Border>
+            </Grid>
 
         <Grid x:Name="IncomingCallOverlay" Grid.ColumnSpan="2" Visibility="Collapsed" Background="#9907111E">
             <Border Style="{StaticResource Surface}" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center">

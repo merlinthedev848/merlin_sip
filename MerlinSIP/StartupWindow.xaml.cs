@@ -33,11 +33,9 @@ public partial class StartupWindow : Window
     {
         AudioInputComboBox.ItemsSource = _deviceDiscoveryService.GetAudioInputs();
         AudioOutputComboBox.ItemsSource = _deviceDiscoveryService.GetAudioOutputs();
-        VideoSourceComboBox.ItemsSource = _deviceDiscoveryService.GetVideoSources();
 
         AudioInputComboBox.SelectedIndex = AudioInputComboBox.Items.Count > 0 ? 0 : -1;
         AudioOutputComboBox.SelectedIndex = AudioOutputComboBox.Items.Count > 0 ? 0 : -1;
-        VideoSourceComboBox.SelectedIndex = VideoSourceComboBox.Items.Count > 0 ? 0 : -1;
     }
 
     private async void ContinueButton_Click(object sender, RoutedEventArgs e)
@@ -106,10 +104,9 @@ public partial class StartupWindow : Window
     private async Task AcceptCredentialsStep()
     {
         if (AudioInputComboBox.SelectedItem is not MediaDeviceInfo audioInput ||
-            AudioOutputComboBox.SelectedItem is not MediaDeviceInfo audioOutput ||
-            VideoSourceComboBox.SelectedItem is not MediaDeviceInfo videoSource)
+            AudioOutputComboBox.SelectedItem is not MediaDeviceInfo audioOutput)
         {
-            ErrorText.Text = "Select audio input, audio output, and video source devices.";
+            ErrorText.Text = "Select audio input and audio output devices.";
             return;
         }
 
@@ -128,8 +125,7 @@ public partial class StartupWindow : Window
                 _licenseStatus,
                 _licenseService.LocalKey ?? string.Empty,
                 audioInput,
-                audioOutput,
-                videoSource);
+                audioOutput);
 
             if (!provisioned.Success || provisioned.Config is null)
             {
@@ -176,7 +172,6 @@ public partial class StartupWindow : Window
             _licenseStatus,
             audioInput,
             audioOutput,
-            videoSource,
             LicenseLocalKey: _licenseService.LocalKey ?? string.Empty).WithFixedSipEndpoint();
 
         DialogResult = true;

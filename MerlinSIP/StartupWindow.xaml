@@ -115,9 +115,6 @@
 
                             <TextBlock Text="Audio output" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
                             <ComboBox x:Name="AudioOutputComboBox" Margin="0,6,0,12" />
-
-                            <TextBlock Text="Video source" Foreground="{StaticResource MutedBrush}" FontWeight="Medium" />
-                            <ComboBox x:Name="VideoSourceComboBox" Margin="0,6,0,12" />
                         </StackPanel>
 
                         <TextBlock x:Name="ErrorText"

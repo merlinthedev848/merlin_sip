@@ -13,3 +13,8 @@ publish/
 .tools/
 _authenticator/
 installer/*.generated.wxs
+.wix/
+.vs/
+*.msi
+*.suo
+*.user

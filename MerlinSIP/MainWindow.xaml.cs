@@ -828,11 +828,9 @@ public partial class MainWindow : Window
     {
         AudioInputComboBox.ItemsSource = _deviceDiscoveryService.GetAudioInputs();
         AudioOutputComboBox.ItemsSource = _deviceDiscoveryService.GetAudioOutputs();
-        VideoSourceComboBox.ItemsSource = _deviceDiscoveryService.GetVideoSources();
         RingtoneComboBox.ItemsSource = RingtonePlayer.Choices;
         SelectDevice(AudioInputComboBox, _config.AudioInput);
         SelectDevice(AudioOutputComboBox, _config.AudioOutput);
-        SelectDevice(VideoSourceComboBox, _config.VideoSource);
         SelectRingtone(_config.Ringtone);
         LoadVolumeSliders();
     }
@@ -841,11 +839,9 @@ public partial class MainWindow : Window
     {
         AudioInputComboBox.ItemsSource = new[] { _config.AudioInput };
         AudioOutputComboBox.ItemsSource = new[] { _config.AudioOutput };
-        VideoSourceComboBox.ItemsSource = new[] { _config.VideoSource };
         RingtoneComboBox.ItemsSource = RingtonePlayer.Choices;
         AudioInputComboBox.SelectedIndex = 0;
         AudioOutputComboBox.SelectedIndex = 0;
-        VideoSourceComboBox.SelectedIndex = 0;
         SelectRingtone(_config.Ringtone);
         LoadVolumeSliders();
     }
@@ -1863,7 +1859,6 @@ public partial class MainWindow : Window
             Password = PasswordBox.Password,
             AudioInput = mediaConfig.AudioInput,
             AudioOutput = mediaConfig.AudioOutput,
-            VideoSource = mediaConfig.VideoSource,
             Ringtone = mediaConfig.Ringtone,
             MicrophoneVolume = mediaConfig.MicrophoneVolume,
             HeadphoneVolume = mediaConfig.HeadphoneVolume,
@@ -1882,7 +1877,6 @@ public partial class MainWindow : Window
     {
         var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
         var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
-        var videoSource = VideoSourceComboBox.SelectedItem as MediaDeviceInfo ?? _config.VideoSource;
         var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
         return _config with
         {
@@ -1894,7 +1888,6 @@ public partial class MainWindow : Window
                 : AppStartupConfig.FixedSipServer,
             AudioInput = audioInput,
             AudioOutput = audioOutput,
-            VideoSource = videoSource,
             Ringtone = ringtone?.Id ?? _config.Ringtone,
             MicrophoneVolume = Math.Clamp(MicrophoneVolumeSlider.Value / 100, 0.25, 2.0),
             HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0),
@@ -1915,26 +1908,6 @@ public partial class MainWindow : Window
         });
     }
 
-    private async void SaveDevicesButton_Click(object sender, RoutedEventArgs e)
-    {
-        var previousInput = _config.AudioInput;
-        var previousOutput = _config.AudioOutput;
-        var previousVideo = _config.VideoSource;
-        _config = BuildConfigFromSettings().WithFixedSipEndpoint();
-        await _cacheService.SaveSettingsAsync(_config);
-
-        var mediaDeviceChanged =
-            previousInput.Id != _config.AudioInput.Id ||
-            previousOutput.Id != _config.AudioOutput.Id ||
-            previousVideo.Id != _config.VideoSource.Id;
-
-        SettingsOverlay.Visibility = Visibility.Collapsed;
-        FooterStatusText.Text = mediaDeviceChanged
-            ? "Device settings saved. Current registration stays active."
-            : "Ringtone saved.";
-        UpdateCallControls();
-    }
-
     private async void ProvisionAndReconnectButton_Click(object sender, RoutedEventArgs e)
     {
         ProvisionAndReconnectButton.IsEnabled = false;
@@ -1944,7 +1917,6 @@ public partial class MainWindow : Window
         {
             var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
             var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
-            var videoSource = VideoSourceComboBox.SelectedItem as MediaDeviceInfo ?? _config.VideoSource;
             var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
 
             var result = await _provisioningService.ProvisionAsync(
@@ -1953,8 +1925,7 @@ public partial class MainWindow : Window
                 _config.LicenseStatus,
                 _config.LicenseLocalKey,
                 audioInput,
-                audioOutput,
-                videoSource);
+                audioOutput);
 
             if (!result.Success || result.Config is null)
             {
@@ -2055,7 +2026,7 @@ public partial class MainWindow : Window
         var inactiveBg = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#F1F5F9")!;
         var inactiveFg = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#475569")!;
 
-        foreach (var btn in new[] { TabBtnGeneral, TabBtnAccount, TabBtnHandling, TabBtnDevices })
+        foreach (var btn in new[] { TabBtnGeneral, TabBtnAccount, TabBtnHandling, TabBtnDevices, TabBtnDiagnostics })
         {
             if (btn == activeBtn)
             {
@@ -2096,36 +2067,10 @@ public partial class MainWindow : Window
         UpdateActiveSettingsTab(TabBtnDevices);
     }
 
-    private async void SaveNetworkModeButton_Click(object sender, RoutedEventArgs e)
+    private void SettingsDiagnosticsButton_Click(object sender, RoutedEventArgs e)
     {
-        var previousTransport = _config.SipSignallingTransport;
-        _config = _config with
-        {
-            SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true,
-            SipSignallingTransport = ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp)
-        };
-
-        await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
-        _sipRegistrationService.UpdateNetworkAssistance(_config.SipAlgCompatibilityMode);
-        UpdateNetworkAssistanceText();
-        if (_config.UsesTcpSignalling)
-        {
-            var probe = await _sipsorceryCompatibilityService.TestTcpRegistrationAsync(_config);
-            FooterStatusText.Text = probe.Message;
-        }
-        else
-        {
-            FooterStatusText.Text = _config.SipAlgCompatibilityMode
-                ? "Router keepalive assist is on."
-                : "Standard network mode is on.";
-        }
-
-        if (!string.Equals(previousTransport, _config.SipSignallingTransport, StringComparison.OrdinalIgnoreCase))
-        {
-            _registered = false;
-            UpdateCallControls();
-            await RegisterSipAsync();
-        }
+        SettingsTabs.SelectedItem = SettingsDiagnosticsTab;
+        UpdateActiveSettingsTab(TabBtnDiagnostics);
     }
 
     private void SipAlgCompatibilityCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -2237,10 +2182,39 @@ public partial class MainWindow : Window
         SettingsTabs.SelectedItem = SettingsDevicesTab;
     }
 
-    private async void SaveApplicationSettingsButton_Click(object sender, RoutedEventArgs e)
+    private async void SaveAllSettingsButton_Click(object sender, RoutedEventArgs e)
     {
+        var previousInput = _config.AudioInput;
+        var previousOutput = _config.AudioOutput;
+        var previousTransport = _config.SipSignallingTransport;
+        var previousExtension = _config.Extension;
+        var previousUsername = _config.Username;
+        var previousPassword = _config.Password;
+        var previousServer = _config.Server;
+
+        var audioInput = AudioInputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioInput;
+        var audioOutput = AudioOutputComboBox.SelectedItem as MediaDeviceInfo ?? _config.AudioOutput;
+        var ringtone = RingtoneComboBox.SelectedItem as RingtoneChoice;
+
+        var server = _config.AllowsCustomSipEndpoint
+            ? PrivatePbxSettingsTextBox.Text.Trim()
+            : AppStartupConfig.FixedSipServer;
+
         _config = _config with
         {
+            Server = server,
+            Port = AppStartupConfig.FixedSipPort,
+            Domain = server,
+            Extension = ExtensionTextBox.Text.Trim(),
+            Username = UsernameTextBox.Text.Trim(),
+            Password = PasswordBox.Password,
+            AudioInput = audioInput,
+            AudioOutput = audioOutput,
+            Ringtone = ringtone?.Id ?? _config.Ringtone,
+            MicrophoneVolume = Math.Clamp(MicrophoneVolumeSlider.Value / 100, 0.25, 2.0),
+            HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0),
+            SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true,
+            SipSignallingTransport = ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp),
             MobileNumber = MobileNumberTextBox.Text.Trim(),
             DndMode = ComboBoxText(DndModeComboBox, "Off"),
             DeclineIncomingAction = ComboBoxText(DeclineActionComboBox, "Send busy"),
@@ -2257,7 +2231,29 @@ public partial class MainWindow : Window
 
         await _cacheService.SaveSettingsAsync(_config.WithFixedSipEndpoint());
         ApplyDndMode();
-        FooterStatusText.Text = "Settings saved.";
+        _sipRegistrationService.UpdateNetworkAssistance(_config.SipAlgCompatibilityMode);
+        UpdateNetworkAssistanceText();
+
+        var mediaDeviceChanged = previousInput.Id != _config.AudioInput.Id || previousOutput.Id != _config.AudioOutput.Id;
+        var transportChanged = !string.Equals(previousTransport, _config.SipSignallingTransport, StringComparison.OrdinalIgnoreCase);
+        var credentialsChanged = !string.Equals(previousExtension, _config.Extension) ||
+                                 !string.Equals(previousUsername, _config.Username) ||
+                                 !string.Equals(previousPassword, _config.Password) ||
+                                 !string.Equals(previousServer, _config.Server);
+
+        SettingsOverlay.Visibility = Visibility.Collapsed;
+        FooterStatusText.Text = "Settings saved successfully.";
+
+        if (transportChanged || credentialsChanged)
+        {
+            _registered = false;
+            UpdateCallControls();
+            await RegisterSipAsync();
+        }
+        else if (mediaDeviceChanged)
+        {
+            UpdateCallControls();
+        }
     }
 
     private void QueuePickupButton_Click(object sender, RoutedEventArgs e)

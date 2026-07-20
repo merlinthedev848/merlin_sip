@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Merlin SIP</string>
-    <string name="title_activity_main">Merlin SIP</string>
-    <string name="package_name">com.ckmedia.merlinsip</string>
-    <string name="custom_url_scheme">com.ckmedia.merlinsip</string>
-</resources>

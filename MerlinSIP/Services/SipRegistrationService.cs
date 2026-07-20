@@ -653,14 +653,31 @@ public sealed class SipRegistrationService : IDisposable
 
         if (_pendingIncomingCall is not null)
         {
-            await SendSimpleResponseAsync(
-                _pendingIncomingCall.Request,
-                _pendingIncomingCall.RemoteEndPoint,
-                486,
-                "Busy Here",
-                cancellationToken,
-                _pendingIncomingCall.LocalTag);
-            DebugLog.Write($"SEND INCOMING REJECT callId={_pendingIncomingCall.CallId}");
+            var mobileNumber = _config?.MobileNumber;
+            if (!string.IsNullOrWhiteSpace(mobileNumber))
+            {
+                var targetUri = $"sip:{mobileNumber}@{_domain}";
+                await SendSimpleResponseAsync(
+                    _pendingIncomingCall.Request,
+                    _pendingIncomingCall.RemoteEndPoint,
+                    302,
+                    "Moved Temporarily",
+                    cancellationToken,
+                    _pendingIncomingCall.LocalTag,
+                    $"Contact: <{targetUri}>");
+                DebugLog.Write($"SEND INCOMING REDIRECT (busy/decline) callId={_pendingIncomingCall.CallId} target={targetUri}");
+            }
+            else
+            {
+                await SendSimpleResponseAsync(
+                    _pendingIncomingCall.Request,
+                    _pendingIncomingCall.RemoteEndPoint,
+                    486,
+                    "Busy Here",
+                    cancellationToken,
+                    _pendingIncomingCall.LocalTag);
+                DebugLog.Write($"SEND INCOMING REJECT callId={_pendingIncomingCall.CallId}");
+            }
             _pendingIncomingCall = null;
             _audioSession?.Dispose();
             _audioSession = null;
@@ -1725,8 +1742,18 @@ public sealed class SipRegistrationService : IDisposable
 
         if (_rejectIncomingCalls)
         {
-            await SendSimpleResponseAsync(message, remoteEndPoint, 486, "Busy Here", cancellationToken, localTag);
-            DebugLog.Write("RECV INVITE rejected because DND is enabled");
+            var mobileNumber = _config?.MobileNumber;
+            if (!string.IsNullOrWhiteSpace(mobileNumber))
+            {
+                var targetUri = $"sip:{mobileNumber}@{_domain}";
+                await SendSimpleResponseAsync(message, remoteEndPoint, 302, "Moved Temporarily", cancellationToken, localTag, $"Contact: <{targetUri}>");
+                DebugLog.Write($"RECV INVITE redirected because DND is enabled and mobile number is set target={targetUri}");
+            }
+            else
+            {
+                await SendSimpleResponseAsync(message, remoteEndPoint, 486, "Busy Here", cancellationToken, localTag);
+                DebugLog.Write("RECV INVITE rejected because DND is enabled");
+            }
             QueueRegistrationRefresh("DND incoming reject");
             return;
         }
@@ -1798,7 +1825,8 @@ public sealed class SipRegistrationService : IDisposable
         int code,
         string reason,
         CancellationToken cancellationToken,
-        string? localTag = null)
+        string? localTag = null,
+        string? additionalHeader = null)
     {
         if (!IsTransportReady)
         {
@@ -1817,18 +1845,27 @@ public sealed class SipRegistrationService : IDisposable
             to = EnsureToTag(to, localTag ?? Guid.NewGuid().ToString("N")[..12]);
         }
 
-        var response = string.Join("\r\n", [
+        var responseList = new List<string>
+        {
             $"SIP/2.0 {code} {reason}",
             $"Via: {via}",
             $"From: {from}",
             $"To: {to}",
             $"Call-ID: {callId}",
             $"CSeq: {cseq}",
-            "User-Agent: CK Media Services Merlin SIP",
-            "Content-Length: 0",
-            "",
-            ""
-        ]);
+            "User-Agent: CK Media Services Merlin SIP"
+        };
+
+        if (!string.IsNullOrEmpty(additionalHeader))
+        {
+            responseList.Add(additionalHeader);
+        }
+
+        responseList.Add("Content-Length: 0");
+        responseList.Add("");
+        responseList.Add("");
+
+        var response = string.Join("\r\n", responseList);
 
         var payload = Encoding.UTF8.GetBytes(response);
         await SendToRemoteAsync(payload, remoteEndPoint, cancellationToken);

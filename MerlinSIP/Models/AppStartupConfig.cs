@@ -11,7 +11,6 @@ public sealed record AppStartupConfig(
     string LicenseStatus,
     MediaDeviceInfo AudioInput,
     MediaDeviceInfo AudioOutput,
-    MediaDeviceInfo VideoSource,
     string Ringtone = AppStartupConfig.DefaultRingtone,
     double MicrophoneVolume = 1.0,
     double HeadphoneVolume = 1.0,

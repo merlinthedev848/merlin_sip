@@ -25,7 +25,6 @@ public sealed class ProvisioningService
         string licenseLocalKey,
         MediaDeviceInfo audioInput,
         MediaDeviceInfo audioOutput,
-        MediaDeviceInfo videoSource,
         CancellationToken cancellationToken = default)
     {
         var cleanedCode = new string(code.Where(char.IsDigit).ToArray());
@@ -75,7 +74,6 @@ public sealed class ProvisioningService
                     licenseStatus,
                     audioInput,
                     audioOutput,
-                    videoSource,
                     LicenseLocalKey: licenseLocalKey).WithFixedSipEndpoint();
 
                 return ProvisioningResult.Ok(config);
