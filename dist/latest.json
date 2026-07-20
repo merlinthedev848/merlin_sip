@@ -1,5 +1,5 @@
 {
-  "Version": "1.1.35",
-  "DownloadUrl": "https://updates.chriskendall.media/merlin-sip/releases/MerlinSIP-1.1.35-x64-faststart.msi",
-  "Notes": "Release 1.1.35: Hidden CALL button during active calls, widened END button, larger current call details, fixed presence recovery after ending calls, restored BLF-based presence updating, and added a 3-way conference calling option."
+  "Version": "1.1.36",
+  "DownloadUrl": "https://updates.chriskendall.media/merlin-sip/releases/MerlinSIP-1.1.36-x64-faststart.msi",
+  "Notes": "Release 1.1.36: Overhauled Settings menu to feature a professional, compact corporate layout, split into 6 scroll-free tabs (General, Account, Routing, Audio, Diagnostics, and About), restored mobile number call-forwarding (SIP 302 Redirection on Busy/DND), and removed video camera device constraints."
 }
