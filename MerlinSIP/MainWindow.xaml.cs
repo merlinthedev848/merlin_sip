@@ -2026,7 +2026,7 @@ public partial class MainWindow : Window
         var inactiveBg = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#F1F5F9")!;
         var inactiveFg = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#475569")!;
 
-        foreach (var btn in new[] { TabBtnGeneral, TabBtnAccount, TabBtnHandling, TabBtnDevices, TabBtnDiagnostics })
+        foreach (var btn in new[] { TabBtnGeneral, TabBtnAccount, TabBtnHandling, TabBtnAudio, TabBtnDiagnostics, TabBtnAbout })
         {
             if (btn == activeBtn)
             {
@@ -2061,16 +2061,22 @@ public partial class MainWindow : Window
         UpdateActiveSettingsTab(TabBtnHandling);
     }
 
-    private void SettingsDevicesButton_Click(object sender, RoutedEventArgs e)
+    private void SettingsAudioButton_Click(object sender, RoutedEventArgs e)
     {
-        SettingsTabs.SelectedItem = SettingsDevicesTab;
-        UpdateActiveSettingsTab(TabBtnDevices);
+        SettingsTabs.SelectedItem = SettingsAudioTab;
+        UpdateActiveSettingsTab(TabBtnAudio);
     }
 
     private void SettingsDiagnosticsButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsTabs.SelectedItem = SettingsDiagnosticsTab;
         UpdateActiveSettingsTab(TabBtnDiagnostics);
+    }
+
+    private void SettingsAboutButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsTabs.SelectedItem = SettingsAboutTab;
+        UpdateActiveSettingsTab(TabBtnAbout);
     }
 
     private void SipAlgCompatibilityCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -2172,15 +2178,7 @@ public partial class MainWindow : Window
         return report.ToString().Trim();
     }
 
-    private void SettingsUpdatesButton_Click(object sender, RoutedEventArgs e)
-    {
-        SettingsTabs.SelectedItem = SettingsDevicesTab;
-    }
 
-    private void SettingsAboutButton_Click(object sender, RoutedEventArgs e)
-    {
-        SettingsTabs.SelectedItem = SettingsDevicesTab;
-    }
 
     private async void SaveAllSettingsButton_Click(object sender, RoutedEventArgs e)
     {
