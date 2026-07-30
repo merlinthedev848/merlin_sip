@@ -1138,6 +1138,13 @@
                                                       Checked="SipAlgCompatibilityCheckBox_Changed"
                                                       Unchecked="SipAlgCompatibilityCheckBox_Changed" />
 
+                                            <CheckBox x:Name="IgnoreSslErrorsCheckBox"
+                                                      Content="Ignore licensing SSL/TLS validation errors"
+                                                      FontWeight="SemiBold"
+                                                      Margin="0,4,0,6"
+                                                      Checked="IgnoreSslErrorsCheckBox_Changed"
+                                                      Unchecked="IgnoreSslErrorsCheckBox_Changed" />
+
                                             <Grid Margin="0,4,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />

@@ -12,10 +12,7 @@ public sealed class UpdateService
     private const string UpdatesBaseUrl = "https://updates.chriskendall.media/merlin-sip/";
     private const string ReleasesUrl = "https://updates.chriskendall.media/merlin-sip/releases/";
     private static readonly TimeSpan InstallerRetention = TimeSpan.FromDays(14);
-    private static readonly HttpClient HttpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(15)
-    };
+    private static readonly HttpClient HttpClient = HttpClientHelper.CreateClient();
 
     public async Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken cancellationToken = default)
     {

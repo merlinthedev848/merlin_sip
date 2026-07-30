@@ -103,7 +103,8 @@ public sealed class AppCacheService
             settings.RegistrationExpiry ?? 3600,
             settings.HeartbeatInterval ?? 30,
             settings.LocalSipPort ?? 5060,
-            settings.PreferredCodecs ?? "PCMA,PCMU,G722").WithFixedSipEndpoint();
+            settings.PreferredCodecs ?? "PCMA,PCMU,G722",
+            settings.IgnoreSslErrors ?? false).WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
@@ -158,7 +159,8 @@ public sealed class AppCacheService
             config.RegistrationExpiry,
             config.HeartbeatInterval,
             config.LocalSipPort,
-            config.PreferredCodecs);
+            config.PreferredCodecs,
+            config.IgnoreSslErrors);
 
         try
         {
@@ -303,5 +305,6 @@ public sealed class AppCacheService
         int? RegistrationExpiry = null,
         int? HeartbeatInterval = null,
         int? LocalSipPort = null,
-        string? PreferredCodecs = null);
+        string? PreferredCodecs = null,
+        bool? IgnoreSslErrors = null);
 }

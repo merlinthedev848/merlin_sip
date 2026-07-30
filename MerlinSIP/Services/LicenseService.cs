@@ -16,10 +16,7 @@ public sealed class LicenseService
 #endif
     private static readonly Uri VerifyUrl = new("https://accounts.chriskendall.media/license/verify");
     private static readonly Uri ActivateUrl = new("https://accounts.chriskendall.media/license/activate");
-    private static readonly HttpClient HttpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(15)
-    };
+    private static readonly HttpClient HttpClient = HttpClientHelper.CreateClient();
 
     public string Status { get; private set; } = "Licensed";
     public string? LocalKey { get; private set; }

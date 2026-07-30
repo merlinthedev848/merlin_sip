@@ -815,6 +815,7 @@ public partial class MainWindow : Window
         PrivatePbxSettingsPanel.Visibility = customEndpoint ? Visibility.Visible : Visibility.Collapsed;
         PrivatePbxSettingsTextBox.Text = customEndpoint ? _config.Server : string.Empty;
         SipAlgCompatibilityCheckBox.IsChecked = _config.SipAlgCompatibilityMode;
+        IgnoreSslErrorsCheckBox.IsChecked = _config.IgnoreSslErrors;
         SelectSipTransportMode(_config.SipSignallingTransport);
         LicenseStatusText.Text = ShortLicenseStatus(_config.LicenseStatus);
         LicensedToText.Text = LicenseeFromStatus(_config.LicenseStatus);
@@ -2076,6 +2077,7 @@ public partial class MainWindow : Window
             MicrophoneVolume = Math.Clamp(MicrophoneVolumeSlider.Value / 100, 0.25, 2.0),
             HeadphoneVolume = Math.Clamp(HeadphoneVolumeSlider.Value / 100, 0.25, 2.0),
             SipAlgCompatibilityMode = SipAlgCompatibilityCheckBox.IsChecked == true,
+            IgnoreSslErrors = IgnoreSslErrorsCheckBox.IsChecked == true,
             SipSignallingTransport = ComboBoxTag(SipTransportModeComboBox, AppStartupConfig.TransportUdp)
         };
     }
@@ -2266,6 +2268,10 @@ public partial class MainWindow : Window
     private void SipAlgCompatibilityCheckBox_Changed(object sender, RoutedEventArgs e)
     {
         UpdateNetworkAssistanceText();
+    }
+
+    private void IgnoreSslErrorsCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
     }
 
     private void SipTransportModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
