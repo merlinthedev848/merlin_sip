@@ -35,7 +35,16 @@ public sealed record AppStartupConfig(
     bool CombineContactsInSearch = true,
     int IncomingNotificationSeconds = 30,
     int FailedCallDisplaySeconds = 5,
-    bool ShowFavouriteExtensionsOnTransfer = true)
+    bool ShowFavouriteExtensionsOnTransfer = true,
+    string CallPickupPrefix = "*8",
+    string QueueLoginLogoutCode = "*62",
+    string CallRecordingCode = "*1",
+    bool EnableAdvancedDiagnostics = false,
+    string StunServer = "stun.l.google.com:19302",
+    int RegistrationExpiry = 3600,
+    int HeartbeatInterval = 30,
+    int LocalSipPort = 5060,
+    string PreferredCodecs = "PCMA,PCMU,G722")
 {
     public const string FixedSipServer = "pbx.chriskendall.media";
     public const int FixedSipPort = 5060;

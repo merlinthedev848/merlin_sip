@@ -72,6 +72,19 @@ public partial class MainWindow : Window
     private string _userSelectedPresence = "Available";
     private ContactEntry? _editingContact;
     private IncomingCallWindow? _incomingCallWindow;
+    private System.Windows.Interop.HwndSource? _hwndSource;
+    private GlobalHotkeyService? _hotkeyService;
+    private readonly DispatcherTimer _searchDebounceTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private const int WM_CLIPBOARDUPDATE = 0x031D;
+    private const int WM_DEVICECHANGE = 0x0219;
+    private const int DBT_DEVNODES_CHANGED = 0x0007;
+    private string _lastClipboardText = "";
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool AddClipboardFormatListener(IntPtr hwnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 
     public MainWindow(AppStartupConfig config)
     {
@@ -96,6 +109,7 @@ public partial class MainWindow : Window
         _callTimer.Tick += CallTimer_Tick;
         _connectionWatchdog.Tick += ConnectionWatchdog_Tick;
         _licenseWatchdog.Tick += LicenseWatchdog_Tick;
+        _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
         Closing += MainWindow_Closing;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
@@ -115,6 +129,8 @@ public partial class MainWindow : Window
         await VerifyLicenseAsync();
         _ = RegisterSipAsync();
         _connectionWatchdog.Start();
+        InitGlobalHotkeys();
+        InitHwndHooks();
     }
 
     private void MainWindow_Closed(object? sender, EventArgs e)
@@ -135,6 +151,7 @@ public partial class MainWindow : Window
     {
         if (_allowExit)
         {
+            CleanupHooks();
             return;
         }
 
@@ -144,13 +161,89 @@ public partial class MainWindow : Window
         FooterStatusText.Text = "Merlin SIP is running in the notification area.";
     }
 
+    private void CleanupHooks()
+    {
+        if (_hwndSource != null)
+        {
+            _hwndSource.RemoveHook(HwndHook);
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (handle != IntPtr.Zero) RemoveClipboardFormatListener(handle);
+            _hwndSource = null;
+        }
+        _hotkeyService?.Dispose();
+        _hotkeyService = null;
+    }
+
+    private void InitHwndHooks()
+    {
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero)
+        {
+            _hwndSource = System.Windows.Interop.HwndSource.FromHwnd(handle);
+            _hwndSource?.AddHook(HwndHook);
+            AddClipboardFormatListener(handle);
+        }
+    }
+
+    private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_DEVICECHANGE && (wParam.ToInt32() == DBT_DEVNODES_CHANGED || wParam.ToInt32() == 0x8000))
+        {
+            DebugLog.Write("USB audio device change detected. Re-enumerating audio devices...");
+            Dispatcher.InvokeAsync(LoadDeviceSelectors, DispatcherPriority.Background);
+        }
+        else if (msg == WM_CLIPBOARDUPDATE)
+        {
+            ProcessClipboardUpdate();
+        }
+        return IntPtr.Zero;
+    }
+
+    private void ProcessClipboardUpdate()
+    {
+        try
+        {
+            if (System.Windows.Clipboard.ContainsText())
+            {
+                var text = System.Windows.Clipboard.GetText().Trim();
+                if (text != _lastClipboardText && text.Length >= 7 && text.Length <= 18 && text.All(c => char.IsDigit(c) || c == '+' || c == '-' || c == ' '))
+                {
+                    _lastClipboardText = text;
+                    DestinationTextBox.Text = text;
+                    NoticeText.Text = "Copied number ready to dial: " + text;
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void InitGlobalHotkeys()
+    {
+        try
+        {
+            _hotkeyService = new GlobalHotkeyService(this);
+            _hotkeyService.AnswerRequested += delegate
+            {
+                if (_incomingRinging) AnswerIncomingCall();
+                else if (!_callInProgress && !string.IsNullOrWhiteSpace(DestinationTextBox.Text)) DialButton_Click(this, new RoutedEventArgs());
+            };
+            _hotkeyService.HoldRequested += delegate { if (_callInProgress) HoldButton_Click(this, new RoutedEventArgs()); };
+            _hotkeyService.TransferRequested += delegate { if (_callInProgress) TransferButton_Click(this, new RoutedEventArgs()); };
+            _hotkeyService.Register();
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write("Failed to initialize global hotkeys: " + ex.Message);
+        }
+    }
+
     private void InitializeTrayIcon()
     {
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "CKMedia-Icon.ico");
         var icon = File.Exists(iconPath) ? new DrawingIcon(iconPath) : DrawingSystemIcons.Application;
         var menu = new WinForms.ContextMenuStrip();
-        menu.Items.Add("Open Merlin SIP", null, (_, _) => Dispatcher.Invoke(RestoreFromTray));
-        menu.Items.Add("Exit Merlin SIP", null, (_, _) => Dispatcher.Invoke(ExitFromTray));
+        menu.Items.Add("Open Merlin SIP", null, (_, _) => Dispatcher.InvokeAsync(RestoreFromTray));
+        menu.Items.Add("Exit Merlin SIP", null, (_, _) => Dispatcher.InvokeAsync(ExitFromTray));
 
         _trayIcon = new WinForms.NotifyIcon
         {
@@ -159,7 +252,35 @@ public partial class MainWindow : Window
             Visible = true,
             ContextMenuStrip = menu
         };
-        _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreFromTray);
+        _trayIcon.DoubleClick += (_, _) => Dispatcher.InvokeAsync(RestoreFromTray);
+    }
+
+    private bool _isMiniWidgetMode;
+
+    public void ToggleMiniWidgetMode()
+    {
+        _isMiniWidgetMode = !_isMiniWidgetMode;
+        if (_isMiniWidgetMode)
+        {
+            this.Width = 360.0;
+            this.Height = 160.0;
+            this.Topmost = true;
+            this.WindowStyle = WindowStyle.ToolWindow;
+            NoticeText.Text = "Mini-Widget Mode Active";
+        }
+        else
+        {
+            this.Width = 1420.0;
+            this.Height = 900.0;
+            this.Topmost = false;
+            this.WindowStyle = WindowStyle.SingleBorderWindow;
+            NoticeText.Text = "Standard Mode";
+        }
+    }
+
+    private void ToggleMiniWidgetMode_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleMiniWidgetMode();
     }
 
     public void RestoreFromTray()
@@ -168,6 +289,30 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+    }
+
+    public void HandleTelProtocolLaunch(string rawUrl)
+    {
+        var number = ProtocolHandlerService.ParseTelUrl(rawUrl);
+        if (string.IsNullOrWhiteSpace(number))
+        {
+            return;
+        }
+
+        Dispatcher.InvokeAsync(() =>
+        {
+            RestoreFromTray();
+            MainTabs.SelectedItem = PhoneTab;
+            DestinationTextBox.Text = number;
+            NoticeText.Text = $"Tel link target: {number}";
+            FooterStatusText.Text = $"Opened tel: link for {number}";
+            UpdateCallControls();
+
+            if (/*_config.AutoDialTelLinks &&*/ !_callInProgress && !_incomingRinging && _registered && !_licenseLocked)
+            {
+                DialButton_Click(this, new RoutedEventArgs());
+            }
+        });
     }
 
     private void ExitFromTray()
@@ -242,7 +387,10 @@ public partial class MainWindow : Window
 
     private void CallTimer_Tick(object? sender, EventArgs e)
     {
-        UpdateCallTimer();
+        if (WindowState != WindowState.Minimized)
+        {
+            UpdateCallTimer();
+        }
     }
 
     private void StartCallTimer()
@@ -477,7 +625,7 @@ public partial class MainWindow : Window
 
     private void SipRegistrationService_IncomingCall(object? sender, IncomingCallEventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.InvokeAsync(() =>
         {
             var contact = _contactStore.FindByNumber(_contacts, e.CallerNumber);
             var callerName = contact?.Name ?? e.CallerNumber;
@@ -527,7 +675,7 @@ public partial class MainWindow : Window
 
     private void SipRegistrationService_CallProgress(object? sender, CallProgressEventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.InvokeAsync(() =>
         {
             if (e.Connected)
             {
@@ -594,7 +742,7 @@ public partial class MainWindow : Window
 
     private void SipRegistrationService_ContactPresenceChanged(object? sender, ContactPresenceEventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.InvokeAsync(() =>
         {
             var isOwnExtension = false;
             if (!string.IsNullOrWhiteSpace(_config.Extension) &&
@@ -642,7 +790,7 @@ public partial class MainWindow : Window
 
     private void SipRegistrationService_IncomingMessage(object? sender, IncomingMessageEventArgs e)
     {
-        Dispatcher.Invoke(async () =>
+        Dispatcher.InvokeAsync(async () =>
         {
             var contact = _contactStore.FindByNumber(_contacts, e.SenderNumber);
             var senderName = contact?.Name ?? e.SenderNumber;
@@ -1126,17 +1274,13 @@ public partial class MainWindow : Window
 
     private void ApplyGlobalSearchFilter()
     {
-        var query = GlobalSearchTextBox.Text.Trim();
-        ReplaceCollection(_filteredDirectoryContacts, FilterContacts(query));
-        ReplaceCollection(_filteredDirectoryFavorites, FilterFavorites(query));
-        ReplaceCollection(_filteredPhonebookContacts, FilterContacts(query));
-        ReplaceCollection(_filteredRecentCalls, FilterCalls(query));
-        ReplaceCollection(_filteredCallHistory, FilterCalls(query));
+        SearchDebounceTimer_Tick(null, EventArgs.Empty);
     }
 
-    private IEnumerable<ContactEntry> FilterFavorites(string query)
+
+    private IEnumerable<ContactEntry> FilterFavorites(IEnumerable<ContactEntry> source, string query)
     {
-        var favorites = _contacts.Where(c => c.IsFavorite);
+        var favorites = source.Where(c => c.IsFavorite);
         return string.IsNullOrWhiteSpace(query)
             ? favorites
             : favorites.Where(contact =>
@@ -1147,11 +1291,11 @@ public partial class MainWindow : Window
                 ContainsSearchText(contact.PresenceLabel, query));
     }
 
-    private IEnumerable<ContactEntry> FilterContacts(string query)
+    private IEnumerable<ContactEntry> FilterContacts(IEnumerable<ContactEntry> source, string query)
     {
         return string.IsNullOrWhiteSpace(query)
-            ? _contacts
-            : _contacts.Where(contact =>
+            ? source
+            : source.Where(contact =>
                 ContainsSearchText(contact.Name, query) ||
                 ContainsSearchText(contact.Number, query) ||
                 ContainsSearchText(contact.Company, query) ||
@@ -1159,11 +1303,11 @@ public partial class MainWindow : Window
                 ContainsSearchText(contact.PresenceLabel, query));
     }
 
-    private IEnumerable<CallHistoryEntry> FilterCalls(string query)
+    private IEnumerable<CallHistoryEntry> FilterCalls(IEnumerable<CallHistoryEntry> source, string query)
     {
         return string.IsNullOrWhiteSpace(query)
-            ? _callHistory
-            : _callHistory.Where(call =>
+            ? source
+            : source.Where(call =>
                 ContainsSearchText(call.Name, query) ||
                 ContainsSearchText(call.Number, query) ||
                 ContainsSearchText(call.Direction, query) ||
@@ -1201,7 +1345,34 @@ public partial class MainWindow : Window
 
     private void GlobalSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        ApplyGlobalSearchFilter();
+        _searchDebounceTimer.Stop();
+        _searchDebounceTimer.Start();
+    }
+
+    private async void SearchDebounceTimer_Tick(object? sender, EventArgs e)
+    {
+        _searchDebounceTimer.Stop();
+        var query = GlobalSearchTextBox.Text.Trim();
+        
+        var contacts = _contacts.ToList();
+        var callHistory = _callHistory.ToList();
+        
+        var result = await Task.Run(() => 
+        {
+            return new 
+            {
+                FilteredContacts = FilterContacts(contacts, query).ToList(),
+                FilteredFavorites = FilterFavorites(contacts, query).ToList(),
+                FilteredCalls = FilterCalls(callHistory, query).ToList()
+            };
+        });
+        
+        ReplaceCollection(_filteredDirectoryContacts, result.FilteredContacts);
+        ReplaceCollection(_filteredPhonebookContacts, result.FilteredContacts);
+        ReplaceCollection(_filteredDirectoryFavorites, result.FilteredFavorites);
+        ReplaceCollection(_filteredRecentCalls, result.FilteredCalls);
+        ReplaceCollection(_filteredCallHistory, result.FilteredCalls);
+        
         ApplyGlobalSearchNavigation();
     }
 
@@ -1464,30 +1635,43 @@ public partial class MainWindow : Window
 
     private async void AnswerIncomingCall()
     {
-        StopLocalRingback();
-        _ringtonePlayer.Stop();
-        HideIncomingCallSurfaces();
-        MainTabs.SelectedItem = PhoneTab;
-        WindowState = WindowState.Normal;
-        Activate();
+        try
+        {
+            StopLocalRingback();
+            _ringtonePlayer.Stop();
+            HideIncomingCallSurfaces();
+            MainTabs.SelectedItem = PhoneTab;
+            WindowState = WindowState.Normal;
+            Activate();
 
-        var result = await _sipRegistrationService.AnswerIncomingCallAsync();
-        FooterStatusText.Text = result.Message;
-        NoticeText.Text = result.Signalled ? "Call answered." : result.Message;
-        _incomingRinging = false;
-        _callInProgress = result.Signalled;
-        _callConnected = result.Signalled;
-        if (result.Signalled)
-        {
-            SetContactPresence(_activeRemoteNumber, "Busy");
-            StartCallTimer();
+            var result = await _sipRegistrationService.AnswerIncomingCallAsync();
+            FooterStatusText.Text = result.Message;
+            NoticeText.Text = result.Signalled ? "Call answered." : result.Message;
+            _incomingRinging = false;
+            _callInProgress = result.Signalled;
+            _callConnected = result.Signalled;
+            if (result.Signalled)
+            {
+                SetContactPresence(_activeRemoteNumber, "Busy");
+                StartCallTimer();
+            }
+            else
+            {
+                SetContactPresence(_activeRemoteNumber, "Offline");
+                _activeRemoteNumber = "";
+            }
+            UpdateCallControls();
         }
-        else
+        catch (Exception ex)
         {
-            SetContactPresence(_activeRemoteNumber, "Offline");
-            _activeRemoteNumber = "";
+            DebugLog.Write($"Error answering incoming call: {ex.Message}");
+            NoticeText.Text = "Failed to answer call.";
+            FooterStatusText.Text = "An error occurred while answering the call.";
+            _incomingRinging = false;
+            _callInProgress = false;
+            _callConnected = false;
+            UpdateCallControls();
         }
-        UpdateCallControls();
     }
 
     private async void DeclineIncomingCall()
@@ -2284,6 +2468,13 @@ public partial class MainWindow : Window
         await _callHistoryStore.SaveAsync(_callHistory);
         ApplyGlobalSearchFilter();
         FooterStatusText.Text = "Call history cleared.";
+    }
+
+    private void DiagnosticsSummaryButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new DiagnosticsSummaryDialog();
+        dialog.Owner = this;
+        dialog.ShowDialog();
     }
 
     private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)

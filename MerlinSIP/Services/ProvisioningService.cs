@@ -36,47 +36,79 @@ public sealed class ProvisioningService
         try
         {
             ProvisioningResult? lastFailure = null;
+            var maxDelay = TimeSpan.FromSeconds(30);
+            var delay = TimeSpan.FromSeconds(1);
 
-            foreach (var url in ProvisioningUrls)
+            for (int attempt = 0; attempt < 5; attempt++)
             {
-                using var response = await HttpClient.PostAsJsonAsync(url, new ProvisioningRequest(cleanedCode), cancellationToken);
-                var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
-                var isJson = contentType.Contains("json", StringComparison.OrdinalIgnoreCase);
-
-                if (!isJson)
+                if (attempt > 0)
                 {
-                    DebugLog.Write($"PROVISION endpoint returned non-json status={(int)response.StatusCode} url={url}");
-                    lastFailure = ProvisioningResult.Fail("The provisioning service is not available right now.");
-                    continue;
+                    var jitter = TimeSpan.FromMilliseconds(Random.Shared.Next(0, 500));
+                    await Task.Delay(delay + jitter, cancellationToken);
+                    delay = delay * 2;
+                    if (delay > maxDelay) delay = maxDelay;
                 }
 
-                var payload = await response.Content.ReadFromJsonAsync<ProvisioningResponse>(cancellationToken: cancellationToken);
-                if (!response.IsSuccessStatusCode || payload is null || !payload.Success || payload.Sip is null)
+                foreach (var url in ProvisioningUrls)
                 {
-                    return ProvisioningResult.Fail(ToCustomerMessage(payload?.Error, response.StatusCode));
+                    HttpResponseMessage response;
+                    try
+                    {
+                        response = await HttpClient.PostAsJsonAsync(url, new ProvisioningRequest(cleanedCode), cancellationToken);
+                    }
+                    catch (HttpRequestException)
+                    {
+                        lastFailure = ProvisioningResult.Fail("The provisioning service is not available right now.");
+                        continue; // try next URL or retry
+                    }
+                    
+                    using (response)
+                    {
+                        var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+                        var isJson = contentType.Contains("json", StringComparison.OrdinalIgnoreCase);
+
+                        if (!isJson)
+                        {
+                            DebugLog.Write($"PROVISION endpoint returned non-json status={(int)response.StatusCode} url={url}");
+                            lastFailure = ProvisioningResult.Fail("The provisioning service is not available right now.");
+                            continue;
+                        }
+
+                        var payload = await response.Content.ReadFromJsonAsync<ProvisioningResponse>(cancellationToken: cancellationToken);
+                        if (!response.IsSuccessStatusCode || payload is null || !payload.Success || payload.Sip is null)
+                        {
+                            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests || 
+                                (int)response.StatusCode >= 500)
+                            {
+                                lastFailure = ProvisioningResult.Fail(ToCustomerMessage(payload?.Error, response.StatusCode));
+                                break; // Break URL loop, go to outer retry loop
+                            }
+                            return ProvisioningResult.Fail(ToCustomerMessage(payload?.Error, response.StatusCode));
+                        }
+
+                        if (string.IsNullOrWhiteSpace(payload.Sip.Extension) ||
+                            string.IsNullOrWhiteSpace(payload.Sip.AuthName) ||
+                            string.IsNullOrWhiteSpace(payload.Sip.SipPassword))
+                        {
+                            return ProvisioningResult.Fail("The provisioning code did not return complete account details.");
+                        }
+
+                        var config = new AppStartupConfig(
+                            AppStartupConfig.FixedSipServer,
+                            AppStartupConfig.FixedSipPort,
+                            AppStartupConfig.FixedSipServer,
+                            payload.Sip.Extension.Trim(),
+                            payload.Sip.AuthName.Trim(),
+                            payload.Sip.SipPassword,
+                            licenseKey,
+                            licenseStatus,
+                            audioInput,
+                            audioOutput,
+                            LicenseLocalKey: licenseLocalKey).WithFixedSipEndpoint();
+
+                        return ProvisioningResult.Ok(config);
+                    }
                 }
-
-                if (string.IsNullOrWhiteSpace(payload.Sip.Extension) ||
-                    string.IsNullOrWhiteSpace(payload.Sip.AuthName) ||
-                    string.IsNullOrWhiteSpace(payload.Sip.SipPassword))
-                {
-                    return ProvisioningResult.Fail("The provisioning code did not return complete account details.");
-                }
-
-                var config = new AppStartupConfig(
-                    AppStartupConfig.FixedSipServer,
-                    AppStartupConfig.FixedSipPort,
-                    AppStartupConfig.FixedSipServer,
-                    payload.Sip.Extension.Trim(),
-                    payload.Sip.AuthName.Trim(),
-                    payload.Sip.SipPassword,
-                    licenseKey,
-                    licenseStatus,
-                    audioInput,
-                    audioOutput,
-                    LicenseLocalKey: licenseLocalKey).WithFixedSipEndpoint();
-
-                return ProvisioningResult.Ok(config);
             }
 
             return lastFailure ?? ProvisioningResult.Fail("The provisioning service is not available right now.");

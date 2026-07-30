@@ -247,6 +247,7 @@
         <Border Grid.Column="0" Background="{StaticResource SideRailBrush}" Padding="16,22" BorderThickness="0,0,1,0" BorderBrush="#1F2937">
             <DockPanel LastChildFill="True">
                 <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center">
+                    <Button Content="Mini" Style="{StaticResource SoftButton}" Click="ToggleMiniWidgetMode_Click" Margin="0,0,0,10" Width="58" Height="28" />
                     <Border Width="58" Height="58" CornerRadius="8" Background="{StaticResource PrimaryBrush}" BorderThickness="1" BorderBrush="#E2D8C3">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="6" ShadowDepth="1.5" Opacity="0.15" Color="#000000" />
@@ -1219,6 +1220,31 @@
                                                         <ComboBoxItem Content="60 seconds" />
                                                         <ComboBoxItem Content="90 seconds" />
                                                     </ComboBox>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <Border Style="{StaticResource SettingsCard}">
+                                        <StackPanel>
+                                            <TextBlock Text="Feature Codes" Foreground="#111827" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                    <TextBlock Text="Call Pickup Prefix" />
+                                                    <TextBox x:Name="CallPickupPrefixTextBox" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Margin="4,0,4,0">
+                                                    <TextBlock Text="Queue Login/Logout" />
+                                                    <TextBox x:Name="QueueToggleCodeTextBox" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                                    <TextBlock Text="Call Recording" />
+                                                    <TextBox x:Name="CallRecordingCodeTextBox" />
                                                 </StackPanel>
                                             </Grid>
                                         </StackPanel>

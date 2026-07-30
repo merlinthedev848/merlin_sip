@@ -8,6 +8,7 @@ namespace MerlinSip.Services;
 
 public sealed class AppCacheService
 {
+    public static AppStartupConfig? ActiveConfig { get; set; }
     private readonly string _root = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "MerlinSIP");
@@ -93,7 +94,16 @@ public sealed class AppCacheService
             settings.CombineContactsInSearch ?? true,
             settings.IncomingNotificationSeconds ?? 30,
             settings.FailedCallDisplaySeconds ?? 5,
-            settings.ShowFavouriteExtensionsOnTransfer ?? true).WithFixedSipEndpoint();
+            settings.ShowFavouriteExtensionsOnTransfer ?? true,
+            settings.CallPickupPrefix ?? "*8",
+            settings.QueueLoginLogoutCode ?? "*62",
+            settings.CallRecordingCode ?? "*1",
+            settings.EnableAdvancedDiagnostics ?? false,
+            settings.StunServer ?? "stun.l.google.com:19302",
+            settings.RegistrationExpiry ?? 3600,
+            settings.HeartbeatInterval ?? 30,
+            settings.LocalSipPort ?? 5060,
+            settings.PreferredCodecs ?? "PCMA,PCMU,G722").WithFixedSipEndpoint();
     }
 
     public async Task SaveSettingsAsync(AppStartupConfig config)
@@ -139,7 +149,16 @@ public sealed class AppCacheService
             config.CombineContactsInSearch,
             config.IncomingNotificationSeconds,
             config.FailedCallDisplaySeconds,
-            config.ShowFavouriteExtensionsOnTransfer);
+            config.ShowFavouriteExtensionsOnTransfer,
+            config.CallPickupPrefix,
+            config.QueueLoginLogoutCode,
+            config.CallRecordingCode,
+            config.EnableAdvancedDiagnostics,
+            config.StunServer,
+            config.RegistrationExpiry,
+            config.HeartbeatInterval,
+            config.LocalSipPort,
+            config.PreferredCodecs);
 
         try
         {
@@ -275,5 +294,14 @@ public sealed class AppCacheService
         bool? CombineContactsInSearch = null,
         int? IncomingNotificationSeconds = null,
         int? FailedCallDisplaySeconds = null,
-        bool? ShowFavouriteExtensionsOnTransfer = null);
+        bool? ShowFavouriteExtensionsOnTransfer = null,
+        string? CallPickupPrefix = null,
+        string? QueueLoginLogoutCode = null,
+        string? CallRecordingCode = null,
+        bool? EnableAdvancedDiagnostics = null,
+        string? StunServer = null,
+        int? RegistrationExpiry = null,
+        int? HeartbeatInterval = null,
+        int? LocalSipPort = null,
+        string? PreferredCodecs = null);
 }

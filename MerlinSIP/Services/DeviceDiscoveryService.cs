@@ -46,6 +46,16 @@ public sealed class DeviceDiscoveryService
 
     public IReadOnlyList<MediaDeviceInfo> GetVideoSources()
     {
+        var task = System.Threading.Tasks.Task.Run(GetVideoSourcesInternal);
+        if (task.Wait(3000))
+        {
+            return task.Result;
+        }
+        return [DefaultVideoSource];
+    }
+
+    private IReadOnlyList<MediaDeviceInfo> GetVideoSourcesInternal()
+    {
         var devices = new List<MediaDeviceInfo>();
         object? deviceEnum = null;
         IEnumMoniker? enumMoniker = null;
@@ -74,10 +84,11 @@ public sealed class DeviceDiscoveryService
             while (enumMoniker.Next(1, monikers, IntPtr.Zero) == 0)
             {
                 var moniker = monikers[0];
+                object? propertyBagObject = null;
                 try
                 {
                     var propertyBagId = typeof(IPropertyBag).GUID;
-                    moniker.BindToStorage(null!, null!, ref propertyBagId, out var propertyBagObject);
+                    moniker.BindToStorage(null!, null!, ref propertyBagId, out propertyBagObject);
                     if (propertyBagObject is IPropertyBag propertyBag)
                     {
                         propertyBag.Read("FriendlyName", out var name, IntPtr.Zero);
@@ -86,12 +97,14 @@ public sealed class DeviceDiscoveryService
                         {
                             devices.Add(new MediaDeviceInfo(id, friendlyName));
                         }
-
-                        Marshal.ReleaseComObject(propertyBag);
                     }
                 }
                 finally
                 {
+                    if (propertyBagObject is not null)
+                    {
+                        Marshal.ReleaseComObject(propertyBagObject);
+                    }
                     Marshal.ReleaseComObject(moniker);
                 }
             }

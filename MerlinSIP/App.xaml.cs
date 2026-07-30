@@ -20,17 +20,20 @@ public partial class App : System.Windows.Application
             Services.DebugLog.Write($"UNHANDLED APPDOMAIN EXCEPTION: {args.ExceptionObject}");
         };
 
+        var telArg = e.Args.FirstOrDefault(arg => arg.StartsWith("tel:", StringComparison.OrdinalIgnoreCase) || arg.StartsWith("callto:", StringComparison.OrdinalIgnoreCase) || arg.StartsWith("sip:", StringComparison.OrdinalIgnoreCase));
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         _singleInstanceService = new Services.SingleInstanceService();
         if (!_singleInstanceService.IsPrimaryInstance)
         {
-            await Services.SingleInstanceService.NotifyExistingInstanceAsync();
+            await Services.SingleInstanceService.NotifyExistingInstanceAsync(telArg ?? "activate");
             Shutdown();
             return;
         }
 
+        Services.ProtocolHandlerService.RegisterProtocolHandlers();
         var cache = new Services.AppCacheService();
         var config = await cache.LoadSettingsAsync();
+        Services.AppCacheService.ActiveConfig = config;
 
         if (config is null)
         {
@@ -43,14 +46,26 @@ public partial class App : System.Windows.Application
             }
 
             config = startupWindow.Config;
+            Services.AppCacheService.ActiveConfig = config;
             await cache.SaveSettingsAsync(config);
         }
 
         var mainWindow = new MainWindow(config);
-        _singleInstanceService.ActivationRequested += (_, _) => mainWindow.RestoreFromTray();
+        _singleInstanceService.ActivationRequested += (_, msg) => 
+        {
+            mainWindow.RestoreFromTray();
+            if (!string.IsNullOrWhiteSpace(msg) && msg != "activate")
+            {
+                mainWindow.HandleTelProtocolLaunch(msg);
+            }
+        };
         _singleInstanceService.StartListening(Dispatcher);
         MainWindow = mainWindow;
         mainWindow.Show();
+        if (!string.IsNullOrWhiteSpace(telArg))
+        {
+            mainWindow.HandleTelProtocolLaunch(telArg);
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

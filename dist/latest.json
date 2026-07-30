@@ -1,5 +1,5 @@
 {
-  "Version": "1.1.36",
-  "DownloadUrl": "https://updates.chriskendall.media/merlin-sip/releases/MerlinSIP-1.1.36-x64-faststart.msi",
-  "Notes": "Release 1.1.36: Overhauled Settings menu to feature a professional, compact corporate layout, split into 6 scroll-free tabs (General, Account, Routing, Audio, Diagnostics, and About), restored mobile number call-forwarding (SIP 302 Redirection on Busy/DND), and removed video camera device constraints."
+  "Version": "1.1.51",
+  "DownloadUrl": "https://updates.chriskendall.media/merlin-sip/releases/MerlinSIP-1.1.51-x64-faststart.msi",
+  "Notes": "Release 1.1.51: Resolved race condition and application crash on call teardown (401 unauthenticated drops). Fixed 100% CPU spin loop on socket/IOException in TCP listener. Optimized parsing of TCP packets to remove O(N^2) allocations. Implemented synchronous DNS cache to resolve endpoint blockages. Added support for intercom auto-answer and message waiting indicator (MWI). Integrated live Call Quality Monitor (MOS scoring) and Call Waiting support. Optimized UI search debounce and implemented native Windows clipboard/device change notifications."
 }
