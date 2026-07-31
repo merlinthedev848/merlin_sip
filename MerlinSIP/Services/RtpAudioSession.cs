@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 using MerlinSip.Models;
 
 namespace MerlinSip.Services;
@@ -119,6 +120,8 @@ public sealed class RtpAudioSession : IDisposable
 	private int _nonSilentInboundFrames;
 
 	private int _speakerFramesWritten;
+
+	private int _audioPumpLateWarnings;
 
 	private FileStream? _recordingStream;
 
@@ -560,12 +563,24 @@ public sealed class RtpAudioSession : IDisposable
 
 	private async Task AudioPumpLoopAsync(CancellationToken cancellationToken)
 	{
+		var stopwatch = Stopwatch.StartNew();
+		var nextTick = TimeSpan.Zero;
 		while (!cancellationToken.IsCancellationRequested)
 		{
 			try
 			{
 				PumpAudioFrame();
-				await Task.Delay(20, cancellationToken);
+				nextTick += TimeSpan.FromMilliseconds(20);
+				var delay = nextTick - stopwatch.Elapsed;
+				if (delay > TimeSpan.Zero)
+				{
+					await Task.Delay(delay, cancellationToken);
+				}
+				else if (delay < TimeSpan.FromMilliseconds(-40) && Interlocked.Increment(ref _audioPumpLateWarnings) <= 3)
+				{
+					DebugLog.Write($"RTP audio pump late ms={-delay.TotalMilliseconds:F1}");
+					nextTick = stopwatch.Elapsed;
+				}
 			}
 			catch (OperationCanceledException)
 			{
@@ -575,6 +590,7 @@ public sealed class RtpAudioSession : IDisposable
 			{
 				DebugLog.Write($"RTP audio pump error: {error.Message}");
 				await Task.Delay(20, cancellationToken);
+				nextTick = stopwatch.Elapsed;
 			}
 		}
 	}
@@ -589,6 +605,11 @@ public sealed class RtpAudioSession : IDisposable
 
 		var call1Frame = _call1Held ? AudioFrameQueue.GetSilenceFrame(SamplesPerPacket) : _call1RxQueue.DequeueOrSilence(SamplesPerPacket);
 		var call2Frame = (!_secondaryRunning || _call2Held) ? AudioFrameQueue.GetSilenceFrame(SamplesPerPacket) : _call2RxQueue.DequeueOrSilence(SamplesPerPacket);
+		var underruns = _call1RxQueue.Underruns;
+		if (underruns is 10 or 25 or 50)
+		{
+			DebugLog.Write($"RTP jitter buffer underruns={underruns} queued={_call1RxQueue.Count}");
+		}
 		RecordFrameIfNeeded(micFrame, call1Frame, call2Frame);
 		PlayMixedFrame(call1Frame, call2Frame);
 		SendPrimaryFrame(micFrame, call2Frame);
@@ -795,7 +816,7 @@ public sealed class RtpAudioSession : IDisposable
 						if (received == 1)
 						{
 							var extension = (udpReceiveResult.Buffer[0] & 0x10) != 0;
-							DebugLog.Write($"RTP first inbound packet remote={udpReceiveResult.RemoteEndPoint} payload={num3} bytes={udpReceiveResult.Buffer.Length} offset={payloadOffset} ext={extension} peak={peak}");
+							DebugLog.Write($"RTP first inbound packet remote={udpReceiveResult.RemoteEndPoint} payload={num3} bytes={udpReceiveResult.Buffer.Length} offset={payloadOffset} ext={extension} peak={peak} queue={rxQueue.Count}");
 						}
 						if (peak > 400 && Interlocked.Exchange(ref _nonSilentInboundFrames, 1) == 0)
 						{

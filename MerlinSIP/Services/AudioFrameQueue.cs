@@ -9,31 +9,21 @@ public sealed class AudioFrameQueue
 
 	private readonly Queue<short[]> _queue = new Queue<short[]>();
 
-	private int _maxFrames = 8;
+	private const int TargetFrames = 4;
 
-	private long _lastArrivalTicks;
+	private const int MaxFrames = 14;
+
+	private bool _started;
+
+	private int _underruns;
 
 	private static readonly short[] SharedSilenceFrame = new short[160];
 
 	public void Enqueue(short[] samples)
 	{
-		long tickCount = Environment.TickCount64;
 		lock (_lock)
 		{
-			if (_lastArrivalTicks > 0)
-			{
-				long num = Math.Abs(tickCount - _lastArrivalTicks - 20);
-				if (num > 25 && _maxFrames < 14)
-				{
-					_maxFrames++;
-				}
-				else if (num <= 4 && _maxFrames > 4)
-				{
-					_maxFrames--;
-				}
-			}
-			_lastArrivalTicks = tickCount;
-			if (_queue.Count >= _maxFrames)
+			if (_queue.Count >= MaxFrames)
 			{
 				_queue.Dequeue();
 			}
@@ -54,12 +44,47 @@ public sealed class AudioFrameQueue
 	{
 		lock (_lock)
 		{
+			if (!_started)
+			{
+				if (_queue.Count < TargetFrames)
+				{
+					return GetSilenceFrame(sampleCount);
+				}
+
+				_started = true;
+			}
+
 			if (_queue.Count > 0)
 			{
 				return _queue.Dequeue();
 			}
+
+			_started = false;
+			_underruns++;
 		}
 		return GetSilenceFrame(sampleCount);
+	}
+
+	public int Count
+	{
+		get
+		{
+			lock (_lock)
+			{
+				return _queue.Count;
+			}
+		}
+	}
+
+	public int Underruns
+	{
+		get
+		{
+			lock (_lock)
+			{
+				return _underruns;
+			}
+		}
 	}
 
 	public void Clear()
@@ -67,8 +92,8 @@ public sealed class AudioFrameQueue
 		lock (_lock)
 		{
 			_queue.Clear();
-			_maxFrames = 8;
-			_lastArrivalTicks = 0L;
+			_started = false;
+			_underruns = 0;
 		}
 	}
 }
