@@ -2,11 +2,11 @@
   <Package
     Name="Merlin SIP"
     Manufacturer="CK Media Services"
-    Version="1.1.51"
+    Version="1.2.0"
     UpgradeCode="{8E5C2C6E-3A1E-4F83-9897-4E62EB06E0EC}"
     Scope="perMachine">
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Merlin SIP is already installed." />
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of Merlin SIP is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <Icon Id="AppIcon.ico" SourceFile="$(var.ProjectDir)\MerlinSIP\Assets\CKMedia-Icon.ico" />

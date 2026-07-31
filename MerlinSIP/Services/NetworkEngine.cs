@@ -48,19 +48,16 @@ public class NetworkEngine
 
 	private readonly string[] GoogleDnsServers = new string[2] { "8.8.8.8", "8.8.4.4" };
 
-	private readonly (string host, string ip)[] CkMediaStunServers = new(string, string)[3]
+	private readonly (string host, string ip)[] PrimaryStunServers = new(string, string)[1]
 	{
-		("stun.l.google.com", "74.125.250.129"),
-		("stun1.l.google.com", "74.125.250.129"),
-		("stun2.l.google.com", "74.125.250.129")
+		("pbx.chriskendall.media", "")
 	};
 
 	private (string host, string ip)[] GetGoogleStunServers()
 	{
-		string stun = AppCacheService.ActiveConfig?.StunServer ?? "stun.l.google.com";
 		return new(string, string)[5]
 		{
-			(stun, "74.125.250.129"),
+			("stun.l.google.com", "74.125.250.129"),
 			("stun1.l.google.com", "74.125.250.129"),
 			("stun2.l.google.com", "74.125.250.129"),
 			("stun3.l.google.com", "74.125.250.129"),
@@ -83,7 +80,7 @@ public class NetworkEngine
 
 	public int LocalSipPort { get; set; } = 5060;
 
-	public string StunServer { get; set; } = "stun.l.google.com";
+	public string StunServer { get; set; } = "pbx.chriskendall.media";
 
 	public int StunPort { get; set; } = 3478;
 
@@ -105,11 +102,11 @@ public class NetworkEngine
 
 	public int ClientUserId { get; set; }
 
-	public string PresenceUrl { get; set; } = "http://pbx.chriskendall.media/Presence";
+	public string PresenceUrl { get; set; } = "https://pbx.chriskendall.media";
 
-	public string SignallingUrl { get; set; } = "http://pbx.chriskendall.media/Signals";
+	public string SignallingUrl { get; set; } = "https://pbx.chriskendall.media";
 
-	public string RoomsUrl { get; set; } = "http://pbx.chriskendall.media/Rooms";
+	public string RoomsUrl { get; set; } = "https://pbx.chriskendall.media";
 
 	public bool HasLocalConnectivityIssue { get; private set; }
 
@@ -219,9 +216,9 @@ public class NetworkEngine
 				try 
 				{
 					string text = process.ProcessName.ToLower();
-					if (text.Contains("agilico") || text.Contains("softphone") || text.Contains("dmc"))
+					if (text.Contains("merlinsip") || text.Contains("merlin") || text.Contains("sip"))
 					{
-						Log($"Active Softphone Process: '{process.ProcessName}' (PID: {process.Id}) is running.");
+						Log($"Active voice client process: '{process.ProcessName}' (PID: {process.Id}) is running.");
 						flag = true;
 					}
 				}
@@ -229,7 +226,7 @@ public class NetworkEngine
 			}
 			if (!flag)
 			{
-				Log("Active Softphone Process: No running softphone processes detected.");
+				Log("Active voice client process: No running client processes detected.");
 			}
 		}
 		catch (Exception ex)
@@ -336,7 +333,7 @@ public class NetworkEngine
 				}
 				else if (list3.Count == 0 && !flag5)
 				{
-					string text7 = "Adapter '" + name + "' is active but has no Default Gateway configured. It cannot route traffic to the internet or Agilico portal.";
+					string text7 = "Adapter '" + name + "' is active but has no Default Gateway configured. It cannot route traffic to the internet or service portal.";
 					Log("  [CRITICAL] " + text7, isError: true);
 					list.Add(text7);
 				}
@@ -654,12 +651,12 @@ public class NetworkEngine
 	{
 		_cts = new CancellationTokenSource();
 		CancellationToken token = _cts.Token;
-		Log("Starting CK Media Services Diagnostic Tool...");
+		Log("Starting Network Diagnostic Tool...");
 		Log("=================================================================");
 		Log($"Timestamp:         {DateTime.Now}");
 		Log($"OS Version:        {Environment.OSVersion}");
 		Log("Local IP Address:  " + GetLocalIpAddress());
-		Log("Diagnostic Scope:  Strictly checking CK Media Services KB Network Guidance");
+		Log("Diagnostic Scope:  Checking network guidance for voice service readiness");
 		Log("=================================================================");
 		Log("All tests are running directly against the servers and ports specified in the network guide.");
 		try
@@ -782,19 +779,19 @@ public class NetworkEngine
 			{
 				return false;
 			}
-			bool CkMediaStunPass = true;
+			bool primaryStunPass = true;
 			if (SelectedTests[3])
 			{
 				Log("");
 				Log("=================================================================");
 				Log("=== CHECK 4/10: STUN SERVER ACCESSIBILITY (UDP 3478) ===");
 				Log("=================================================================");
-				CkMediaStunPass = await RunCkMediaStunTestsAsync(token);
+				primaryStunPass = await RunPrimaryStunTestsAsync(token);
 			}
 			else
 			{
 				Log("Check 4: Skipped by user selection.");
-				UpdateProgress("STUN Server Check", "Skipped", "Skipped by user");
+				UpdateProgress("Primary STUN Servers", "Skipped", "Skipped by user");
 			}
 			if (token.IsCancellationRequested)
 			{
@@ -904,11 +901,11 @@ public class NetworkEngine
 				Log("Check 10: Skipped by user selection.");
 				UpdateProgress("Inbound Signalling & Presence", "Skipped", "Skipped by user");
 			}
-			bool flag2 = dnsPass && httpPass && ntpPass && CkMediaStunPass && googleStunPass && natHopsPass && natPortPass && sipAlgPass && rtpQualityPass && flag;
+			bool flag2 = dnsPass && httpPass && ntpPass && primaryStunPass && googleStunPass && natHopsPass && natPortPass && sipAlgPass && rtpQualityPass && flag;
 			int num = 0;
 			int num2 = 0;
 			int[] array = new int[10] { 15, 15, 5, 0, 5, 5, 5, 15, 15, 10 };
-			bool[] array2 = new bool[10] { dnsPass, httpPass, ntpPass, CkMediaStunPass, googleStunPass, natHopsPass, natPortPass, sipAlgPass, rtpQualityPass, flag };
+			bool[] array2 = new bool[10] { dnsPass, httpPass, ntpPass, primaryStunPass, googleStunPass, natHopsPass, natPortPass, sipAlgPass, rtpQualityPass, flag };
 			for (int j = 0; j < 10; j++)
 			{
 				if (SelectedTests[j])
@@ -921,7 +918,7 @@ public class NetworkEngine
 				}
 			}
 			int num3 = ((num > 0) ? ((int)Math.Round((double)num2 / (double)num * 100.0)) : 100);
-			Log(flag2 ? "All network checks PASSED! Your firewall configuration is fully compliant with the Agilico Network Guidance." : "Some network checks FAILED or generated Warnings. Please review the recommendations.");
+			Log(flag2 ? "All network checks PASSED. The firewall configuration is suitable for voice service." : "Some network checks FAILED or generated warnings. Please review the recommendations.");
 			Log($"Weighted Diagnostics Score: {num3}/100");
 			this.OnComplete?.Invoke(flag2, num3);
 			return flag2;
@@ -945,7 +942,7 @@ public class NetworkEngine
 		{
 			return false;
 		}
-		UpdateProgress("DNS Domain & Resolution Check", "Running", "Resolving Agilico service domains...");
+		UpdateProgress("DNS Domain & Resolution Check", "Running", "Resolving service domains...");
 		Log("Test 1: Verifying DNS Resolution and Google DNS availability...");
 		if (IsSimulationMode)
 		{
@@ -1257,31 +1254,31 @@ public class NetworkEngine
 		}
 	}
 
-	private async Task<bool> RunCkMediaStunTestsAsync(CancellationToken token)
+	private async Task<bool> RunPrimaryStunTestsAsync(CancellationToken token)
 	{
-		if (CheckLocalConnectivityBeforeTest("CK Media Services STUN Servers"))
+		if (CheckLocalConnectivityBeforeTest("Primary STUN Servers"))
 		{
 			return false;
 		}
-		UpdateProgress("CK Media Services STUN Servers", "Running", "Querying primary and secondary STUN...");
-		Log("Test 4: Querying CK Media Services STUN Servers...");
+		UpdateProgress("Primary STUN Servers", "Running", "Querying PBX STUN endpoint...");
+		Log("Test 4: Querying PBX STUN endpoint...");
 		if (IsSimulationMode)
 		{
 			await Task.Delay(1000, token);
-			UpdateProgress("CK Media Services STUN Servers", "Passed", "Pass - All 4 CK Media Services STUN Servers OK");
+			UpdateProgress("Primary STUN Servers", "Passed", "Pass - PBX STUN endpoint OK");
 			return true;
 		}
 		int successCount = 0;
 		List<string> failedServers = new List<string>();
-		(string host, string ip)[] ckMediaStunServers = CkMediaStunServers;
-		for (int i = 0; i < ckMediaStunServers.Length; i++)
+		(string host, string ip)[] primaryStunServers = PrimaryStunServers;
+		for (int i = 0; i < primaryStunServers.Length; i++)
 		{
-			var (host, value) = ckMediaStunServers[i];
+			var (host, value) = primaryStunServers[i];
 			if (token.IsCancellationRequested)
 			{
 				return false;
 			}
-			Log($"Querying CK Media Services STUN Server: {host} ({value})...");
+			Log($"Querying PBX STUN endpoint: {host}...");
 			var (flag, text, value2) = await QueryStunServerAsync(host, 3478, token);
 			if (flag)
 			{
@@ -1294,24 +1291,24 @@ public class NetworkEngine
 			}
 			else
 			{
-				Log("Agilico STUN server " + host + " failed to respond.");
+				Log("PBX STUN endpoint " + host + " failed to respond.");
 				failedServers.Add(host);
 			}
 		}
-		if (successCount == CkMediaStunServers.Length)
+		if (successCount == PrimaryStunServers.Length)
 		{
-			Log("Test 4: PASSED. All CK Media Services STUN Servers responded successfully.");
-			UpdateProgress("CK Media Services STUN Servers", "Passed", "Pass - All 4 servers online");
+			Log("Test 4: PASSED. PBX STUN endpoint responded successfully.");
+			UpdateProgress("Primary STUN Servers", "Passed", "Pass - PBX STUN endpoint online");
 		}
 		else if (successCount > 0)
 		{
-			Log($"Test 4: Successful: {successCount}/{CkMediaStunServers.Length}. Failed: {string.Join(", ", failedServers)}");
-			UpdateProgress("CK Media Services STUN Servers", "Passed", $"Pass - {successCount}/{CkMediaStunServers.Length} online");
+			Log($"Test 4: Successful: {successCount}/{PrimaryStunServers.Length}. Failed: {string.Join(", ", failedServers)}");
+			UpdateProgress("Primary STUN Servers", "Passed", $"Pass - {successCount}/{PrimaryStunServers.Length} online");
 		}
 		else
 		{
-			Log("Test 4: INFO. All CK Media Services STUN Servers failed to respond (expected due to server-side firewall). Egress is verified via Google Backup STUN.");
-			UpdateProgress("CK Media Services STUN Servers", "Passed", "Informational - Agilico STUN unreachable (firewalled)");
+			Log("Test 4: INFO. PBX STUN endpoint did not respond. Egress is verified via Google Backup STUN.");
+			UpdateProgress("Primary STUN Servers", "Passed", "Informational - PBX STUN unreachable");
 		}
 		return true;
 	}
@@ -1397,7 +1394,7 @@ public class NetworkEngine
 		Log($"Intermediate private hops detected: {num}");
 		if (num > 1)
 		{
-			Log($"Error: Double NAT detected ({num} private network devices). This violates the Single NAT recommendation in the Agilico Network Guidance.", isError: true);
+			Log($"Error: Double NAT detected ({num} private network devices). This violates the single-NAT recommendation for reliable voice service.", isError: true);
 			UpdateProgress("NAT Routing & Hops Check", "Failed", $"Fail - Double NAT ({num} hops)");
 			return false;
 		}
@@ -1591,7 +1588,7 @@ public class NetworkEngine
 				string value2 = Guid.NewGuid().ToString("N").Substring(0, 10);
 				string value3 = Guid.NewGuid().ToString("N").Substring(0, 16) + "@chriskendall.media";
 				string fakeLocalIp = "192.168.1.100";
-				string s = $"OPTIONS sip:{server} SIP/2.0\r\nVia: SIP/2.0/UDP {fakeLocalIp}:{localPort};rport;branch={value}\r\nMax-Forwards: 70\r\nTo: <sip:ping@{server}>\r\nFrom: <sip:ping@{fakeLocalIp}:{localPort}>;tag={value2}\r\nCall-ID: {value3}\r\nCSeq: 1 OPTIONS\r\nContact: <sip:ping@{fakeLocalIp}:{localPort}>\r\nUser-Agent: CK Media Services Diagnostic Tool\r\nContent-Length: 0\r\n\r\n";
+				string s = $"OPTIONS sip:{server} SIP/2.0\r\nVia: SIP/2.0/UDP {fakeLocalIp}:{localPort};rport;branch={value}\r\nMax-Forwards: 70\r\nTo: <sip:ping@{server}>\r\nFrom: <sip:ping@{fakeLocalIp}:{localPort}>;tag={value2}\r\nCall-ID: {value3}\r\nCSeq: 1 OPTIONS\r\nContact: <sip:ping@{fakeLocalIp}:{localPort}>\r\nUser-Agent: Merlin SIP Network Diagnostics\r\nContent-Length: 0\r\n\r\n";
 				byte[] bytes = Encoding.UTF8.GetBytes(s);
 				string actualLocalIp = GetLocalIpAddress();
 				Pcap.RecordPacket(bytes, actualLocalIp, localPort, endpoint.Address.ToString(), endpoint.Port, isUdp: true);
@@ -1698,7 +1695,7 @@ public class NetworkEngine
 					string value = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
 					string value2 = Guid.NewGuid().ToString("N").Substring(0, 10);
 					callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@chriskendall.media";
-					string s = $"OPTIONS sip:{targetHost} SIP/2.0\r\nVia: SIP/2.0/UDP {localIp}:{localPort};rport;branch={value}\r\nMax-Forwards: 70\r\nTo: <sip:checker@{targetHost}>\r\nFrom: <sip:checker@{localIp}:{localPort}>;tag={value2}\r\nCall-ID: {callId}\r\nCSeq: {i + 1} OPTIONS\r\nContact: <sip:checker@{localIp}:{localPort}>\r\nUser-Agent: CK Media Services Diagnostic Tool\r\nContent-Length: 0\r\n\r\n";
+					string s = $"OPTIONS sip:{targetHost} SIP/2.0\r\nVia: SIP/2.0/UDP {localIp}:{localPort};rport;branch={value}\r\nMax-Forwards: 70\r\nTo: <sip:checker@{targetHost}>\r\nFrom: <sip:checker@{localIp}:{localPort}>;tag={value2}\r\nCall-ID: {callId}\r\nCSeq: {i + 1} OPTIONS\r\nContact: <sip:checker@{localIp}:{localPort}>\r\nUser-Agent: Merlin SIP Network Diagnostics\r\nContent-Length: 0\r\n\r\n";
 					array2 = Encoding.UTF8.GetBytes(s);
 				}
 				else
@@ -1774,7 +1771,7 @@ public class NetworkEngine
 		}
 		UpdateProgress("RTP Jitter/Loss Check", "Running", "Simulating G.711 media paths...");
 		Log("Test 9: Advanced SIP Media (RTP) Quality Simulation...");
-		Log("Running three test streams to verify standard SIP ports, Agilico STUN, and Google WebRTC STUN (high port 19302)...");
+		Log("Running three test streams to verify standard SIP ports, primary STUN, and Google WebRTC STUN (high port 19302)...");
 		if (IsSimulationMode)
 		{
 			await Task.Delay(1500, token);
@@ -1783,19 +1780,19 @@ public class NetworkEngine
 			UpdateProgress("RTP Jitter/Loss Check", "Passed", $"Pass - Excellent Quality (0% loss, 5ms jitter, Est. MOS: {value} - Excellent)");
 			return true;
 		}
-		(int sent, int received, double loss, double jitter, double avgRtt, bool pass) pathA = await RunSingleRtpPathCheckAsync("Path A (PBX Port 5060)", DomainToCheck, 5060, "SIP", token);
+		(int sent, int received, double loss, double jitter, double avgRtt, bool pass) pathA = await RunSingleRtpPathCheckAsync("Path A (SIP Port 5060)", SipAlgServer, SipAlgPort, "SIP", token);
 		if (token.IsCancellationRequested)
 		{
 			return false;
 		}
-		(int sent, int received, double loss, double jitter, double avgRtt, bool pass) pathB = await RunSingleRtpPathCheckAsync("Path B (PBX Local Port)", DomainToCheck, LocalSipPort, "SIP", token);
+		(int sent, int received, double loss, double jitter, double avgRtt, bool pass) pathB = await RunSingleRtpPathCheckAsync("Path B (Primary STUN 3478)", "pbx.chriskendall.media", 3478, "STUN", token);
 		if (token.IsCancellationRequested)
 		{
 			return false;
 		}
 		(int, int, double, double, double, bool) tuple = await RunSingleRtpPathCheckAsync("Path C (Google STUN 19302)", "stun.l.google.com", 19302, "STUN", token);
-		bool num = pathA.pass || pathB.pass || tuple.Item6;
-		double num2 = VoipTools.CalculateMosScore(lossPercentage: Math.Min(pathA.loss, pathB.loss), jitterMs: Math.Min(pathA.jitter, pathB.jitter), latencyMs: pathA.pass ? pathA.avgRtt : (pathB.pass ? pathB.avgRtt : tuple.Item5));
+		bool num = pathA.pass && tuple.Item6;
+		double num2 = VoipTools.CalculateMosScore(lossPercentage: Math.Max(pathA.loss, tuple.Item3), jitterMs: Math.Max(pathA.jitter, tuple.Item4), latencyMs: (pathA.avgRtt + tuple.Item5) / 2.0);
 		string value2 = "Excellent";
 		if (num2 < 2.0)
 		{
@@ -1814,8 +1811,8 @@ public class NetworkEngine
 			value2 = "Good";
 		}
 		Log("RTP Quality Summary:");
-		Log($"  Path A (PBX Port 5060): Loss={pathA.loss:0.0}%, Jitter={pathA.jitter:0.1}ms, RTT={pathA.avgRtt:0.1}ms - {(pathA.pass ? "PASS" : "FAIL")}");
-		Log($"  Path B (PBX Local Port): Loss={pathB.loss:0.0}%, Jitter={pathB.jitter:0.1}ms, RTT={pathB.avgRtt:0.1}ms - {(pathB.pass ? "PASS" : "FAIL")}");
+		Log($"  Path A (SIP 5060): Loss={pathA.loss:0.0}%, Jitter={pathA.jitter:0.1}ms, RTT={pathA.avgRtt:0.1}ms - {(pathA.pass ? "PASS" : "FAIL")}");
+		Log($"  Path B (Primary STUN): Loss={pathB.loss:0.0}%, Jitter={pathB.jitter:0.1}ms, RTT={pathB.avgRtt:0.1}ms - {(pathB.pass ? "PASS" : "FAIL")} (Informational only)");
 		Log($"  Path C (Google STUN 19302): Loss={tuple.Item3:0.0}%, Jitter={tuple.Item4:0.1}ms, RTT={tuple.Item5:0.1}ms - {(tuple.Item6 ? "PASS" : "FAIL")}");
 		Log($"  Estimated Call Quality: MOS {num2:F2} ({value2})");
 		if (num)

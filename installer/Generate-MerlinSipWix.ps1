@@ -190,7 +190,7 @@ function Add-DirectoryContent {
 [void] $builder.AppendLine('    UpgradeCode="{8E5C2C6E-3A1E-4F83-9897-4E62EB06E0EC}"')
 [void] $builder.AppendLine('    Scope="perMachine">')
 [void] $builder.AppendLine('')
-[void] $builder.AppendLine('    <MajorUpgrade DowngradeErrorMessage="A newer version of Merlin SIP is already installed." />')
+[void] $builder.AppendLine('    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of Merlin SIP is already installed." />')
 [void] $builder.AppendLine('    <MediaTemplate EmbedCab="yes" />')
 [void] $builder.AppendLine('')
 [void] $builder.AppendLine("    <Icon Id=`"AppIcon.ico`" SourceFile=`"$(Escape-Xml (Join-Path $projectRoot 'MerlinSIP\Assets\CKMedia-Icon.ico'))`" />")

@@ -92,11 +92,11 @@ public partial class StartupWindow : Window
             PrivatePbxTextBox.Text = _allowCustomSipEndpoint ? AppStartupConfig.FixedSipServer : string.Empty;
             LicenseStepPanel.Visibility = Visibility.Collapsed;
             CredentialsStepPanel.Visibility = Visibility.Visible;
-            SubtitleText.Text = "License accepted. Choose how to authenticate this device.";
+            SubtitleText.Text = "Activation complete. Choose how this device should connect.";
         }
         finally
         {
-            ContinueButton.Content = "Provision";
+            ContinueButton.Content = "Complete setup";
             ContinueButton.IsEnabled = true;
         }
     }
@@ -115,7 +115,7 @@ public partial class StartupWindow : Window
             var provisionCode = ProvisioningCodeTextBox.Text?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(provisionCode))
             {
-                ErrorText.Text = "Enter a provisioning code.";
+                ErrorText.Text = "Enter a setup code.";
                 return;
             }
 
@@ -145,19 +145,19 @@ public partial class StartupWindow : Window
 
         if (_allowCustomSipEndpoint && string.IsNullOrWhiteSpace(server))
         {
-            ErrorText.Text = "Enter the PBX server.";
+            ErrorText.Text = "Enter the SIP server.";
             return;
         }
 
         if (string.IsNullOrWhiteSpace(extension))
         {
-            ErrorText.Text = "Enter the user / extension.";
+            ErrorText.Text = "Enter the extension or user ID.";
             return;
         }
 
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
-            ErrorText.Text = "Enter the login username and password.";
+            ErrorText.Text = "Enter the authentication username and password.";
             return;
         }
 

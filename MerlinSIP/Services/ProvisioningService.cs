@@ -7,10 +7,28 @@ namespace MerlinSip.Services;
 
 public sealed class ProvisioningService
 {
-    private static readonly Uri[] ProvisioningUrls =
+    private static readonly string[] ProvisioningUrlTemplates =
     [
-        new("https://accounts.chriskendall.media/sip/provision"),
-        new("https://accounts.chriskendall.media/index.php/sip/provision")
+        "https://accounts.chriskendall.media/sip/register/{code}",
+        "https://accounts.chriskendall.media/index.php/sip/register/{code}",
+        "https://accounts.chriskendall.media/sip/device/{code}",
+        "https://accounts.chriskendall.media/index.php/sip/device/{code}",
+        "https://accounts.chriskendall.media/sip/autoprovision/{code}",
+        "https://accounts.chriskendall.media/index.php/sip/autoprovision/{code}",
+        "https://accounts.chriskendall.media/sip/details/{code}",
+        "https://accounts.chriskendall.media/index.php/sip/details/{code}",
+        "https://accounts.chriskendall.media/sip/provision/{code}",
+        "https://accounts.chriskendall.media/index.php/sip/provision/{code}",
+        "https://accounts.chriskendall.media/sip/details",
+        "https://accounts.chriskendall.media/index.php/sip/details",
+        "https://accounts.chriskendall.media/sip/autoprovision/details",
+        "https://accounts.chriskendall.media/index.php/sip/autoprovision/details",
+        "https://accounts.chriskendall.media/sip/provision/details",
+        "https://accounts.chriskendall.media/index.php/sip/provision/details",
+        "https://accounts.chriskendall.media/sip/autoprovision",
+        "https://accounts.chriskendall.media/index.php/sip/autoprovision",
+        "https://accounts.chriskendall.media/sip/provision",
+        "https://accounts.chriskendall.media/index.php/sip/provision"
     ];
 
     private static readonly HttpClient HttpClient = new()
@@ -49,7 +67,8 @@ public sealed class ProvisioningService
                     if (delay > maxDelay) delay = maxDelay;
                 }
 
-                foreach (var url in ProvisioningUrls)
+                var urls = ProvisioningUrlTemplates.Select(t => new Uri(t.Replace("{code}", cleanedCode))).ToArray();
+                foreach (var url in urls)
                 {
                     HttpResponseMessage response;
                     try

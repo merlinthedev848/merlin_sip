@@ -4,6 +4,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Net.Security;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using MerlinSip.Models;
@@ -337,7 +338,7 @@ public sealed class SipRegistrationService : IDisposable
 
             if (config.UsesTlsSignalling)
             {
-                var sslStream = new SslStream(_tcpClient.GetStream(), false, (sender, cert, chain, errs) => true);
+                var sslStream = new SslStream(_tcpClient.GetStream(), false, ValidateTlsCertificate);
                 await sslStream.AuthenticateAsClientAsync(config.Server);
                 _tcpStream = sslStream;
                 var localEndPoint = (IPEndPoint)_tcpClient.Client.LocalEndPoint!;
@@ -396,6 +397,7 @@ public sealed class SipRegistrationService : IDisposable
             StartListening();
             StartRegistrationRefresh();
             StartNatKeepAlive();
+            StartHeartbeat();
         }
 
         return result;
@@ -408,16 +410,14 @@ public sealed class SipRegistrationService : IDisposable
             return new SipCallResult(false, "Register the SIP account first.");
         }
 
-        if (!_registered)
+        var registrationCheck = await RegisterCurrentSocketAsync(cancellationToken);
+        if (!registrationCheck.Connected)
         {
-            var registration = await RegisterCurrentSocketAsync(cancellationToken);
-            if (!registration.Connected)
-            {
-                return new SipCallResult(false, $"Registration check failed: {registration.Message}");
-            }
-
-            _registered = true;
+            _registered = false;
+            return new SipCallResult(false, $"Registration check failed: {registrationCheck.Message}");
         }
+
+        _registered = true;
 
         var callId = $"{Guid.NewGuid():N}@merlin-sip";
         var target = destination.Contains('@') ? destination : $"{destination}@{_domain}";
@@ -615,6 +615,11 @@ public sealed class SipRegistrationService : IDisposable
                 DebugLog.Write($"BLF subscribe failed extension={extension} error={error.Message}");
             }
         }
+    }
+
+    private static bool ValidateTlsCertificate(object? sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
+    {
+        return sslPolicyErrors == SslPolicyErrors.None;
     }
 
     private async Task SubscribeToContactPresenceAsync(string extension, CancellationToken cancellationToken)
@@ -1812,7 +1817,10 @@ public sealed class SipRegistrationService : IDisposable
             {
                 var delay = _config?.HeartbeatInterval > 0 ? _config.HeartbeatInterval : 60;
                 await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
-                if (!IsTransportReady || _config == null) continue;
+                if (!IsTransportReady || _config == null || _activeCall is not null || _pendingResponse is not null)
+                {
+                    continue;
+                }
 
                 var cseq = _inviteCseq++;
                 var branch = CreateBranch();
@@ -1826,6 +1834,7 @@ public sealed class SipRegistrationService : IDisposable
 
                 if (response.Code >= 200 && response.Code < 300)
                 {
+                    _registered = true;
                     _lastHeartbeatSuccess = DateTimeOffset.Now;
                     _heartbeatConsecutiveFailures = 0;
                     HeartbeatStatus?.Invoke(this, new HeartbeatStatusEventArgs(true, response.Code, latency, 0, "OK"));
@@ -1834,11 +1843,13 @@ public sealed class SipRegistrationService : IDisposable
                 {
                     _heartbeatConsecutiveFailures++;
                     HeartbeatStatus?.Invoke(this, new HeartbeatStatusEventArgs(false, response.Code, latency, _heartbeatConsecutiveFailures, "Failed response"));
+                    await RecoverRegistrationAfterHeartbeatFailureAsync(cancellationToken);
                 }
                 else
                 {
                     _heartbeatConsecutiveFailures++;
                     HeartbeatStatus?.Invoke(this, new HeartbeatStatusEventArgs(false, 0, latency, _heartbeatConsecutiveFailures, "No response"));
+                    await RecoverRegistrationAfterHeartbeatFailureAsync(cancellationToken);
                 }
             }
             catch (OperationCanceledException)
@@ -1849,7 +1860,39 @@ public sealed class SipRegistrationService : IDisposable
             {
                 _heartbeatConsecutiveFailures++;
                 HeartbeatStatus?.Invoke(this, new HeartbeatStatusEventArgs(false, 0, 0, _heartbeatConsecutiveFailures, ex.Message));
+                await RecoverRegistrationAfterHeartbeatFailureAsync(cancellationToken);
             }
+        }
+    }
+
+    private async Task RecoverRegistrationAfterHeartbeatFailureAsync(CancellationToken cancellationToken)
+    {
+        if (_heartbeatConsecutiveFailures < 3 || _activeCall is not null || _pendingResponse is not null || _config is null)
+        {
+            return;
+        }
+
+        DebugLog.Write($"HEARTBEAT recovery starting failures={_heartbeatConsecutiveFailures}");
+        _registered = false;
+        try
+        {
+            var result = await RegisterCurrentSocketAsync(cancellationToken);
+            DebugLog.Write($"HEARTBEAT recovery register connected={result.Connected} message={result.Message}");
+            if (result.Connected)
+            {
+                _registered = true;
+                _heartbeatConsecutiveFailures = 0;
+                _lastHeartbeatSuccess = DateTimeOffset.Now;
+                HeartbeatStatus?.Invoke(this, new HeartbeatStatusEventArgs(true, 200, 0, 0, "Registration restored"));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"HEARTBEAT recovery failed error={error.Message}");
         }
     }
 
@@ -2709,6 +2752,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private void DisposeClient()
     {
+        StopHeartbeat();
         _listenCancellation?.Cancel();
         _listenCancellation?.Dispose();
         _listenCancellation = null;

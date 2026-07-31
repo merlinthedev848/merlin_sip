@@ -25,9 +25,9 @@ if ([string]::IsNullOrWhiteSpace($version)) {
     throw "Unable to read product version from '$projectFile'."
 }
 
-& $dotnet publish $projectFile /p:PublishProfile=$publishProfile
+& $dotnet publish $projectFile -c $Configuration -r $RuntimeIdentifier --self-contained true /p:PublishSingleFile=false
 
-$publishDir = Join-Path $projectDir "MerlinSIP\bin\$Configuration\net8.0-windows\$RuntimeIdentifier\publish"
+$publishDir = Join-Path $projectDir "MerlinSIP\bin\$Configuration\net10.0-windows\$RuntimeIdentifier\publish"
 $generatedWix = Join-Path $projectDir 'installer\MerlinSIP.generated.wxs'
 $distDir = Join-Path $projectDir 'dist'
 $msiPath = Join-Path $distDir "MerlinSIP-$version-x64-faststart.msi"

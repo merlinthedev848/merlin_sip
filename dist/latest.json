@@ -1,5 +1,5 @@
 {
-  "Version": "1.1.51",
-  "DownloadUrl": "https://updates.chriskendall.media/merlin-sip/releases/MerlinSIP-1.1.51-x64-faststart.msi",
-  "Notes": "Release 1.1.51: Resolved race condition and application crash on call teardown (401 unauthenticated drops). Fixed 100% CPU spin loop on socket/IOException in TCP listener. Optimized parsing of TCP packets to remove O(N^2) allocations. Implemented synchronous DNS cache to resolve endpoint blockages. Added support for intercom auto-answer and message waiting indicator (MWI). Integrated live Call Quality Monitor (MOS scoring) and Call Waiting support. Optimized UI search debounce and implemented native Windows clipboard/device change notifications."
+  "Version": "1.2.0",
+  "DownloadUrl": "https://updates.chriskendall.media/merlin-sip/releases/MerlinSIP-1.2.0-x64-faststart.msi",
+  "Notes": "Release 1.2.0: Restored missing SIP registration & merging logic, fixed UI layout crashes on control disabled state, updated dropdown styling, and swapped placeholder gold logos for CK Media branding."
 }

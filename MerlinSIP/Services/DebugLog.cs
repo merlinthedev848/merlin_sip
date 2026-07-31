@@ -25,4 +25,24 @@ internal static class DebugLog
             // Logging should never break the phone.
         }
     }
+
+    public static List<string> GetRecentLines(int count)
+    {
+        try
+        {
+            lock (Sync)
+            {
+                if (!File.Exists(Path))
+                {
+                    return [];
+                }
+                var lines = File.ReadAllLines(Path);
+                return lines.Length <= count ? [.. lines] : [.. lines.Skip(lines.Length - count)];
+            }
+        }
+        catch
+        {
+            return [];
+        }
+    }
 }

@@ -49,7 +49,7 @@ public sealed record AppStartupConfig(
 {
     public const string FixedSipServer = "pbx.chriskendall.media";
     public const int FixedSipPort = 5060;
-    public const string DefaultRingtone = "merlin";
+    public const string DefaultRingtone = "meridian";
     public const string TransportUdp = "UDP";
     public const string TransportTcp = "TCP";
     public const string TransportTls = "TLS";

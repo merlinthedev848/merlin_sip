@@ -8,6 +8,7 @@
         <Color x:Key="PanelColor">#F3F4F6</Color>
         <Color x:Key="LineColor">#E2E8F0</Color>
         <Color x:Key="AmberColor">#D97706</Color>
+        <Color x:Key="TealColor">#D97706</Color>
         <Color x:Key="NightColor">#111317</Color>
 
         <SolidColorBrush x:Key="InkBrush" Color="{StaticResource InkColor}" />
@@ -15,6 +16,7 @@
         <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource PanelColor}" />
         <SolidColorBrush x:Key="LineBrush" Color="{StaticResource LineColor}" />
         <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
+        <SolidColorBrush x:Key="TealBrush" Color="{StaticResource TealColor}" />
         <SolidColorBrush x:Key="NightBrush" Color="{StaticResource NightColor}" />
         <LinearGradientBrush x:Key="PanelGradientBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#FFFFFF" Offset="0" />
@@ -52,7 +54,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Chrome"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderBrush="#CBD5E1"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8"
                                 Padding="{TemplateBinding Padding}">
@@ -132,6 +134,23 @@
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
             <Setter Property="FontSize" Value="14" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="#D4C9B3"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="0" Padding="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="PasswordBox">
@@ -142,15 +161,32 @@
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
             <Setter Property="FontSize" Value="14" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="PasswordBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="#D4C9B3"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="0" Padding="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="ComboBox">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="MinHeight" Value="42" />
-            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Padding" Value="12,10,40,10" />
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
             <Setter Property="Background" Value="#FBFCFF" />
-            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="BorderBrush" Value="#D4C9B3" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="MaxDropDownHeight" Value="220" />
@@ -165,7 +201,7 @@
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="8">
                                 <Grid>
-                                    <ContentPresenter Margin="12,0,42,0"
+                                    <ContentPresenter Margin="{TemplateBinding Padding}"
                                                       HorizontalAlignment="Left"
                                                       VerticalAlignment="Center"
                                                       Content="{TemplateBinding SelectionBoxItem}"
@@ -175,7 +211,7 @@
                                     <Path x:Name="Arrow"
                                           Width="10"
                                           Height="6"
-                                          Margin="0,0,16,0"
+                                          Margin="0,0,12,0"
                                           HorizontalAlignment="Right"
                                           VerticalAlignment="Center"
                                           Fill="{StaticResource MutedBrush}"
@@ -196,16 +232,16 @@
                                    AllowsTransparency="True"
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom"
-                                   PopupAnimation="Fade">
+                                 PopupAnimation="Fade">
                                 <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                                         MaxHeight="{TemplateBinding MaxDropDownHeight}"
-                                        Margin="0,6,0,0"
+                                        Margin="0,4,0,0"
                                         Background="#FFFFFF"
-                                        BorderBrush="{StaticResource LineBrush}"
+                                        BorderBrush="#D4C9B3"
                                         BorderThickness="1"
                                         CornerRadius="8">
                                     <Border.Effect>
-                                        <DropShadowEffect BlurRadius="20" ShadowDepth="8" Opacity="0.16" Color="#172033" />
+                                        <DropShadowEffect BlurRadius="12" ShadowDepth="3" Opacity="0.08" Color="#1E293B" />
                                     </Border.Effect>
                                     <ScrollViewer Padding="4" SnapsToDevicePixels="True">
                                         <ItemsPresenter />
@@ -219,11 +255,11 @@
                                 <Setter TargetName="Chrome" Property="Background" Value="#FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource TealBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#D4C9B3" />
                             </Trigger>
                             <Trigger Property="IsDropDownOpen" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource TealBrush}" />
-                                <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource TealBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#D4C9B3" />
+                                <Setter TargetName="Arrow" Property="Fill" Value="#D97706" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.55" />
@@ -239,6 +275,8 @@
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
@@ -246,19 +284,76 @@
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="7"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter />
+                            <ContentPresenter
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Content="{TemplateBinding Content}"
+                                ContentStringFormat="{TemplateBinding ContentStringFormat}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                RecognizesAccessKey="True" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="#DFF8EE" />
-                                <Setter Property="Foreground" Value="#0F513F" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#FEF3C7" />
+                                <Setter Property="Foreground" Value="#92400E" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemChrome" Property="Background" Value="#FFFFFF" />
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#F8FAFC" />
                                 <Setter Property="Foreground" Value="#111827" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#E2E8F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="HasDropShadow" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.12" Color="#1E293B" />
+                            </Border.Effect>
+                            <ItemsPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="MenuBorder"
+                                Background="Transparent"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="MenuBorder" Property="Background" Value="#FEF3C7" />
+                                <Setter Property="Foreground" Value="#92400E" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

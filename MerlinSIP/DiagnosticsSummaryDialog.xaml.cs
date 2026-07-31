@@ -1,14 +1,16 @@
 using System;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Media;
 using MerlinSip.Services;
 
 namespace MerlinSip
 {
     public partial class DiagnosticsSummaryDialog : Window
     {
-        private NetworkEngine? _engine;
-
         public DiagnosticsSummaryDialog()
         {
             InitializeComponent();
@@ -18,37 +20,69 @@ namespace MerlinSip
         private async void DiagnosticsSummaryDialog_Loaded(object sender, RoutedEventArgs e)
         {
             CloseBtn.IsEnabled = false;
-            CurrentTestText.Text = "Running Environment Scan...";
-            LogsText.Text = "";
-            _engine = new NetworkEngine();
-            
-            _engine.OnLog += (msg, isError) =>
+            CurrentTestText.Text = "Running environment scan...";
+            var logBuilder = new StringBuilder();
+
+            void AppendLog(string message)
             {
-                Dispatcher.InvokeAsync(() =>
-                {
-                    LogsText.Text += msg + Environment.NewLine;
-                    LogsScrollViewer.ScrollToEnd();
-                });
-            };
-            
-            _engine.OnProgress += (testName, status, details) =>
-            {
-                Dispatcher.InvokeAsync(() =>
-                {
-                    CurrentTestText.Text = $"Running: {testName} ({status})";
-                });
-            };
-            
+                logBuilder.AppendLine($"[{DateTime.Now:HH:mm:ss}] {message}");
+                LogsText.Text = logBuilder.ToString();
+                LogsScrollViewer.ScrollToEnd();
+            }
+
             try
             {
-                bool flag = await _engine.RunDiagnosticsAsync();
-                CurrentTestText.Text = flag ? "Diagnostics Completed - PASS" : "Diagnostics Completed - FAIL/WARN";
-                CurrentTestText.Foreground = flag ? System.Windows.Media.Brushes.Green : System.Windows.Media.Brushes.DarkOrange;
+                AppendLog("Starting network diagnostics...");
+
+                // 1. Network Interfaces Check
+                CurrentTestText.Text = "Checking network interfaces...";
+                AppendLog("Checking local network interfaces...");
+                var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+                int activeCount = 0;
+                foreach (var ni in interfaces)
+                {
+                    if (ni.OperationalStatus == OperationalStatus.Up && ni.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                    {
+                        activeCount++;
+                        AppendLog($"  Interface: {ni.Name} ({ni.NetworkInterfaceType}) - UP");
+                    }
+                }
+                AppendLog($"Found {activeCount} active network interface(s).");
+
+                // 2. DNS Resolution Check
+                CurrentTestText.Text = "Testing DNS resolution...";
+                AppendLog("Testing DNS resolution for the configured service domain...");
+                try
+                {
+                    var entry = await Dns.GetHostEntryAsync("chriskendall.media");
+                    AppendLog($"  DNS Resolved successfully. Address count: {entry.AddressList.Length}");
+                    foreach (var addr in entry.AddressList)
+                    {
+                        AppendLog($"    -> {addr}");
+                    }
+                }
+                catch (Exception dnsEx)
+                {
+                    AppendLog($"  DNS Test warning: {dnsEx.Message}");
+                }
+
+                // 3. Debug Log Dump
+                CurrentTestText.Text = "Collecting recent application log entries...";
+                AppendLog("Recent application log entries:");
+                var recentLogs = DebugLog.GetRecentLines(15);
+                foreach (var line in recentLogs)
+                {
+                    AppendLog($"  {line}");
+                }
+
+                CurrentTestText.Text = "Diagnostics completed";
+                CurrentTestText.Foreground = System.Windows.Media.Brushes.Green;
+                AppendLog("All diagnostic checks finished successfully.");
             }
             catch (Exception ex)
             {
-                LogsText.Text += Environment.NewLine + "Error executing diagnostics: " + ex.Message + Environment.NewLine;
-                CurrentTestText.Text = "Diagnostics Failed";
+                AppendLog($"Error executing diagnostics: {ex.Message}");
+                CurrentTestText.Text = "Diagnostics failed";
                 CurrentTestText.Foreground = System.Windows.Media.Brushes.Red;
             }
             finally

@@ -67,6 +67,9 @@ public partial class MainWindow : Window
     private bool _incomingRinging;
     private bool _localRingbackActive;
     private bool _allowExit;
+    private bool _networkDiagnosticsRunning;
+    private NetworkEngine? _activeNetworkDiagnostics;
+    private readonly List<string> _networkDiagnosticsProgress = [];
     private string _selectedChatNumber = "";
     private string _activeRemoteNumber = "";
     private string _userSelectedPresence = "Available";
@@ -106,6 +109,7 @@ public partial class MainWindow : Window
         _sipRegistrationService.CallProgress += SipRegistrationService_CallProgress;
         _sipRegistrationService.CallEnded += SipRegistrationService_CallEnded;
         _sipRegistrationService.ContactPresenceChanged += SipRegistrationService_ContactPresenceChanged;
+        _sipRegistrationService.HeartbeatStatus += SipRegistrationService_HeartbeatStatus;
         _callTimer.Tick += CallTimer_Tick;
         _connectionWatchdog.Tick += ConnectionWatchdog_Tick;
         _licenseWatchdog.Tick += LicenseWatchdog_Tick;
@@ -349,7 +353,6 @@ public partial class MainWindow : Window
             {
                 _registered = false;
                 SetConnectionState("No network", "#FFE2E2", "#9B1C1C");
-                FooterStatusText.Text = "No network connectivity.";
                 UpdateCallControls();
                 return;
             }
@@ -593,8 +596,8 @@ public partial class MainWindow : Window
             if (string.Equals(FooterStatusText.Text, message, StringComparison.Ordinal) ||
                 string.Equals(NoticeText.Text, message, StringComparison.Ordinal))
             {
-                NoticeText.Text = "Ready.";
-                FooterStatusText.Text = "Ready.";
+                NoticeText.Text = "Application ready.";
+                FooterStatusText.Text = "Application ready.";
             }
         });
     }
@@ -770,6 +773,33 @@ public partial class MainWindow : Window
 
             SetContactPresence(e.Number, e.Presence);
         });
+    }
+
+    private void SipRegistrationService_HeartbeatStatus(object? sender, HeartbeatStatusEventArgs e)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (_callInProgress || _incomingRinging)
+            {
+                return;
+            }
+
+            if (e.Success)
+            {
+                _registered = true;
+                SetConnectionState("Connected", "#DFF8EE", "#106247");
+                UpdateCallControls();
+                return;
+            }
+
+            DebugLog.Write($"HEARTBEAT status failed code={e.ResponseCode} failures={e.ConsecutiveFailures} message={e.Message}");
+            if (e.ConsecutiveFailures >= 3)
+            {
+                _registered = false;
+                SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
+                UpdateCallControls();
+            }
+        }, DispatcherPriority.Background);
     }
 
     private void SipRegistrationService_CallEnded(object? sender, CallEndedEventArgs e)
@@ -1056,7 +1086,6 @@ public partial class MainWindow : Window
             _registered = false;
             SetConnectionState("No network", "#FFE2E2", "#9B1C1C");
             ServerStatusText.Text = "No network connectivity detected.";
-            FooterStatusText.Text = "No network connectivity.";
             UpdateCallControls();
             return;
         }
@@ -1077,7 +1106,6 @@ public partial class MainWindow : Window
             _registered = true;
             SetConnectionState("Connected", "#DFF8EE", "#106247");
             ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
-            FooterStatusText.Text = "Ready.";
             await RefreshPresenceSubscriptionsAsync();
         }
         else
@@ -1112,7 +1140,6 @@ public partial class MainWindow : Window
                 _registered = true;
                 SetConnectionState("Connected", "#DFF8EE", "#106247");
                 ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
-                FooterStatusText.Text = "Ready.";
                 await RefreshPresenceSubscriptionsAsync();
             }
             else
@@ -1120,7 +1147,6 @@ public partial class MainWindow : Window
                 _registered = false;
                 SetConnectionState("Not connected", "#FFE2E2", "#9B1C1C");
                 ServerStatusText.Text = ToCustomerConnectionMessage(result.Message);
-                FooterStatusText.Text = "Connection status is available in Settings.";
             }
         }
 
@@ -1134,26 +1160,28 @@ public partial class MainWindow : Window
         ConnectionStatusText.Text = text;
         ConnectionPill.Background = (WpfBrush)new BrushConverter().ConvertFromString(background)!;
         ConnectionStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(foreground)!;
-
-        var mainText = text.Equals("Connected", StringComparison.OrdinalIgnoreCase)
-            ? "Connected"
+        FooterStatusBar.Background = (WpfBrush)new BrushConverter().ConvertFromString(background)!;
+        FooterStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(foreground)!;
+        FooterStatusText.Text = text.Equals("Connected", StringComparison.OrdinalIgnoreCase)
+            ? "Live connectivity status: Connected"
             : text.Equals("Connecting...", StringComparison.OrdinalIgnoreCase)
-                ? "Checking"
-                : "Not connected";
-        MainConnectionStatusText.Text = mainText;
-        MainConnectionPill.Background = (WpfBrush)new BrushConverter().ConvertFromString(background)!;
-        MainConnectionStatusText.Foreground = (WpfBrush)new BrushConverter().ConvertFromString(foreground)!;
+                ? "Live connectivity status: Checking account connection"
+                : text.Equals("No network", StringComparison.OrdinalIgnoreCase)
+                    ? "Live connectivity status: No network connection detected"
+                    : "Live connectivity status: Not connected";
     }
 
     private void ApplyAppVersion()
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
-        AppVersionText.Text = version is null
+        var versionStr = version is null
             ? "Unknown"
             : version.Revision > 0
                 ? $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}"
                 : $"{version.Major}.{version.Minor}.{version.Build}";
-        UpdateStatusText.Text = $"Version {AppVersionText.Text}";
+        AppVersionText.Text = $"v{versionStr}";
+        AboutVersionText.Text = versionStr;
+        UpdateStatusText.Text = $"Version {versionStr}";
         ProductIdText.Text = LicenseService.ProductId;
     }
 
@@ -1494,7 +1522,7 @@ public partial class MainWindow : Window
 
     private void PresenceMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem item || item.Header is not string status)
+        if (sender is not System.Windows.Controls.MenuItem item || item.Header is not string status)
         {
             return;
         }
@@ -2030,7 +2058,7 @@ public partial class MainWindow : Window
             : AppStartupConfig.FixedSipServer;
         if (_config.AllowsCustomSipEndpoint && string.IsNullOrWhiteSpace(server))
         {
-            FooterStatusText.Text = "Enter the PBX server.";
+            FooterStatusText.Text = "Enter the SIP server.";
             return;
         }
 
@@ -2097,7 +2125,7 @@ public partial class MainWindow : Window
     private async void ProvisionAndReconnectButton_Click(object sender, RoutedEventArgs e)
     {
         ProvisionAndReconnectButton.IsEnabled = false;
-        FooterStatusText.Text = "Provisioning account.";
+        FooterStatusText.Text = "Applying account setup.";
 
         try
         {
@@ -2294,79 +2322,132 @@ public partial class MainWindow : Window
 
     private async void RunPbxDiagnosticsButton_Click(object sender, RoutedEventArgs e)
     {
+        await RunNetworkDiagnosticsAsync();
+    }
+
+    private async Task RunNetworkDiagnosticsAsync()
+    {
+        if (_networkDiagnosticsRunning)
+        {
+            return;
+        }
+
+        _networkDiagnosticsRunning = true;
+        _networkDiagnosticsProgress.Clear();
         RunPbxDiagnosticsButton.IsEnabled = false;
-        PbxDiagnosticsText.Text = "Running PBX compatibility checks...";
-        FooterStatusText.Text = "Running PBX compatibility checks.";
+        RunPbxDiagnosticsButton.Content = "Running";
+        PbxDiagnosticsText.Text = "1/10 DNS Resolution - RUNNING";
+        FooterStatusText.Text = "Running network diagnostics in the background.";
+        DebugLog.Write("Network diagnostics started from Settings.");
+
+        var engine = new NetworkEngine
+        {
+            SelectedTests = [true, true, true, true, true, true, true, true, true, true]
+        };
+        _activeNetworkDiagnostics = engine;
+        int? finalScore = null;
+
+        engine.OnLog += (message, isError) =>
+        {
+            DebugLog.Write(isError ? $"NETWORK DIAGNOSTICS ERROR: {message}" : $"NETWORK DIAGNOSTICS: {message}");
+        };
+        engine.OnProgress += (testName, status, details) =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                UpdateNetworkDiagnosticsProgress(testName, status, details);
+            }, DispatcherPriority.Background);
+        };
+        engine.OnComplete += (_, score) =>
+        {
+            finalScore = score;
+        };
 
         try
         {
-            PbxDiagnosticsText.Text = await RunPbxDiagnosticsAsync();
-            FooterStatusText.Text = "PBX diagnostics complete.";
+            var passed = await Task.Run(async () => await engine.RunDiagnosticsAsync());
+            PbxDiagnosticsText.Text = BuildNetworkDiagnosticsSummary(passed, finalScore);
+            FooterStatusText.Text = passed
+                ? "Network diagnostics complete."
+                : "Network diagnostics found issues.";
+            DebugLog.Write($"Network diagnostics completed. Passed={passed}. Score={finalScore?.ToString() ?? "n/a"}.");
+        }
+        catch (Exception error)
+        {
+            DebugLog.Write($"Network diagnostics failed: {error}");
+            PbxDiagnosticsText.Text = "Network diagnostics failed. Check debug.log for details.";
+            FooterStatusText.Text = "Network diagnostics failed.";
         }
         finally
         {
+            _activeNetworkDiagnostics = null;
+            _networkDiagnosticsRunning = false;
+            RunPbxDiagnosticsButton.Content = "Run test";
             RunPbxDiagnosticsButton.IsEnabled = true;
         }
     }
 
-    private async Task<string> RunPbxDiagnosticsAsync()
+    private void UpdateNetworkDiagnosticsProgress(string testName, string status, string details)
     {
-        DebugLog.Write("PBX diagnostics started. Internal note: Yeastar S100 reaches EOL on 2027-07-01; plan P-Series migration support.");
+        var line = $"{testName}: {status}. {details}";
+        var existingIndex = _networkDiagnosticsProgress.FindIndex(item => item.StartsWith($"{testName}:", StringComparison.OrdinalIgnoreCase));
+        if (existingIndex >= 0)
+        {
+            _networkDiagnosticsProgress[existingIndex] = line;
+        }
+        else
+        {
+            _networkDiagnosticsProgress.Add(line);
+        }
+
+        var displayTest = GetNetworkDiagnosticDisplayTest(testName);
+        PbxDiagnosticsText.Text = $"{displayTest.Number}/10 {displayTest.Name} - {GetNetworkDiagnosticDisplayStatus(status)}";
+    }
+
+    private static (int Number, string Name) GetNetworkDiagnosticDisplayTest(string testName)
+    {
+        return testName switch
+        {
+            "DNS Domain & Resolution Check" => (1, "DNS Resolution"),
+            "HTTP/HTTPS Outbound Probes" => (2, "Web Connectivity"),
+            "NTP Subsystem (UDP 123)" => (3, "Time Sync"),
+            "Primary STUN Servers" => (4, "PBX Reachability"),
+            "Google STUN Servers" => (5, "Public STUN"),
+            "NAT Routing & Hops Check" => (6, "NAT Routing"),
+            "NAT Port Translation (Random Port)" => (7, "NAT Port Mapping"),
+            "SIP ALG Detection" => (8, "SIP ALG"),
+            "RTP Jitter/Loss Check" => (9, "Media Quality"),
+            "Inbound Signalling & Presence" => (10, "Signalling Reachability"),
+            _ => (1, "Network Check")
+        };
+    }
+
+    private static string GetNetworkDiagnosticDisplayStatus(string status)
+    {
+        return status switch
+        {
+            "Running" => "RUNNING",
+            "Passed" or "Pass" => "PASSED",
+            "Failed" or "Fail" => "FAILED",
+            "Skipped" => "SKIPPED",
+            _ => status.ToUpperInvariant()
+        };
+    }
+
+    private string BuildNetworkDiagnosticsSummary(bool passed, int? score)
+    {
         var report = new StringBuilder();
-
-        if (!NetworkInterface.GetIsNetworkAvailable())
+        report.AppendLine(passed
+            ? "Network diagnostics complete: Passed."
+            : "Network diagnostics complete: Issues found.");
+        if (score.HasValue)
         {
-            report.AppendLine("Network: No network connectivity detected.");
-            report.AppendLine("Registration: Not tested because the PC is offline.");
-            return report.ToString().Trim();
+            report.AppendLine($"Weighted score: {score}/100.");
         }
-
-        var registration = await _sipRegistrationService.RefreshRegistrationAsync();
-        if (registration.Connected)
-        {
-            _registered = true;
-            SetConnectionState("Connected", "#DFF8EE", "#106247");
-            report.AppendLine("Registration: OK.");
-        }
-        else
-        {
-            report.AppendLine($"Registration: Failed. {ToCustomerConnectionMessage(registration.Message)}");
-        }
-
-        var options = await _sipRegistrationService.SendOptionsAsync();
-        report.AppendLine(options.Signalled
-            ? "PBX response: OK. The server answered OPTIONS."
-            : $"PBX response: Failed. {options.Message}");
-
-        var message = await _sipRegistrationService.SendMessageAsync(_config.Extension, "PBX compatibility test from CK Media Services.");
-        report.AppendLine(message.Signalled
-            ? "Extension messaging: OK. SIP MESSAGE was accepted."
-            : $"Extension messaging: Failed. {message.Message}");
-
-        report.AppendLine($"RTP audio: {_sipRegistrationService.RtpStatus}");
-        report.AppendLine($"Outbound route clue: {_sipRegistrationService.LastCallFailureReason}");
-        if (_config.UsesTlsSignalling)
-        {
-            report.AppendLine("TLS signalling: Selected. (Note: TLS traffic is fully encrypted, completely bypassing any router SIP ALG inspection).");
-        }
-        else if (_config.UsesTcpSignalling)
-        {
-            var tcpProbe = await _sipsorceryCompatibilityService.TestTcpRegistrationAsync(_config);
-            report.AppendLine($"TCP/SIPSorcery signalling: {(tcpProbe.Supported ? "OK" : "Failed")}. {tcpProbe.Message}");
-        }
-        else
-        {
-            report.AppendLine("TCP/SIPSorcery signalling: Not selected. Standard UDP signalling remains active.");
-        }
-
-        report.AppendLine(_config.SipAlgCompatibilityMode
-            ? "Router keepalive assist: On. Standard SIP registration is unchanged; extra UDP keepalive traffic is being added."
-            : "Router keepalive assist: Off. Merlin SIP is using standard SIP registration.");
-        report.AppendLine("SIP ALG note: If registration is OK but outbound calls fail only on a specific ISP router, that router may be rewriting SIP/SDP. UDP keepalive cannot fully bypass a hardcoded SIP ALG; use a PBX-side TCP/TLS compatibility profile for that customer.");
-        report.AppendLine("Video: H.264 readiness is noted, but video calling remains disabled until real video RTP/SDP negotiation is implemented.");
-
+        report.AppendLine("Full details are available in the diagnostic log.");
         return report.ToString().Trim();
     }
+
 
 
 
@@ -2619,21 +2700,21 @@ public partial class MainWindow : Window
 
         var activeCall = _callInProgress || _incomingRinging || _callConnected;
 
-        // Hide DialButton and widen HangupButton during active call
-        if (_callInProgress || _incomingRinging)
+        if (activeCall)
         {
             DialButton.Visibility = Visibility.Collapsed;
+            HangupButton.Visibility = Visibility.Visible;
             DialButtonColumn.Width = new GridLength(0);
             HangupButtonColumn.Width = new GridLength(1, GridUnitType.Star);
         }
         else
         {
             DialButton.Visibility = Visibility.Visible;
+            HangupButton.Visibility = Visibility.Collapsed;
             DialButtonColumn.Width = new GridLength(1, GridUnitType.Star);
-            HangupButtonColumn.Width = new GridLength(1, GridUnitType.Star);
+            HangupButtonColumn.Width = new GridLength(0);
         }
 
-        // Show/hide in-call controls vs DND button
         if (activeCall)
         {
             InCallButtonsGrid.Visibility = Visibility.Visible;
@@ -2645,7 +2726,7 @@ public partial class MainWindow : Window
         else
         {
             InCallButtonsGrid.Visibility = Visibility.Collapsed;
-            DndButton.Visibility = Visibility.Visible;
+            DndButton.Visibility = Visibility.Collapsed;
 
             DestinationPreviewText.FontSize = 28;
             CallerLookupText.FontSize = 13;
@@ -2685,9 +2766,9 @@ public partial class MainWindow : Window
     {
         if (!ConfirmDialogWindow.Confirm(
             this,
-            "Reset app",
+            "Reset application",
             "Clear saved account settings, contacts, and call history? Merlin SIP will close so setup can run again next time.",
-            "Reset app"))
+            "Reset application"))
         {
             return;
         }

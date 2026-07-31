@@ -2,7 +2,7 @@ namespace MerlinSip.ViewModels;
 
 public sealed class MainWindowViewModel : ObservableObject
 {
-    private string _notice = "Ready.";
+    private string _notice = "Application ready.";
     private string _connectionState = "Connecting...";
     private string _presenceState = "Available";
     private string _searchText = "";
