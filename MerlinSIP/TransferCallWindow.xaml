@@ -4,7 +4,7 @@
         Title="Transfer call"
         Icon="Assets/CKMedia-Icon.ico"
         Width="430"
-        Height="260"
+        Height="318"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -34,11 +34,30 @@
                         Click="CancelButton_Click" />
                 <StackPanel>
                     <TextBlock Text="Transfer call" FontSize="24" FontWeight="Black" Foreground="#111827" />
-                    <TextBlock Text="Enter the extension or number." FontSize="13" Foreground="#667085" Margin="0,4,0,0" />
+                    <TextBlock Text="Choose blind or assisted transfer." FontSize="13" Foreground="#667085" Margin="0,4,0,0" />
                 </StackPanel>
             </DockPanel>
 
             <StackPanel Grid.Row="1" VerticalAlignment="Stretch">
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <RadioButton x:Name="BlindTransferRadio"
+                                 Grid.Column="0"
+                                 Content="Blind transfer"
+                                 IsChecked="True"
+                                 FontWeight="SemiBold"
+                                 Foreground="#111827"
+                                 Margin="0,0,10,0" />
+                    <RadioButton x:Name="AssistedTransferRadio"
+                                 Grid.Column="1"
+                                 Content="Assisted transfer"
+                                 FontWeight="SemiBold"
+                                 Foreground="#111827"
+                                 Margin="10,0,0,0" />
+                </Grid>
                 <TextBlock Text="Transfer to" FontSize="13" FontWeight="Bold" Foreground="#52627A" Margin="0,0,0,8" />
                 <TextBox x:Name="TransferTargetTextBox"
                          MinHeight="44"

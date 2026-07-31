@@ -59,6 +59,8 @@ public sealed class RtpAudioSession : IDisposable
 
 	private CancellationTokenSource? _audioPumpCancellation;
 
+	private Thread? _audioPumpThread;
+
 	private ushort _sequence;
 
 	private ushort _secondarySequence;
@@ -550,18 +552,29 @@ public sealed class RtpAudioSession : IDisposable
 
 		_audioPumpCancellation = new CancellationTokenSource();
 		var token = _audioPumpCancellation.Token;
-		_ = Task.Run(() => AudioPumpLoopAsync(token), token);
+		_audioPumpThread = new Thread(() => AudioPumpLoop(token))
+		{
+			IsBackground = true,
+			Name = "Merlin SIP RTP audio pump",
+			Priority = ThreadPriority.AboveNormal
+		};
+		_audioPumpThread.Start();
 		DebugLog.Write("RTP audio pump started");
 	}
 
 	private void StopAudioPump()
 	{
 		_audioPumpCancellation?.Cancel();
+		if (_audioPumpThread is not null && _audioPumpThread.IsAlive)
+		{
+			_audioPumpThread.Join(TimeSpan.FromMilliseconds(250));
+		}
+		_audioPumpThread = null;
 		_audioPumpCancellation?.Dispose();
 		_audioPumpCancellation = null;
 	}
 
-	private async Task AudioPumpLoopAsync(CancellationToken cancellationToken)
+	private void AudioPumpLoop(CancellationToken cancellationToken)
 	{
 		var stopwatch = Stopwatch.StartNew();
 		var nextTick = TimeSpan.Zero;
@@ -571,12 +584,12 @@ public sealed class RtpAudioSession : IDisposable
 			{
 				PumpAudioFrame();
 				nextTick += TimeSpan.FromMilliseconds(20);
-				var delay = nextTick - stopwatch.Elapsed;
-				if (delay > TimeSpan.Zero)
+				if (nextTick > stopwatch.Elapsed)
 				{
-					await Task.Delay(delay, cancellationToken);
+					SleepUntilDue(stopwatch, nextTick, cancellationToken);
 				}
-				else if (delay < TimeSpan.FromMilliseconds(-40) && Interlocked.Increment(ref _audioPumpLateWarnings) <= 3)
+				var delay = nextTick - stopwatch.Elapsed;
+				if (delay < TimeSpan.FromMilliseconds(-40) && Interlocked.Increment(ref _audioPumpLateWarnings) <= 3)
 				{
 					DebugLog.Write($"RTP audio pump late ms={-delay.TotalMilliseconds:F1}");
 					nextTick = stopwatch.Elapsed;
@@ -589,9 +602,40 @@ public sealed class RtpAudioSession : IDisposable
 			catch (Exception error)
 			{
 				DebugLog.Write($"RTP audio pump error: {error.Message}");
-				await Task.Delay(20, cancellationToken);
+				SleepFor(TimeSpan.FromMilliseconds(20), cancellationToken);
 				nextTick = stopwatch.Elapsed;
 			}
+		}
+	}
+
+	private static void SleepUntilDue(Stopwatch stopwatch, TimeSpan due, CancellationToken cancellationToken)
+	{
+		var delay = due - stopwatch.Elapsed;
+		var milliseconds = (int)Math.Max(0, delay.TotalMilliseconds - 1);
+		if (milliseconds > 0)
+		{
+			if (cancellationToken.WaitHandle.WaitOne(milliseconds))
+			{
+				throw new OperationCanceledException(cancellationToken);
+			}
+		}
+
+		while (!cancellationToken.IsCancellationRequested && stopwatch.Elapsed < due)
+		{
+			Thread.SpinWait(64);
+		}
+	}
+
+	private static void SleepFor(TimeSpan delay, CancellationToken cancellationToken)
+	{
+		if (delay <= TimeSpan.Zero)
+		{
+			return;
+		}
+
+		if (cancellationToken.WaitHandle.WaitOne(delay))
+		{
+			throw new OperationCanceledException(cancellationToken);
 		}
 	}
 

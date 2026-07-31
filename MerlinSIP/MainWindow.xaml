@@ -116,6 +116,12 @@
             <Setter Property="FontSize" Value="13" />
         </Style>
 
+        <Style x:Key="IconSoftButton" TargetType="Button" BasedOn="{StaticResource SoftButton}">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="21" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+
         <Style x:Key="SettingsTabButton" TargetType="Button">
             <Setter Property="Height" Value="42" />
             <Setter Property="FontSize" Value="13" />
@@ -431,18 +437,18 @@
                                         <ColumnDefinition Width="0" x:Name="HangupButtonColumn" />
                                     </Grid.ColumnDefinitions>
                                     <Button Grid.Column="0" x:Name="DialButton" Content="Dial" Style="{StaticResource SoftButton}" Background="{StaticResource PrimaryBrush}" Foreground="White" Click="DialButton_Click" Margin="0" />
-                                    <Button Grid.Column="1" x:Name="HangupButton" Content="Hang up" Style="{StaticResource SoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="HangupButton_Click" Visibility="Collapsed" Margin="0" />
+                                    <Button Grid.Column="1" x:Name="HangupButton" Content="&#xE778;" Style="{StaticResource IconSoftButton}" Background="{StaticResource DangerBrush}" Foreground="White" Click="HangupButton_Click" Visibility="Collapsed" Margin="0" ToolTip="Hang up" AutomationProperties.Name="Hang up" />
                                 </Grid>
 
                                 <Grid Grid.Row="4">
-                                     <UniformGrid x:Name="InCallButtonsGrid" Columns="2" Rows="2" Visibility="Collapsed" Margin="0,-2">
-                                         <Button x:Name="MuteButton" Content="Mute" Style="{StaticResource SoftButton}" Click="MuteButton_Click" Margin="0,2,6,2" />
-                                         <Button x:Name="HoldButton" Content="Hold" Style="{StaticResource SoftButton}" Click="HoldButton_Click" Margin="6,2,0,2" />
-                                         <Button x:Name="ConferenceButton" Content="Conference" Style="{StaticResource SoftButton}" Click="ConferenceButton_Click" Margin="0,6,6,2" />
-                                         <Button x:Name="TransferButton" Content="Transfer" Style="{StaticResource SoftButton}" Click="TransferButton_Click" Margin="6,6,0,2" />
+                                     <UniformGrid x:Name="InCallButtonsGrid" Columns="4" Rows="1" Visibility="Collapsed" Margin="0,-2,0,0">
+                                         <Button x:Name="MuteButton" Content="&#xE720;" Style="{StaticResource IconSoftButton}" Click="MuteButton_Click" Margin="0,2,5,2" ToolTip="Mute" AutomationProperties.Name="Mute" />
+                                         <Button x:Name="HoldButton" Content="&#xE769;" Style="{StaticResource IconSoftButton}" Click="HoldButton_Click" Margin="5,2,5,2" ToolTip="Hold" AutomationProperties.Name="Hold" />
+                                         <Button x:Name="ConferenceButton" Content="&#xE716;" Style="{StaticResource IconSoftButton}" Click="ConferenceButton_Click" Margin="5,2,5,2" ToolTip="Conference" AutomationProperties.Name="Conference" />
+                                         <Button x:Name="TransferButton" Content="&#xE72A;" Style="{StaticResource IconSoftButton}" Click="TransferButton_Click" Margin="5,2,0,2" ToolTip="Transfer" AutomationProperties.Name="Transfer" />
                                      </UniformGrid>
                                      <Button x:Name="DndButton" Content="DND" Style="{StaticResource SoftButton}" Width="120" HorizontalAlignment="Center" Click="DndButton_Click" Visibility="Collapsed" />
-                                 </Grid>
+                                  </Grid>
                             </Grid>
                         </Border>
 

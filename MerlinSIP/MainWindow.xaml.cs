@@ -82,6 +82,14 @@ public partial class MainWindow : Window
     private const int WM_DEVICECHANGE = 0x0219;
     private const int DBT_DEVNODES_CHANGED = 0x0007;
     private string _lastClipboardText = "";
+    private static readonly System.Windows.Media.FontFamily InCallIconFont = new("Segoe Fluent Icons, Segoe MDL2 Assets");
+    private const string HangupIcon = "\uE778";
+    private const string MicIcon = "\uE720";
+    private const string MutedMicIcon = "\uE74F";
+    private const string HoldIcon = "\uE769";
+    private const string ResumeIcon = "\uE768";
+    private const string ConferenceIcon = "\uE716";
+    private const string TransferIcon = "\uE72A";
 
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     private static extern bool AddClipboardFormatListener(IntPtr hwnd);
@@ -118,7 +126,42 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
         InitializeTrayIcon();
+        UpdateInCallButtonIcons();
         UpdateCallControls();
+    }
+
+    private static TextBlock CreateInCallIcon(string glyph)
+    {
+        return new TextBlock
+        {
+            Text = glyph,
+            FontFamily = InCallIconFont,
+            FontSize = 21,
+            FontWeight = FontWeights.Bold,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center
+        };
+    }
+
+    private static void SetIconButton(WpfButton button, string glyph, string label)
+    {
+        button.Content = CreateInCallIcon(glyph);
+        button.ToolTip = label;
+        System.Windows.Automation.AutomationProperties.SetName(button, label);
+    }
+
+    private void UpdateInCallButtonIcons()
+    {
+        SetIconButton(HangupButton, HangupIcon, "Hang up");
+        SetIconButton(MuteButton, _muted ? MutedMicIcon : MicIcon, _muted ? "Unmute" : "Mute");
+        SetIconButton(HoldButton, _held ? ResumeIcon : HoldIcon, _held ? "Resume" : "Hold");
+        SetIconButton(ConferenceButton, ConferenceIcon, "Conference");
+        SetIconButton(
+            TransferButton,
+            TransferIcon,
+            _sipRegistrationService.IsConferenceActive && !_sipRegistrationService.IsConferenceMerged
+                ? "Complete assisted transfer"
+                : "Transfer");
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -747,32 +790,44 @@ public partial class MainWindow : Window
     {
         Dispatcher.InvokeAsync(() =>
         {
-            var isOwnExtension = false;
-            if (!string.IsNullOrWhiteSpace(_config.Extension) &&
-                string.Equals(NormalizeDialDestination(e.Number), NormalizeDialDestination(_config.Extension), StringComparison.OrdinalIgnoreCase))
-            {
-                isOwnExtension = true;
-            }
-            else if (!string.IsNullOrWhiteSpace(_config.Username) &&
-                     string.Equals(NormalizeDialDestination(e.Number), NormalizeDialDestination(_config.Username), StringComparison.OrdinalIgnoreCase))
-            {
-                isOwnExtension = true;
-            }
+            var isOwnExtension = IsOwnPresenceNumber(e.Number);
 
             if (isOwnExtension)
             {
-                if (e.Presence == "Busy" || e.Presence == "Ringing")
+                if (_callInProgress || _callConnected || _incomingRinging)
                 {
-                    UpdateMainPresenceDisplayOnly(e.Presence);
+                    UpdateMainPresenceDisplayOnly(_incomingRinging ? "Ringing" : "Busy");
+                    if (string.Equals(e.Presence, "Available", StringComparison.OrdinalIgnoreCase) && _callConnected)
+                    {
+                        DebugLog.Write("UI own BLF reports Available while call is active; clearing stale call display.");
+                        _sipRegistrationService.ClearStaleCallState("own BLF available");
+                        _ = OnCallFinished("Ended", "Call ended.");
+                    }
                 }
                 else
                 {
-                    UpdateMainPresenceDisplayOnly(_userSelectedPresence);
+                    UpdateMainPresenceDisplayOnly(
+                        e.Presence == "Busy" || e.Presence == "Ringing"
+                            ? e.Presence
+                            : _userSelectedPresence);
                 }
             }
 
             SetContactPresence(e.Number, e.Presence);
         });
+    }
+
+    private bool IsOwnPresenceNumber(string number)
+    {
+        var normalized = NormalizeDialDestination(number);
+        if (!string.IsNullOrWhiteSpace(_config.Extension) &&
+            string.Equals(normalized, NormalizeDialDestination(_config.Extension), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(_config.Username) &&
+               string.Equals(normalized, NormalizeDialDestination(_config.Username), StringComparison.OrdinalIgnoreCase);
     }
 
     private void SipRegistrationService_HeartbeatStatus(object? sender, HeartbeatStatusEventArgs e)
@@ -1751,7 +1806,7 @@ public partial class MainWindow : Window
 
         _muted = !_muted;
         _sipRegistrationService.SetMuted(_muted);
-        MuteButton.Content = _muted ? "Unmute" : "Mute";
+        UpdateInCallButtonIcons();
         FooterStatusText.Text = _muted ? "Microphone muted." : "Microphone unmuted.";
     }
 
@@ -1774,7 +1829,7 @@ public partial class MainWindow : Window
         }
 
         _held = nextHeld;
-        HoldButton.Content = _held ? "Resume" : "Hold";
+        UpdateInCallButtonIcons();
         FooterStatusText.Text = _held
             ? "Call is on hold. PBX hold music will be used if enabled."
             : "Call resumed.";
@@ -1807,7 +1862,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = await _sipRegistrationService.ConferenceAsync(target);
+        var result = await _sipRegistrationService.ConsultativeTransferAsync(target);
+        if (result.Signalled)
+        {
+            result = await _sipRegistrationService.MergeConferenceAsync();
+        }
         FooterStatusText.Text = result.Message;
         if (result.Signalled)
         {
@@ -1817,36 +1876,77 @@ public partial class MainWindow : Window
 
     private async void TransferButton_Click(object sender, RoutedEventArgs e)
     {
-        var favorites = _config.ShowFavouriteExtensionsOnTransfer ? _contacts.Where(c => c.IsFavorite) : null;
-        var transferWindow = new TransferCallWindow(DestinationTextBox.Text, favorites)
+        try
         {
-            Owner = this
-        };
+            TransferButton.IsEnabled = false;
+            if (_sipRegistrationService.IsConferenceActive && !_sipRegistrationService.IsConferenceMerged)
+            {
+                FooterStatusText.Text = "Completing assisted transfer.";
+                var completeResult = await _sipRegistrationService.CompleteAssistedTransferAsync();
+                FooterStatusText.Text = completeResult.Message;
+                if (completeResult.Signalled)
+                {
+                    _muted = false;
+                    _held = false;
+                    UpdateInCallButtonIcons();
+                    _callInProgress = false;
+                    _callConnected = false;
+                    StopCallTimer();
+                    ClearDialpadAfterCall();
+                    SetPresenceDisplay(_userSelectedPresence);
+                }
+                return;
+            }
 
-        if (transferWindow.ShowDialog() != true)
-        {
-            return;
+            var favorites = _config.ShowFavouriteExtensionsOnTransfer ? _contacts.Where(c => c.IsFavorite) : null;
+            var transferWindow = new TransferCallWindow(DestinationTextBox.Text, favorites)
+            {
+                Owner = this
+            };
+
+            if (transferWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            var target = NormalizeDialDestination(transferWindow.TransferTarget);
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                FooterStatusText.Text = "Enter a number to transfer to.";
+                return;
+            }
+
+            var result = transferWindow.AssistedTransfer
+                ? await _sipRegistrationService.ConsultativeTransferAsync(target)
+                : await _sipRegistrationService.TransferAsync(target);
+            FooterStatusText.Text = result.Message;
+            if (result.Signalled && transferWindow.AssistedTransfer)
+            {
+                UpdateInCallButtonIcons();
+                NoticeText.Text = "Assisted transfer in progress.";
+                FooterStatusText.Text = "Speak to the third party, then press Transfer again to complete.";
+                UpdateCallControls();
+            }
+            else if (result.Signalled)
+            {
+                _muted = false;
+                _held = false;
+                UpdateInCallButtonIcons();
+                _callInProgress = false;
+                _callConnected = false;
+                StopCallTimer();
+                ClearDialpadAfterCall();
+                SetPresenceDisplay(_userSelectedPresence);
+                UpdateCallControls();
+            }
         }
-
-        var target = NormalizeDialDestination(transferWindow.TransferTarget);
-        if (string.IsNullOrWhiteSpace(target))
+        catch (Exception error)
         {
-            FooterStatusText.Text = "Enter a number to transfer to.";
-            return;
+            DebugLog.Write($"UI transfer failed error={error}");
+            FooterStatusText.Text = "Transfer failed. Check debug.log for details.";
         }
-
-        var result = await _sipRegistrationService.TransferAsync(target);
-        FooterStatusText.Text = result.Message;
-        if (result.Signalled)
+        finally
         {
-            _muted = false;
-            _held = false;
-            MuteButton.Content = "Mute";
-            HoldButton.Content = "Hold";
-            _callInProgress = false;
-            _callConnected = false;
-            StopCallTimer();
-            ClearDialpadAfterCall();
             UpdateCallControls();
         }
     }
@@ -2794,8 +2894,7 @@ public partial class MainWindow : Window
         _held = false;
         _sipRegistrationService.SetMuted(false);
         _sipRegistrationService.SetHeldLocal(false);
-        MuteButton.Content = "Mute";
-        HoldButton.Content = "Hold";
+        UpdateInCallButtonIcons();
 
         StopCallTimer();
         ClearDialpadAfterCall();

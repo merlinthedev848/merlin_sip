@@ -9,9 +9,9 @@ public sealed class AudioFrameQueue
 
 	private readonly Queue<short[]> _queue = new Queue<short[]>();
 
-	private const int TargetFrames = 4;
+	private const int TargetFrames = 6;
 
-	private const int MaxFrames = 14;
+	private const int MaxFrames = 18;
 
 	private bool _started;
 

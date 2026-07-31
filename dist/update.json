@@ -1,5 +1,5 @@
 {
   "Version": "1.2.0",
   "DownloadUrl": "https://updates.chriskendall.media/merlin-sip/releases/MerlinSIP-1.2.0-x64-faststart.msi",
-  "Notes": "Release 1.2.0: Restored missing SIP registration & merging logic, fixed UI layout crashes on control disabled state, updated dropdown styling, and swapped placeholder gold logos for CK Media branding."
+  "Notes": "Release 1.2.0: Updated Merlin SIP for .NET 10 with improved SIP registration resilience, call state recovery, two-way audio stability, diagnostics, professional UI text, refreshed ringtones, icon-based in-call controls, and blind plus assisted transfer support."
 }

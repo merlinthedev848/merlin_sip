@@ -7,6 +7,7 @@ public partial class TransferCallWindow : Window
 {
     private string _transferTarget = "";
     public string TransferTarget => _transferTarget;
+    public bool AssistedTransfer => AssistedTransferRadio.IsChecked == true;
 
     public TransferCallWindow(string currentTarget = "", System.Collections.Generic.IEnumerable<Models.ContactEntry>? favorites = null)
     {
@@ -20,12 +21,12 @@ public partial class TransferCallWindow : Window
         {
             FavoritesListView.ItemsSource = favList;
             FavoritesPanel.Visibility = Visibility.Visible;
-            Height = 440;
+            Height = 498;
         }
         else
         {
             FavoritesPanel.Visibility = Visibility.Collapsed;
-            Height = 260;
+            Height = 318;
         }
     }
 
