@@ -760,8 +760,11 @@ public sealed class SipRegistrationService : IDisposable
                 DebugLog.Write($"SEND INCOMING REJECT callId={_pendingIncomingCall.CallId}");
             }
             _pendingIncomingCall = null;
-            _audioSession?.Dispose();
-            _audioSession = null;
+            if (_activeCall is null)
+            {
+                _audioSession?.Dispose();
+                _audioSession = null;
+            }
             QueueRegistrationRefresh("incoming call rejected");
             return new SipCallResult(true, "Incoming call declined.");
         }
@@ -775,7 +778,7 @@ public sealed class SipRegistrationService : IDisposable
             ? BuildBye(_activeCall)
             : BuildCancel(_activeCall);
 
-        _audioSession?.Dispose();
+        var audioSession = _audioSession;
         _audioSession = null;
         var payload = Encoding.UTF8.GetBytes(message);
         var method = _activeCall.Established ? "BYE" : "CANCEL";
@@ -790,6 +793,7 @@ public sealed class SipRegistrationService : IDisposable
             return new SipCallResult(false, $"Unable to end call: {error.Message}");
         }
         _activeCall = null;
+        DisposeAudioSessionInBackground(audioSession, "local hangup");
         QueueRegistrationRefresh("local hangup");
         return new SipCallResult(true, "Call ended.");
     }
@@ -1010,6 +1014,27 @@ public sealed class SipRegistrationService : IDisposable
         await SendToServerAsync(payload, cancellationToken);
     }
 
+    private static void DisposeAudioSessionInBackground(RtpAudioSession? audioSession, string reason)
+    {
+        if (audioSession is null)
+        {
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                audioSession.Dispose();
+                DebugLog.Write($"RTP disposed reason={reason}");
+            }
+            catch (Exception error)
+            {
+                DebugLog.Write($"RTP dispose failed reason={reason} error={error.Message}");
+            }
+        });
+    }
+
     public void Dispose()
     {
         DisposeClient();
@@ -1128,7 +1153,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private string BuildInvite(string target, string callId, string localTag, int cseq, string branch, string? authorization)
     {
-        var codecs = _config?.PreferredCodecs ?? "0 8";
+        var codecs = GetSupportedAudioPayloads(_config?.PreferredCodecs);
         var sdp = string.Join("\r\n", [
             "v=0",
             $"o=CKMediaServices 0 0 IN IP4 {_localAddress}",
@@ -1140,6 +1165,7 @@ public sealed class SipRegistrationService : IDisposable
             "a=rtpmap:8 PCMA/8000",
             "a=rtpmap:101 telephone-event/8000",
             "a=fmtp:101 0-16",
+            "a=ptime:20",
             "a=sendrecv"
         ]) + "\r\n";
 
@@ -1214,7 +1240,7 @@ public sealed class SipRegistrationService : IDisposable
     private string BuildReInvite(ActiveCall call, int cseq, string branch, bool held, string? authorization)
     {
         var direction = held ? "sendonly" : "sendrecv";
-        var codecs = _config?.PreferredCodecs ?? "0 8";
+        var codecs = GetSupportedAudioPayloads(_config?.PreferredCodecs);
         var sdp = string.Join("\r\n", [
             "v=0",
             $"o=CKMediaServices 0 0 IN IP4 {_localAddress}",
@@ -1226,6 +1252,7 @@ public sealed class SipRegistrationService : IDisposable
             "a=rtpmap:8 PCMA/8000",
             "a=rtpmap:101 telephone-event/8000",
             "a=fmtp:101 0-16",
+            "a=ptime:20",
             $"a={direction}"
         ]) + "\r\n";
 
@@ -1260,6 +1287,42 @@ public sealed class SipRegistrationService : IDisposable
         }
 
         return string.Join("\r\n", lines);
+    }
+
+    private static string GetSupportedAudioPayloads(string? preferredCodecs)
+    {
+        var payloads = new List<string>();
+        var tokens = (preferredCodecs ?? "")
+            .Split([',', ' ', ';', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var token in tokens)
+        {
+            var payload = token.ToUpperInvariant() switch
+            {
+                "PCMU" or "ULAW" or "MU-LAW" or "0" => "0",
+                "PCMA" or "ALAW" or "A-LAW" or "8" => "8",
+                _ => ""
+            };
+
+            if (payload.Length > 0 && !payloads.Contains(payload))
+            {
+                payloads.Add(payload);
+            }
+        }
+
+        if (payloads.Count == 0)
+        {
+            payloads.Add("0");
+            payloads.Add("8");
+        }
+
+        if (payloads.Contains("0") && payloads.Contains("8"))
+        {
+            payloads.Remove("0");
+            payloads.Insert(0, "0");
+        }
+
+        return string.Join(' ', payloads);
     }
 
     private string BuildCancel(ActiveCall call)
@@ -2109,6 +2172,13 @@ public sealed class SipRegistrationService : IDisposable
         var from = headers.GetValueOrDefault("from", "Unknown caller");
         var localTag = Guid.NewGuid().ToString("N")[..12];
 
+        if (_activeCall is not null || _pendingIncomingCall is not null)
+        {
+            await SendSimpleResponseAsync(message, remoteEndPoint, 486, "Busy Here", cancellationToken, localTag);
+            DebugLog.Write($"RECV INVITE rejected busy callId={callId} active={_activeCall?.CallId} pending={_pendingIncomingCall?.CallId}");
+            return;
+        }
+
         if (_rejectIncomingCalls)
         {
             var mobileNumber = _config?.MobileNumber;
@@ -2583,7 +2653,83 @@ public sealed class SipRegistrationService : IDisposable
             }
         }
 
+        if (ShouldUseConfiguredMediaHost(address))
+        {
+            DebugLog.Write($"RTP media address fallback sdp={address} host={_config!.Server}");
+            address = _config.Server;
+        }
+
         return port > 0 && !string.IsNullOrWhiteSpace(address);
+    }
+
+    private bool ShouldUseConfiguredMediaHost(string address)
+    {
+        if (_config is null || string.IsNullOrWhiteSpace(_config.Server) || !IPAddress.TryParse(address, out var mediaAddress))
+        {
+            return false;
+        }
+
+        if (!IsPrivateAddress(mediaAddress) || LocalNetworkCanReach(mediaAddress))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool LocalNetworkCanReach(IPAddress mediaAddress)
+    {
+        foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (networkInterface.OperationalStatus != OperationalStatus.Up)
+            {
+                continue;
+            }
+
+            foreach (var unicast in networkInterface.GetIPProperties().UnicastAddresses)
+            {
+                var localAddress = unicast.Address;
+                if (localAddress.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(localAddress))
+                {
+                    continue;
+                }
+
+                if (IsSamePrivateNetwork(localAddress, mediaAddress))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSamePrivateNetwork(IPAddress localAddress, IPAddress mediaAddress)
+    {
+        var local = localAddress.GetAddressBytes();
+        var media = mediaAddress.GetAddressBytes();
+
+        if (local[0] == 10 && media[0] == 10)
+        {
+            return true;
+        }
+
+        if (local[0] == 192 && local[1] == 168 && media[0] == 192 && media[1] == 168)
+        {
+            return true;
+        }
+
+        return local[0] == 172 && media[0] == 172 &&
+               local[1] >= 16 && local[1] <= 31 &&
+               media[1] >= 16 && media[1] <= 31;
+    }
+
+    private static bool IsPrivateAddress(IPAddress address)
+    {
+        var bytes = address.GetAddressBytes();
+        return bytes[0] == 10 ||
+               (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+               (bytes[0] == 192 && bytes[1] == 168);
     }
 
     private static string Md5(string value)

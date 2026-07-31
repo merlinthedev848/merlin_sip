@@ -42,6 +42,8 @@ public sealed class RtpAudioSession : IDisposable
 
 	private readonly object _buffersSync = new object();
 
+	private readonly object _micSync = new object();
+
 	private nint _waveIn;
 
 	private nint _waveOut;
@@ -53,6 +55,8 @@ public sealed class RtpAudioSession : IDisposable
 	private CancellationTokenSource? _receiveCancellation;
 
 	private CancellationTokenSource? _secondaryReceiveCancellation;
+
+	private CancellationTokenSource? _audioPumpCancellation;
 
 	private ushort _sequence;
 
@@ -94,6 +98,8 @@ public sealed class RtpAudioSession : IDisposable
 
 	private readonly short[] _micSampleBuffer = new short[2048];
 
+	private readonly short[] _latestMicFrame = new short[SamplesPerPacket];
+
 	private readonly byte[] _speakerPcmBuffer = new byte[4096];
 
 	private readonly byte[] _payload1Buffer = new byte[2048];
@@ -107,6 +113,12 @@ public sealed class RtpAudioSession : IDisposable
 	private long _expectedPackets;
 
 	private ushort _lastRxSequence;
+
+	private int _nonSilentMicFrames;
+
+	private int _nonSilentInboundFrames;
+
+	private int _speakerFramesWritten;
 
 	private FileStream? _recordingStream;
 
@@ -170,10 +182,13 @@ public sealed class RtpAudioSession : IDisposable
 			_remoteEndPoint = new IPEndPoint(await ResolveRemoteAddressAsync(remoteAddress), remotePort);
 			_payloadType = payloadType;
 			_transmitMicrophone = transmitMicrophone;
+			StartAudioPump();
 			if (transmitMicrophone && _waveIn != IntPtr.Zero)
 			{
-				WinMm.waveInStart(_waveIn);
+				var result = WinMm.waveInStart(_waveIn);
+				DebugLog.Write($"RTP microphone start existing result={result}");
 			}
+			DebugLog.Write($"RTP restart remote={_remoteEndPoint} payload={payloadType} transmit={transmitMicrophone}");
 			return;
 		}
 		_remoteEndPoint = new IPEndPoint(await ResolveRemoteAddressAsync(remoteAddress), remotePort);
@@ -183,10 +198,13 @@ public sealed class RtpAudioSession : IDisposable
 		_running = true;
 		_receiveCancellation = new CancellationTokenSource();
 		Task.Run(() => ReceiveLoopAsync(_rtpClient, _call1RxQueue, _receiveCancellation.Token, isSecondary: false));
+		StartAudioPump();
 		if (transmitMicrophone && _waveIn != IntPtr.Zero)
 		{
-			WinMm.waveInStart(_waveIn);
+			var result = WinMm.waveInStart(_waveIn);
+			DebugLog.Write($"RTP microphone start result={result}");
 		}
+		DebugLog.Write($"RTP start remote={_remoteEndPoint} payload={payloadType} transmit={transmitMicrophone}");
 	}
 
 	public async Task StartSecondaryAsync(string remoteAddress, int remotePort, int payloadType)
@@ -257,6 +275,7 @@ public sealed class RtpAudioSession : IDisposable
 		StopSecondary();
 		_running = false;
 		_receiveCancellation?.Cancel();
+		StopAudioPump();
 		_call1RxQueue.Clear();
 		DebugLog.Write("RTP stop");
 		if (_waveIn != IntPtr.Zero)
@@ -466,110 +485,43 @@ public sealed class RtpAudioSession : IDisposable
 		{
 			throw new InvalidOperationException($"Unable to open speaker device: {num}");
 		}
+		DebugLog.Write($"RTP speaker opened device={_outputDevice.Name}");
 	}
 
 	private void WaveInCallback(nint waveIn, uint message, nint instance, nint headerPointer, nint reserved)
 	{
 		try
 		{
-			if (message != 960 || !_running || _remoteEndPoint == null || _waveIn == IntPtr.Zero)
+			if (message != 960 || _waveIn == IntPtr.Zero)
 			{
 				return;
 			}
 			WaveHeader waveHeader = Marshal.PtrToStructure<WaveHeader>(headerPointer);
-			if (waveHeader.BytesRecorded <= 0)
+			if (waveHeader.BytesRecorded > 0)
 			{
-				lock (_buffersSync)
+				int bytes = Math.Min(waveHeader.BytesRecorded, SamplesPerPacket * 2);
+				Marshal.Copy(waveHeader.Data, _rawPcmBuffer, 0, bytes);
+				int samples = bytes / 2;
+				float peak = 0f;
+				lock (_micSync)
 				{
-					if (_waveIn != IntPtr.Zero)
+					Array.Clear(_latestMicFrame);
+					for (int i = 0; i < samples; i++)
 					{
-						WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
-					}
-					return;
-				}
-			}
-			if (!_transmitMicrophone || (_call1Held && !_secondaryRunning) || (_call1Held && _call2Held))
-			{
-				lock (_buffersSync)
-				{
-					if (_waveIn != IntPtr.Zero)
-					{
-						WinMm.waveInAddBuffer(_waveIn, headerPointer, Marshal.SizeOf<WaveHeader>());
-					}
-					return;
-				}
-			}
-			int num = Math.Min(waveHeader.BytesRecorded, _rawPcmBuffer.Length);
-			Marshal.Copy(waveHeader.Data, _rawPcmBuffer, 0, num);
-			int num2 = num / 2;
-			float num3 = 0f;
-			for (int i = 0; i < num2; i++)
-			{
-				short sample = BitConverter.ToInt16(_rawPcmBuffer, i * 2);
-				short num4 = (short)((!_muted) ? ApplyGain(sample, _inputGain) : 0);
-				_micSampleBuffer[i] = num4;
-				float num5 = (float)Math.Abs(num4) / 32768f;
-				if (num5 > num3)
-				{
-					num3 = num5;
-				}
-			}
-			CurrentMicLevel = num3;
-			short[] array = (_call1Held ? AudioFrameQueue.GetSilenceFrame(num2) : _call1RxQueue.DequeueOrSilence(num2));
-			short[] array2 = ((!_secondaryRunning || _call2Held) ? AudioFrameQueue.GetSilenceFrame(num2) : _call2RxQueue.DequeueOrSilence(num2));
-			if (IsRecording)
-			{
-				lock (_recordingSync)
-				{
-					if (_recordingWriter != null)
-					{
-						for (int j = 0; j < num2; j++)
+						short sample = BitConverter.ToInt16(_rawPcmBuffer, i * 2);
+						short adjusted = (short)((!_muted) ? ApplyGain(sample, _inputGain) : 0);
+						_latestMicFrame[i] = adjusted;
+						float level = (float)Math.Abs(adjusted) / 32768f;
+						if (level > peak)
 						{
-							short value = _micSampleBuffer[j];
-							short value2 = (short)Math.Clamp(array[j] + array2[j], -32768, 32767);
-							_recordingWriter.Write(value);
-							_recordingWriter.Write(value2);
-							_recordedDataBytes += 4;
+							peak = level;
 						}
 					}
 				}
-			}
-			int length = num2 * 2;
-			for (int k = 0; k < num2; k++)
-			{
-				short sample2 = (short)Math.Clamp(array[k] + array2[k], -32768, 32767);
-				sample2 = ApplyGain(sample2, _outputGain);
-				_speakerPcmBuffer[k * 2] = (byte)(sample2 & 0xFF);
-				_speakerPcmBuffer[k * 2 + 1] = (byte)((sample2 >> 8) & 0xFF);
-			}
-			PlayPcmBuffer(_speakerPcmBuffer, length);
-			if (_running && !_call1Held && _remoteEndPoint != null)
-			{
-				for (int l = 0; l < num2; l++)
+				CurrentMicLevel = peak;
+				if (peak > 0.02f && Interlocked.Exchange(ref _nonSilentMicFrames, 1) == 0)
 				{
-					short sample3 = (_conferenceMerged ? ((short)Math.Clamp(_micSampleBuffer[l] + array2[l], -32768, 32767)) : _micSampleBuffer[l]);
-					_payload1Buffer[l] = ((_payloadType == 8) ? G711Codec.LinearToALaw(sample3) : G711Codec.LinearToMuLaw(sample3));
-				}
-				lock (_sendSync)
-				{
-					byte[] array3 = BuildRtpPacketSegment(_payload1Buffer, num2, _payloadType, _timestamp, marker: false, _ssrc, ref _sequence);
-					_rtpClient.Send(array3, array3.Length, _remoteEndPoint);
-					_timestamp += (uint)num2;
-					Interlocked.Increment(ref _sentPackets);
-				}
-			}
-			if (_secondaryRunning && !_call2Held && _secondaryRemoteEndPoint != null && _secondaryRtpClient != null)
-			{
-				for (int m = 0; m < num2; m++)
-				{
-					short sample4 = (_conferenceMerged ? ((short)Math.Clamp(_micSampleBuffer[m] + array[m], -32768, 32767)) : _micSampleBuffer[m]);
-					_payload2Buffer[m] = ((_secondaryPayloadType == 8) ? G711Codec.LinearToALaw(sample4) : G711Codec.LinearToMuLaw(sample4));
-				}
-				lock (_secondarySendSync)
-				{
-					byte[] array4 = BuildRtpPacketSegment(_payload2Buffer, num2, _secondaryPayloadType, _secondaryTimestamp, marker: false, _secondarySsrc, ref _secondarySequence);
-					_secondaryRtpClient.Send(array4, array4.Length, _secondaryRemoteEndPoint);
-					_secondaryTimestamp += (uint)num2;
+					DebugLog.Write($"RTP microphone non-silent level={peak:F3} device={_inputDevice.Name}");
 				}
 			}
 			lock (_buffersSync)
@@ -583,6 +535,156 @@ public sealed class RtpAudioSession : IDisposable
 		catch (Exception ex)
 		{
 			DebugLog.Write("WaveInCallback crash prevented: " + ex.Message);
+		}
+	}
+
+	private void StartAudioPump()
+	{
+		if (_audioPumpCancellation is not null && !_audioPumpCancellation.IsCancellationRequested)
+		{
+			return;
+		}
+
+		_audioPumpCancellation = new CancellationTokenSource();
+		var token = _audioPumpCancellation.Token;
+		_ = Task.Run(() => AudioPumpLoopAsync(token), token);
+		DebugLog.Write("RTP audio pump started");
+	}
+
+	private void StopAudioPump()
+	{
+		_audioPumpCancellation?.Cancel();
+		_audioPumpCancellation?.Dispose();
+		_audioPumpCancellation = null;
+	}
+
+	private async Task AudioPumpLoopAsync(CancellationToken cancellationToken)
+	{
+		while (!cancellationToken.IsCancellationRequested)
+		{
+			try
+			{
+				PumpAudioFrame();
+				await Task.Delay(20, cancellationToken);
+			}
+			catch (OperationCanceledException)
+			{
+				break;
+			}
+			catch (Exception error)
+			{
+				DebugLog.Write($"RTP audio pump error: {error.Message}");
+				await Task.Delay(20, cancellationToken);
+			}
+		}
+	}
+
+	private void PumpAudioFrame()
+	{
+		var micFrame = new short[SamplesPerPacket];
+		lock (_micSync)
+		{
+			Array.Copy(_latestMicFrame, micFrame, SamplesPerPacket);
+		}
+
+		var call1Frame = _call1Held ? AudioFrameQueue.GetSilenceFrame(SamplesPerPacket) : _call1RxQueue.DequeueOrSilence(SamplesPerPacket);
+		var call2Frame = (!_secondaryRunning || _call2Held) ? AudioFrameQueue.GetSilenceFrame(SamplesPerPacket) : _call2RxQueue.DequeueOrSilence(SamplesPerPacket);
+		RecordFrameIfNeeded(micFrame, call1Frame, call2Frame);
+		PlayMixedFrame(call1Frame, call2Frame);
+		SendPrimaryFrame(micFrame, call2Frame);
+		SendSecondaryFrame(micFrame, call1Frame);
+	}
+
+	private void RecordFrameIfNeeded(short[] micFrame, short[] call1Frame, short[] call2Frame)
+	{
+		if (!IsRecording)
+		{
+			return;
+		}
+
+		lock (_recordingSync)
+		{
+			if (_recordingWriter == null)
+			{
+				return;
+			}
+
+			for (int i = 0; i < SamplesPerPacket; i++)
+			{
+				short received = (short)Math.Clamp(call1Frame[i] + call2Frame[i], -32768, 32767);
+				_recordingWriter.Write(micFrame[i]);
+				_recordingWriter.Write(received);
+				_recordedDataBytes += 4;
+			}
+		}
+	}
+
+	private void PlayMixedFrame(short[] call1Frame, short[] call2Frame)
+	{
+		var peak = 0;
+		for (int i = 0; i < SamplesPerPacket; i++)
+		{
+			short sample = (short)Math.Clamp(call1Frame[i] + call2Frame[i], -32768, 32767);
+			sample = ApplyGain(sample, _outputGain);
+			var level = Math.Abs(sample);
+			if (level > peak)
+			{
+				peak = level;
+			}
+			_speakerPcmBuffer[i * 2] = (byte)(sample & 0xFF);
+			_speakerPcmBuffer[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
+		}
+		if (peak > 400 && Interlocked.Exchange(ref _speakerFramesWritten, 1) == 0)
+		{
+			DebugLog.Write($"RTP speaker non-silent peak={peak} device={_outputDevice.Name}");
+		}
+		PlayPcmBuffer(_speakerPcmBuffer, SamplesPerPacket * 2);
+	}
+
+	private void SendPrimaryFrame(short[] micFrame, short[] call2Frame)
+	{
+		if (!_running || _call1Held || _remoteEndPoint == null)
+		{
+			return;
+		}
+
+		for (int i = 0; i < SamplesPerPacket; i++)
+		{
+			short sample = _conferenceMerged ? (short)Math.Clamp(micFrame[i] + call2Frame[i], -32768, 32767) : micFrame[i];
+			_payload1Buffer[i] = (_payloadType == 8) ? G711Codec.LinearToALaw(sample) : G711Codec.LinearToMuLaw(sample);
+		}
+
+		lock (_sendSync)
+		{
+			byte[] packet = BuildRtpPacketSegment(_payload1Buffer, SamplesPerPacket, _payloadType, _timestamp, marker: false, _ssrc, ref _sequence);
+			_rtpClient.Send(packet, packet.Length, _remoteEndPoint);
+			_timestamp += SamplesPerPacket;
+			var sent = Interlocked.Increment(ref _sentPackets);
+			if (sent == 1)
+			{
+				DebugLog.Write($"RTP first outbound packet remote={_remoteEndPoint} payload={_payloadType}");
+			}
+		}
+	}
+
+	private void SendSecondaryFrame(short[] micFrame, short[] call1Frame)
+	{
+		if (!_secondaryRunning || _call2Held || _secondaryRemoteEndPoint == null || _secondaryRtpClient == null)
+		{
+			return;
+		}
+
+		for (int i = 0; i < SamplesPerPacket; i++)
+		{
+			short sample = _conferenceMerged ? (short)Math.Clamp(micFrame[i] + call1Frame[i], -32768, 32767) : micFrame[i];
+			_payload2Buffer[i] = (_secondaryPayloadType == 8) ? G711Codec.LinearToALaw(sample) : G711Codec.LinearToMuLaw(sample);
+		}
+
+		lock (_secondarySendSync)
+		{
+			byte[] packet = BuildRtpPacketSegment(_payload2Buffer, SamplesPerPacket, _secondaryPayloadType, _secondaryTimestamp, marker: false, _secondarySsrc, ref _secondarySequence);
+			_secondaryRtpClient.Send(packet, packet.Length, _secondaryRemoteEndPoint);
+			_secondaryTimestamp += SamplesPerPacket;
 		}
 	}
 
@@ -635,7 +737,7 @@ public sealed class RtpAudioSession : IDisposable
 				{
 					continue;
 				}
-				Interlocked.Increment(ref _receivedPackets);
+				var received = Volatile.Read(in _receivedPackets);
 				ushort num = (ushort)((udpReceiveResult.Buffer[2] << 8) | udpReceiveResult.Buffer[3]);
 				if (_lastRxSequence > 0)
 				{
@@ -654,12 +756,13 @@ public sealed class RtpAudioSession : IDisposable
 					Interlocked.Increment(ref _expectedPackets);
 				}
 				_lastRxSequence = num;
-				if (!isSecondary && Volatile.Read(in _receivedPackets) == 0)
+				if (!isSecondary && received == 0)
 				{
 					IPEndPoint remoteEndPoint = udpReceiveResult.RemoteEndPoint;
 					if (remoteEndPoint != null && (_remoteEndPoint == null || !remoteEndPoint.Equals(_remoteEndPoint)))
 					{
 						_remoteEndPoint = remoteEndPoint;
+						DebugLog.Write($"RTP learned remote source={remoteEndPoint}");
 					}
 				}
 				int num3 = udpReceiveResult.Buffer[1] & 0x7F;
@@ -667,19 +770,37 @@ public sealed class RtpAudioSession : IDisposable
 				{
 					continue;
 				}
-				int num4 = 12 + (udpReceiveResult.Buffer[0] & 0xF) * 4;
-				if (udpReceiveResult.Buffer.Length > num4)
+				if (!TryGetRtpPayloadOffset(udpReceiveResult.Buffer, out var payloadOffset))
 				{
-					byte[] subArray = udpReceiveResult.Buffer[num4..];
+					continue;
+				}
+				if (udpReceiveResult.Buffer.Length > payloadOffset)
+				{
+					byte[] subArray = udpReceiveResult.Buffer[payloadOffset..];
 					short[] array = new short[subArray.Length];
+					var peak = 0;
 					for (int i = 0; i < subArray.Length; i++)
 					{
 						array[i] = ((num3 == 8) ? G711Codec.ALawToLinear(subArray[i]) : G711Codec.MuLawToLinear(subArray[i]));
+						var level = Math.Abs(array[i]);
+						if (level > peak)
+						{
+							peak = level;
+						}
 					}
 					rxQueue.Enqueue(array);
 					if (!isSecondary)
 					{
-						Interlocked.Increment(ref _receivedPackets);
+						received = Interlocked.Increment(ref _receivedPackets);
+						if (received == 1)
+						{
+							var extension = (udpReceiveResult.Buffer[0] & 0x10) != 0;
+							DebugLog.Write($"RTP first inbound packet remote={udpReceiveResult.RemoteEndPoint} payload={num3} bytes={udpReceiveResult.Buffer.Length} offset={payloadOffset} ext={extension} peak={peak}");
+						}
+						if (peak > 400 && Interlocked.Exchange(ref _nonSilentInboundFrames, 1) == 0)
+						{
+							DebugLog.Write($"RTP inbound non-silent peak={peak} remote={udpReceiveResult.RemoteEndPoint} payload={num3}");
+						}
 					}
 				}
 			}
@@ -692,6 +813,37 @@ public sealed class RtpAudioSession : IDisposable
 				DebugLog.Write($"RTP receive error (secondary={isSecondary}): {ex2.Message}");
 			}
 		}
+	}
+
+	private static bool TryGetRtpPayloadOffset(byte[] packet, out int payloadOffset)
+	{
+		payloadOffset = 0;
+		if (packet.Length < 12)
+		{
+			return false;
+		}
+
+		var csrcCount = packet[0] & 0x0F;
+		payloadOffset = 12 + csrcCount * 4;
+		if (packet.Length < payloadOffset)
+		{
+			return false;
+		}
+
+		var hasExtension = (packet[0] & 0x10) != 0;
+		if (!hasExtension)
+		{
+			return true;
+		}
+
+		if (packet.Length < payloadOffset + 4)
+		{
+			return false;
+		}
+
+		var extensionLengthWords = (packet[payloadOffset + 2] << 8) | packet[payloadOffset + 3];
+		payloadOffset += 4 + extensionLengthWords * 4;
+		return packet.Length >= payloadOffset;
 	}
 
 	private static async Task<IPAddress> ResolveRemoteAddressAsync(string remoteAddress)

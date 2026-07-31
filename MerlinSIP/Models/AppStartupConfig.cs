@@ -44,7 +44,7 @@ public sealed record AppStartupConfig(
     int RegistrationExpiry = 3600,
     int HeartbeatInterval = 30,
     int LocalSipPort = 5060,
-    string PreferredCodecs = "PCMA,PCMU,G722",
+    string PreferredCodecs = "PCMU,PCMA",
     bool IgnoreSslErrors = false)
 {
     public const string FixedSipServer = "pbx.chriskendall.media";

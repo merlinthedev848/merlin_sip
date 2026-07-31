@@ -103,7 +103,7 @@ public sealed class AppCacheService
             settings.RegistrationExpiry ?? 3600,
             settings.HeartbeatInterval ?? 30,
             settings.LocalSipPort ?? 5060,
-            settings.PreferredCodecs ?? "PCMA,PCMU,G722",
+            settings.PreferredCodecs ?? "PCMU,PCMA",
             settings.IgnoreSslErrors ?? false).WithFixedSipEndpoint();
     }
 
